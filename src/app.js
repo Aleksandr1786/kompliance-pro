@@ -269,7 +269,7 @@ async function renderClientCard(id) {
 
     <div class="tab-panel" id="tab-ot">
       <div class="panel">
-        <div class="panel-head"><span>🦺</span><div class="panel-title">Документы — Охрана труда</div><div class="panel-count">${otDocs.length} шт.</div></div>
+        <div class="panel-head"><span>🦺</span><div class="panel-title">Документы — Охрана труда</div><div class="panel-count">${otDocs.length} шт.</div><button class="btn btn-primary" style="margin-left:auto;padding:6px 12px;font-size:11px" onclick="generateDocs(${id})">⚡ Сгенерировать</button></div>
         <div>${otDocs.length ? otDocs.map(d=>renderDocRow(d)).join('') : renderEmptyDocs('ОТ', id)}</div>
       </div>
     </div>
@@ -317,22 +317,12 @@ function renderDocRow(d) {
 }
 
 function renderEmptyDocs(mod, clientId) {
-  if (mod === 'ОТ') {
-    return '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Документов пока нет</div><div class="empty-sub">Нажмите кнопку — система сгенерирует пакет документов по охране труда</div><button class="btn btn-primary" style="margin-top:8px" onclick="generateDocs(' + clientId + ')">⚡ Сгенерировать пакет ОТ</button></div>';
-  }
-  return '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Документов нет</div><div class="empty-sub">Модуль ' + mod + ' — документы появятся здесь после генерации</div></div>';
-}
-
-async function generateDocs(clientId) {
-  showToast('Генерирую документы...');
-  const result = await window.api.docsGenerate(clientId);
-  if (!result.ok) {
-    showToast('Ошибка: ' + result.error, 'var(--red)');
-    return;
-  }
-  const ok = result.results.filter(function(r) { return r.status === 'ok'; }).length;
-  showToast('Готово! Создано ' + ok + ' документов');
-  setTimeout(function() { navigate('client', clientId); }, 1500);
+  return `<div class="empty-state">
+    <div class="empty-icon">📄</div>
+    <div class="empty-title">Документов нет</div>
+    <div class="empty-sub">Документы по модулю ${mod} появятся здесь после генерации</div>
+    <button class="btn btn-primary" style="margin-top:8px" onclick="showToast('Генерация документов будет доступна после подключения AI')">⚡ Сгенерировать</button>
+  </div>`;
 }
 
 function renderEmpRow(e) {

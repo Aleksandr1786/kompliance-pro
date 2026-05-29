@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<title>КомплаенсПро</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">Комплаенс<span>Про</span></div>
+    <div class="logo-sub">Аутсорс-платформа</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Главное</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon">⊞</span> Дашборд</div>
+    <div class="nav-item" data-page="clients"><span class="nav-icon">🏢</span> Клиенты <span class="nav-badge green" id="badge-clients">0</span></div>
+    <div class="nav-item" data-page="tasks"><span class="nav-icon">📋</span> Задачи <span class="nav-badge amber" id="badge-tasks">0</span></div>
+    <div class="nav-section">Модули</div>
+    <div class="nav-item" data-page="ot"><span class="nav-icon">🦺</span> Охрана труда</div>
+    <div class="nav-item" data-page="pd"><span class="nav-icon">🔒</span> Персданные</div>
+    <div class="nav-item" data-page="vu"><span class="nav-icon">⚔️</span> Воинский учёт</div>
+    <div class="nav-section">Система</div>
+    <div class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Настройки</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-block">
+      <div class="user-avatar" id="userAvatar">АС</div>
+      <div><div class="user-name" id="userName">А. Свинцов</div><div class="user-role" id="userRole">Специалист по ОТ</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbarTitle">Дашборд</div>
+    <div class="topbar-right">
+      <div class="ai-status"><div class="ai-dot"></div><span id="aiStatusText">Базовый режим</span></div>
+      <button class="btn btn-primary" id="topbarAction" style="display:none"></button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<!-- МОДАЛ: ДОБАВИТЬ КЛИЕНТА -->
+<div class="modal-overlay" id="modalAddClient">
+  <div class="modal">
+    <div class="modal-title">🏢 Добавить клиента</div>
+    <div class="modal-sub">Система определит пакет документов по ОКВЭД автоматически</div>
+    <div class="form-row">
+      <div class="form-group full">
+        <div class="form-label">Название <span class="req">*</span></div>
+        <input class="form-input" id="c-name" placeholder="ООО Название / ИП Фамилия И.О.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">ИНН</div>
+        <input class="form-input" id="c-inn" placeholder="7700000000">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Форма</div>
+        <select class="form-select" id="c-form">
+          <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">ОКВЭД <span class="req">*</span></div>
+        <input class="form-input" id="c-okved" placeholder="26.20">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Сотрудников</div>
+        <input class="form-input" id="c-staff" type="number" placeholder="25" min="1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Регион</div>
+        <select class="form-select" id="c-region">
+          <option>Краснодарский край</option>
+          <option>Москва</option><option>Санкт-Петербург</option>
+          <option>Московская область</option><option>Ростовская область</option>
+          <option>Ставропольский край</option><option>Другой регион</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Телефон</div>
+        <input class="form-input" id="c-phone" placeholder="+7 000 000-00-00">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:4px">
+      <div class="form-label">Модули</div>
+      <div class="modules-check">
+        <div class="module-pill checked" data-module="OT" onclick="togglePill(this)">🦺 Охрана труда</div>
+        <div class="module-pill checked" data-module="PD" onclick="togglePill(this)">🔒 Персданные</div>
+        <div class="module-pill" data-module="VU" onclick="togglePill(this)">⚔️ Воинский учёт</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddClient')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitAddClient()">Добавить →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ТОСТ -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

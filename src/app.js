@@ -215,6 +215,18 @@ async function renderClientCard(id) {
   btn.className = 'btn btn-ghost';
   btn.onclick = () => { btn.className = 'btn btn-primary'; navigate('clients'); };
 
+  // Add edit button
+  const editBtn = document.getElementById('topbarEdit') || (() => {
+    const b = document.createElement('button');
+    b.id = 'topbarEdit';
+    b.className = 'btn btn-ghost';
+    b.textContent = '✏️ Редактировать';
+    document.getElementById('topbarAction').after(b);
+    return b;
+  })();
+  editBtn.style.display = 'flex';
+  editBtn.onclick = () => openEditModal(clientId);
+
   const otDocs = docs.filter(d => d.module === 'OT');
   const pdDocs = docs.filter(d => d.module === 'PD');
   const vuDocs = docs.filter(d => d.module === 'VU');
@@ -635,6 +647,126 @@ function formatDate(str) {
   if (!str) return '—';
   const d = new Date(str);
   return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' });
+}
+
+// ── РЕДАКТИРОВАНИЕ КЛИЕНТА ───────────────────────────────
+async function openEditModal(clientId) {
+  const c = await window.api.clientGet(clientId);
+  if (!c) return;
+
+  // Create edit modal dynamically
+  let modal = document.getElementById('modalEditClient');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modalEditClient';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal">
+        <div class="modal-title">✏️ Редактировать клиента</div>
+        <div class="modal-sub">Измените данные организации</div>
+        <div class="form-row">
+          <div class="form-group full"><div class="form-label">Название <span class="req">*</span></div><input class="form-input" id="e-name"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">ИНН</div><input class="form-input" id="e-inn"></div>
+          <div class="form-group"><div class="form-label">Форма</div>
+            <select class="form-select" id="e-form">
+              <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">ОКВЭД <span class="req">*</span></div><input class="form-input" id="e-okved"></div>
+          <div class="form-group"><div class="form-label">Сотрудников</div><input class="form-input" id="e-staff" type="number"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Регион</div>
+            <select class="form-select" id="e-region">
+              <option>Краснодарский край</option><option>Москва</option><option>Санкт-Петербург</option>
+              <option>Московская область</option><option>Ростовская область</option>
+              <option>Ставропольский край</option><option>Другой регион</option>
+            </select>
+          </div>
+          <div class="form-group"><div class="form-label">Телефон</div><input class="form-input" id="e-phone"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Должность руководителя</div>
+            <select class="form-select" id="e-manager-position">
+              <option>Индивидуальный предприниматель</option>
+              <option>Генеральный директор</option>
+              <option>Директор</option>
+              <option>Исполнительный директор</option>
+              <option>Руководитель</option>
+            </select>
+          </div>
+          <div class="form-group"><div class="form-label">ФИО руководителя</div><input class="form-input" id="e-manager-name" placeholder="Иванов Иван Иванович"></div>
+        </div>
+        <div class="form-group" style="margin-top:4px">
+          <div class="form-label">Адрес</div>
+          <input class="form-input" id="e-address" placeholder="г. Новороссийск, ул. ...">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-red" onclick="deleteClient(${clientId})">🗑 Удалить</button>
+          <button class="btn btn-ghost" onclick="closeModal('modalEditClient')">Отмена</button>
+          <button class="btn btn-primary" onclick="submitEditClient(${clientId})">💾 Сохранить</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal('modalEditClient'); });
+  }
+
+  // Fill form with current data
+  document.getElementById('e-name').value = c.name || '';
+  document.getElementById('e-inn').value = c.inn || '';
+  document.getElementById('e-okved').value = c.okved || '';
+  document.getElementById('e-staff').value = c.staff || '';
+  document.getElementById('e-phone').value = c.phone || '';
+  document.getElementById('e-address').value = c.address || '';
+  document.getElementById('e-manager-name').value = c.manager_name || '';
+
+  // Set selects
+  const formSel = document.getElementById('e-form');
+  for (let opt of formSel.options) if (opt.value === c.form) { opt.selected = true; break; }
+
+  const regionSel = document.getElementById('e-region');
+  for (let opt of regionSel.options) if (opt.value === c.region || opt.text === c.region) { opt.selected = true; break; }
+
+  const posSel = document.getElementById('e-manager-position');
+  for (let opt of posSel.options) if (opt.value === c.manager_position || opt.text === c.manager_position) { opt.selected = true; break; }
+
+  openModal('modalEditClient');
+}
+
+async function submitEditClient(clientId) {
+  const name = document.getElementById('e-name').value.trim();
+  const okved = document.getElementById('e-okved').value.trim();
+  if (!name) { showToast('Введите название', 'var(--red)'); return; }
+
+  const data = {
+    name,
+    inn:              document.getElementById('e-inn').value.trim(),
+    okved,
+    staff:            parseInt(document.getElementById('e-staff').value) || 0,
+    form:             document.getElementById('e-form').value,
+    region:           document.getElementById('e-region').value,
+    phone:            document.getElementById('e-phone').value.trim(),
+    address:          document.getElementById('e-address').value.trim(),
+    manager_name:     document.getElementById('e-manager-name').value.trim(),
+    manager_position: document.getElementById('e-manager-position').value,
+  };
+
+  await window.api.clientUpdate(clientId, data);
+  closeModal('modalEditClient');
+  showToast('Данные клиента сохранены ✓');
+  await navigate('client', clientId);
+}
+
+async function deleteClient(clientId) {
+  if (!confirm('Удалить клиента и все его данные? Это действие нельзя отменить.')) return;
+  await window.api.clientDelete(clientId);
+  closeModal('modalEditClient');
+  showToast('Клиент удалён');
+  await navigate('clients');
 }
 
 // ── ГЕНЕРАЦИЯ ДОКУМЕНТОВ ─────────────────────────────────

@@ -95,8 +95,8 @@ function utverzdayu(client) {
   return [
     rightPara('УТВЕРЖДАЮ', { bold: true }),
     rightPara(getManagerPosition(client)),
-    rightPara(getOrgDisplay(client)),
     rightPara(getManagerName(client)),
+    rightPara('__________'),
     rightPara('«___» __________ ' + new Date().getFullYear() + ' г.'),
     sp(),
   ];

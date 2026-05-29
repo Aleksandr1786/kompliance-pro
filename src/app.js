@@ -586,6 +586,8 @@ async function submitAddClient() {
     phone:  document.getElementById('c-phone')?.value?.trim() || '',
     email:  '',
     modules: mods || 'OT',
+    manager_name: document.getElementById('c-manager-name')?.value?.trim() || '',
+    manager_position: document.getElementById('c-manager-position')?.value || 'Руководитель',
     color,
     score: 0,
   };

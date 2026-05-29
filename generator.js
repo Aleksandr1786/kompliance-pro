@@ -135,9 +135,11 @@ async function genPrikazOT(client, settings, outputDir) {
     sp(),
     para(`Основание: статья 217 Трудового кодекса Российской Федерации.`),
     sp(), sp(),
-    paraNoIndent(`Руководитель: __________________ / ${settings.user_name || '_______________'} /`),
+    paraNoIndent(`Руководитель: __________________ ${settings.user_name || '______________________________'}`),
     sp(),
-    paraNoIndent(`С приказом ознакомлен(а): __________________ / _____________________ /`),
+    paraNoIndent(`С приказом ознакомлен(а):`),
+    paraNoIndent(`__________________    _____________________________`),
+    paraNoIndent(`(подпись)                    (ФИО)`),
     paraNoIndent(`Дата: «___» __________ ${new Date().getFullYear()} г.`),
   ];
   const doc = makeDoc(children, settings);
@@ -154,7 +156,7 @@ async function genPolozhenie(client, settings, outputDir) {
   const children = [
     centerPara('УТВЕРЖДАЮ', { bold: true }),
     centerPara(`Руководитель ${client.form} «${client.name.replace(/^(ООО|ИП|ЗАО|АО|МУП|ГУП|НКО)\s*/i, '')}»`),
-    centerPara(`__________________ / ${settings.user_name || '_______________'} /`),
+    centerPara(`__________________ ${settings.user_name || '______________________________'}`),
     centerPara(`«___» __________ ${new Date().getFullYear()} г.`),
     sp(),
     centerPara('ПОЛОЖЕНИЕ ОБ ОХРАНЕ ТРУДА', { bold: true, size: 28 }),
@@ -220,7 +222,7 @@ async function genProgrammaVvodnogo(client, settings, outputDir) {
   const children = [
     centerPara('УТВЕРЖДАЮ', { bold: true }),
     centerPara(`Руководитель ${client.form} «${client.name.replace(/^(ООО|ИП|ЗАО|АО|МУП|ГУП|НКО)\s*/i, '')}»`),
-    centerPara(`__________________ / ${settings.user_name || '_______________'} /`),
+    centerPara(`__________________ ${settings.user_name || '______________________________'}`),
     centerPara(`«___» __________ ${new Date().getFullYear()} г.`),
     sp(),
     centerPara('ПРОГРАММА', { bold: true, size: 28 }),
@@ -300,7 +302,7 @@ async function genZhurnalVvodnogo(client, settings, outputDir) {
   const children = [
     centerPara('УТВЕРЖДАЮ', { bold: true }),
     centerPara(`Руководитель ${client.form} «${client.name.replace(/^(ООО|ИП|ЗАО|АО|МУП|ГУП|НКО)\s*/i, '')}»`),
-    centerPara(`__________________ / ${settings.user_name || '_______________'} /`),
+    centerPara(`__________________ ${settings.user_name || '______________________________'}`),
     sp(),
     centerPara('ЖУРНАЛ', { bold: true, size: 28 }),
     centerPara('регистрации вводного инструктажа по охране труда', { bold: true }),
@@ -343,7 +345,7 @@ async function genPrikazUtv(client, settings, outputDir) {
     bullet(`Ознакомить всех работников с Положением об охране труда под подпись в течение 5 рабочих дней с момента подписания настоящего приказа.`),
     bullet(`Контроль за исполнением настоящего приказа возложить на ответственного за охрану труда — ___________________________ (ФИО).`),
     sp(), sp(),
-    paraNoIndent(`Руководитель: __________________ / ${settings.user_name || '_______________'} /`),
+    paraNoIndent(`Руководитель: __________________ ${settings.user_name || '______________________________'}`),
   ];
   const doc = makeDoc(children, settings);
   const buf = await Packer.toBuffer(doc);

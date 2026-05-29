@@ -1,17 +1,14 @@
 @echo off
-chcp 65001 > nul
 cd /d "%~dp0"
 echo.
-echo  ====================================
-echo   КомплаенсПро - Обновление
-echo  ====================================
+echo  *** KomplaensPro - Obnovlenie ***
 echo.
-echo  Шаг 1: Получаю обновления...
+echo  [1/3] Poluchayu obnovleniya...
 git pull origin master
 echo.
-echo  Шаг 2: Устанавливаю зависимости...
+echo  [2/3] Ustanavlivayu zavisimosti...
 call npm install --silent
 echo.
-echo  Шаг 3: Запускаю приложение...
+echo  [3/3] Zapuskayu prilozhenie...
 echo.
 call npm start

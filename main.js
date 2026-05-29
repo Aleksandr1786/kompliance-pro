@@ -228,7 +228,7 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
   try {
     const result = await generatePackage(client, settings, outputDir);
     // Сохраняем документы в базу
-    for (const r of result.results) {
+    for (const r of result.generated) {
       if (r.status === 'ok') {
         const existing = db.get('documents').find({ client_id: clientId, name: r.name }).value();
         if (existing) {

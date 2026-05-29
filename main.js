@@ -227,25 +227,23 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
 
   try {
     const result = await generatePackage(client, settings, outputDir);
-    // Сохраняем документы в базу
-    for (const r of result.generated) {
-      if (r.status === 'ok') {
-        const existing = db.get('documents').find({ client_id: clientId, name: r.name }).value();
-        if (existing) {
-          db.get('documents').find({ client_id: clientId, name: r.name })
-            .assign({ status: 'ok', filename: r.filename, updated_at: new Date().toISOString() }).write();
-        } else {
-          const id = Math.max(0, ...db.get('documents').value().map(d => d.id)) + 1;
-          db.get('documents').push({
-            id, client_id: clientId, module: 'OT', name: r.name,
-            filename: r.filename, status: 'ok',
-            created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-            npa_basis: 'ТК РФ, Постановление Правительства №2464', notes: ''
-          }).write();
-        }
+    // result.generated — массив строк (имена файлов), result.errors — массив ошибок
+    for (const filename of result.generated) {
+      const existing = db.get('documents').find({ client_id: clientId, filename }).value();
+      if (existing) {
+        db.get('documents').find({ client_id: clientId, filename })
+          .assign({ status: 'ok', updated_at: new Date().toISOString() }).write();
+      } else {
+        const id = Math.max(0, ...db.get('documents').value().map(d => d.id)) + 1;
+        db.get('documents').push({
+          id, client_id: clientId, module: 'OT', name: filename,
+          filename, status: 'ok',
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+          npa_basis: 'ТК РФ, Постановление Правительства №2464', notes: ''
+        }).write();
       }
     }
-    return { ok: true, results: result.results, dir: result.dir };
+    return { ok: true, generated: result.generated, errors: result.errors, dir: outputDir };
   } catch(e) {
     return { ok: false, error: e.message };
   }

@@ -216,16 +216,17 @@ async function renderClientCard(id) {
   btn.onclick = () => { btn.className = 'btn btn-primary'; navigate('clients'); };
 
   // Add edit button
-  const editBtn = document.getElementById('topbarEdit') || (() => {
-    const b = document.createElement('button');
-    b.id = 'topbarEdit';
-    b.className = 'btn btn-ghost';
-    b.textContent = '✏️ Редактировать';
-    document.getElementById('topbarAction').after(b);
-    return b;
-  })();
+  let editBtn = document.getElementById('topbarEdit');
+  if (!editBtn) {
+    editBtn = document.createElement('button');
+    editBtn.id = 'topbarEdit';
+    editBtn.className = 'btn btn-ghost';
+    editBtn.textContent = '✏️ Редактировать';
+    document.getElementById('topbarAction').after(editBtn);
+  }
   editBtn.style.display = 'flex';
-  editBtn.onclick = () => openEditModal(clientId);
+  const _cid = id;
+  editBtn.onclick = () => openEditModal(_cid);
 
   const otDocs = docs.filter(d => d.module === 'OT');
   const pdDocs = docs.filter(d => d.module === 'PD');

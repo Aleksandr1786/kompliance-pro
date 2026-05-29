@@ -222,7 +222,7 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
   const settings = db.get('settings').value();
   
   // Папка для документов рядом с базой данных
-  const outputDir = path.join(app.getPath('documents'), 'КомплаенсПро');
+  const outputDir = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
   if (!require('fs').existsSync(outputDir)) require('fs').mkdirSync(outputDir, { recursive: true });
 
   try {

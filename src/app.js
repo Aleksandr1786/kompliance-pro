@@ -778,7 +778,7 @@ async function generateDocs(clientId) {
     showToast('Ошибка: ' + result.error, 'var(--red)');
     return;
   }
-  const ok = result.results.filter(function(r) { return r.status === 'ok'; }).length;
+  const ok = result.generated.length;
   showToast('Готово! Создано ' + ok + ' документов');
   // Открываем папку
   if (result.dir) window.api.docsOpenFolder(result.dir);

@@ -634,3 +634,18 @@ function formatDate(str) {
   const d = new Date(str);
   return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' });
 }
+
+// ── ГЕНЕРАЦИЯ ДОКУМЕНТОВ ─────────────────────────────────
+async function generateDocs(clientId) {
+  showToast('Генерирую документы...');
+  const result = await window.api.docsGenerate(clientId);
+  if (!result.ok) {
+    showToast('Ошибка: ' + result.error, 'var(--red)');
+    return;
+  }
+  const ok = result.results.filter(function(r) { return r.status === 'ok'; }).length;
+  showToast('Готово! Создано ' + ok + ' документов');
+  // Открываем папку
+  if (result.dir) window.api.docsOpenFolder(result.dir);
+  setTimeout(function() { navigate('client', clientId); }, 2000);
+}

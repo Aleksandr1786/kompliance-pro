@@ -400,12 +400,12 @@ async function genZhurnalVvodnogo(client, settings, outputDir) {
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       spacing: { before: 0, after: 40 },
-      children: [new TextRun({ text: org, size: 24, font: 'Times New Roman' })]
+      children: [new TextRun({ text: getManagerName(client), size: 24, font: 'Times New Roman' })]
     }),
     new Paragraph({
       alignment: AlignmentType.RIGHT,
       spacing: { before: 0, after: 40 },
-      children: [new TextRun({ text: '__________    ' + getManagerName(client), size: 24, font: 'Times New Roman' })]
+      children: [new TextRun({ text: '__________', size: 24, font: 'Times New Roman' })]
     }),
     new Paragraph({
       alignment: AlignmentType.RIGHT,

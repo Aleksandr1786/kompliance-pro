@@ -860,7 +860,7 @@ async function openEditModal(clientId) {
     modal.id = 'modalEditClient';
     modal.className = 'modal-overlay';
     modal.innerHTML = `
-      <div class="modal">
+      <div class="modal" style="max-height:90vh;overflow-y:auto">
         <div class="modal-title">✏️ Редактировать клиента</div>
         <div class="modal-sub">Измените данные организации</div>
         <div class="form-row">
@@ -886,50 +886,61 @@ async function openEditModal(clientId) {
               <option>Ставропольский край</option><option>Другой регион</option>
             </select>
           </div>
+          <div class="form-group"><div class="form-label">Город</div><input class="form-input" id="e-city" placeholder="Новороссийск"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group full"><div class="form-label">Юридический адрес</div><input class="form-input" id="e-address" placeholder="г. Новороссийск, ул. Примерная, д. 1"></div>
+        </div>
+        <div class="form-row">
           <div class="form-group"><div class="form-label">Телефон</div><input class="form-input" id="e-phone"></div>
+          <div class="form-group"><div class="form-label">Начальный № приказа</div><input class="form-input" id="e-order-prefix" type="number" min="1"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><div class="form-label">Должность руководителя</div>
             <select class="form-select" id="e-manager-position">
               <option>Индивидуальный предприниматель</option>
-              <option>Генеральный директор</option>
-              <option>Директор</option>
-              <option>Исполнительный директор</option>
-              <option>Руководитель</option>
+              <option>Генеральный директор</option><option>Директор</option>
+              <option>Исполнительный директор</option><option>Руководитель</option>
             </select>
           </div>
           <div class="form-group"><div class="form-label">ФИО руководителя</div><input class="form-input" id="e-manager-name" placeholder="Иванов Иван Иванович"></div>
         </div>
-        <div class="form-group" style="margin-top:4px">
-          <div class="form-label">Адрес</div>
-          <input class="form-input" id="e-address" placeholder="г. Новороссийск, ул. ...">
+        <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ОХРАНУ ТРУДА</div>
+        <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Если отличается от руководителя — заполните. Иначе оставьте пустым.</div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Должность отв. за ОТ</div><input class="form-input" id="e-ot-position" placeholder="Специалист по ОТ"></div>
+          <div class="form-group"><div class="form-label">ФИО отв. за ОТ</div><input class="form-input" id="e-ot-name" placeholder="Петров Пётр Петрович"></div>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-red" onclick="deleteClient(${clientId})">🗑 Удалить</button>
+          <button class="btn btn-red" onclick="deleteClient(currentEditClientId)">🗑 Удалить</button>
           <button class="btn btn-ghost" onclick="closeModal('modalEditClient')">Отмена</button>
-          <button class="btn btn-primary" onclick="submitEditClient(${clientId})">💾 Сохранить</button>
+          <button class="btn btn-primary" onclick="submitEditClient(currentEditClientId)">💾 Сохранить</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) closeModal('modalEditClient'); });
   }
 
-  // Fill form with current data
-  document.getElementById('e-name').value = c.name || '';
-  document.getElementById('e-inn').value = c.inn || '';
-  document.getElementById('e-okved').value = c.okved || '';
-  document.getElementById('e-staff').value = c.staff || '';
-  document.getElementById('e-phone').value = c.phone || '';
-  document.getElementById('e-address').value = c.address || '';
-  document.getElementById('e-manager-name').value = c.manager_name || '';
+  // Сохраняем ID клиента глобально (нужно для кнопок внутри модала)
+  window.currentEditClientId = clientId;
 
-  // Set selects
+  // Заполняем форму текущими данными
+  document.getElementById('e-name').value          = c.name             || '';
+  document.getElementById('e-inn').value           = c.inn              || '';
+  document.getElementById('e-okved').value         = c.okved            || '';
+  document.getElementById('e-staff').value         = c.staff            || '';
+  document.getElementById('e-phone').value         = c.phone            || '';
+  document.getElementById('e-city').value          = c.city             || '';
+  document.getElementById('e-address').value       = c.address          || '';
+  document.getElementById('e-order-prefix').value  = c.order_prefix     || 1;
+  document.getElementById('e-manager-name').value  = c.manager_name     || '';
+  document.getElementById('e-ot-position').value   = c.ot_position      || '';
+  document.getElementById('e-ot-name').value       = c.ot_name          || '';
+
   const formSel = document.getElementById('e-form');
-  for (let opt of formSel.options) if (opt.value === c.form) { opt.selected = true; break; }
-
+  for (let opt of formSel.options) if (opt.value === c.form || opt.text === c.form) { opt.selected = true; break; }
   const regionSel = document.getElementById('e-region');
   for (let opt of regionSel.options) if (opt.value === c.region || opt.text === c.region) { opt.selected = true; break; }
-
   const posSel = document.getElementById('e-manager-position');
   for (let opt of posSel.options) if (opt.value === c.manager_position || opt.text === c.manager_position) { opt.selected = true; break; }
 
@@ -948,10 +959,14 @@ async function submitEditClient(clientId) {
     staff:            parseInt(document.getElementById('e-staff').value) || 0,
     form:             document.getElementById('e-form').value,
     region:           document.getElementById('e-region').value,
+    city:             document.getElementById('e-city').value.trim(),
     phone:            document.getElementById('e-phone').value.trim(),
     address:          document.getElementById('e-address').value.trim(),
+    order_prefix:     parseInt(document.getElementById('e-order-prefix').value) || 1,
     manager_name:     document.getElementById('e-manager-name').value.trim(),
     manager_position: document.getElementById('e-manager-position').value,
+    ot_name:          document.getElementById('e-ot-name').value.trim(),
+    ot_position:      document.getElementById('e-ot-position').value.trim(),
   };
 
   await window.api.clientUpdate(clientId, data);

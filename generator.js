@@ -6,56 +6,197 @@ const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,f
 const {PageOrientation}=require('docx');
 
 // ── РАЗДЕЛ 6 ───────────────────────────────────────────
+// Ширина контента альбомный A4 = 15398 DXA
 
 async function gen_06_01(c,s,dir){
-  const colW=[400,800,2000,700,1500,1300,1200,800,372];
-  const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[1],{bold:true,center:true,sz:SZ_S}),cell('ФИО инструктируемого',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Год рожд.',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Подразделение',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Инструктаж проводил',colW[6],{bold:true,center:true,sz:SZ_S}),cell('Подпись инструктора',colW[7],{bold:true,center:true,sz:SZ_S}),cell('Подпись инструктируемого',colW[8],{bold:true,center:true,sz:SZ_S})]);
-  const emp=c.employees||[];
-  const er=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell(c.doc_date,colW[1],{sz:SZ_S}),cell('',colW[2],{sz:SZ_S}),cell('',colW[3],{sz:SZ_S}),cell(e.position,colW[4],{sz:SZ_S}),cell(c.name,colW[5],{sz:SZ_S}),cell('',colW[6],{sz:SZ_S}),cell('',colW[7],{sz:SZ_S}),cell('',colW[8],{sz:SZ_S})]));
-  const empty=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(emp.length+i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[pC(c.name,{bold:true}),...eL(2),H('ЖУРНАЛ'),H('регистрации вводного инструктажа по охране труда',SZ),...eL(2),pL('Начат: «____» __________________ '+c.doc_year+' г.'),pL('Окончен: «____» __________________ ______ г.'),new (require('docx').Paragraph)({children:[]}),tbl(colW,[hdr,...er,...empty])];
+  // Журнал вводного инструктажа — по образцу
+  const CW_L = 15398;
+  const colW = [600, 1200, 2800, 800, 2200, 2200, 2200, 2199];
+  const hdr = row([
+    cell('№ п/п',              colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата',               colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО инструктируемого',colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Год рожд.',          colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',          colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Инструктаж проводил',colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктора',colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктируемого',colW[7],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emp = c.employees||[];
+  const empRows = emp.map((e,i)=>row([
+    cell(String(i+1),colW[0],{center:true,sz:SZ_S}),
+    cell(c.doc_date, colW[1],{sz:SZ_S}),
+    cell('',         colW[2],{sz:SZ_S}),
+    cell('',         colW[3],{sz:SZ_S}),
+    cell(e.position, colW[4],{sz:SZ_S}),
+    cell('',         colW[5],{sz:SZ_S}),
+    cell('',         colW[6],{sz:SZ_S}),
+    cell('',         colW[7],{sz:SZ_S}),
+  ]));
+  const emptyRows = Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(emp.length+i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('регистрации вводного инструктажа по охране труда',SZ),
+    ...eL(1),
+    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Окончен: «____» __________________ ______ г.'),
+    ...eL(1),
+    tbl(colW,[hdr,...empRows,...emptyRows]),
+  ];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'06.01_Журнал_вводного_инструктажа.docx');
 }
 
 async function gen_06_02(c,s,dir){
-  const colW=[350,700,1800,600,1200,900,700,900,900,800,422];
-  const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[1],{bold:true,center:true,sz:SZ_S}),cell('ФИО инструктируемого',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Год рожд.',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Вид инструктажа',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Причина внепл.',colW[6],{bold:true,center:true,sz:SZ_S}),cell('Кто проводил',colW[7],{bold:true,center:true,sz:SZ_S}),cell('Подпись инструктора',colW[8],{bold:true,center:true,sz:SZ_S}),cell('Подпись инструктируемого',colW[9],{bold:true,center:true,sz:SZ_S}),cell('Допуск к работе',colW[10],{bold:true,center:true,sz:SZ_S})]);
-  const emp=c.employees||[];
-  const er=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell(c.doc_date,colW[1],{sz:SZ_S}),cell('',colW[2],{sz:SZ_S}),cell('',colW[3],{sz:SZ_S}),cell(e.position,colW[4],{sz:SZ_S}),cell('освобождён*',colW[5],{sz:SZ_S}),cell('—',colW[6],{center:true,sz:SZ_S}),cell('—',colW[7],{sz:SZ_S}),cell('—',colW[8],{sz:SZ_S}),cell('—',colW[9],{sz:SZ_S}),cell('—',colW[10],{sz:SZ_S})]));
-  const empty=Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(emp.length+i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[H('ЖУРНАЛ',28),H('регистрации инструктажа на рабочем месте',SZ),H(c.name,SZ),...eL(1),pL('Начат: «____» __________________ '+c.doc_year+' г.'),pL('Окончен: «____» __________________ ______ г.'),...eL(1),tbl(colW,[hdr,...er]),...eL(1),p([{t:'* Примечание: ',b:true},{t:'В соответствии с Перечнем освобождённых от первичного инструктажа — на основании п. 54 ПП РФ от 24.12.2021 № 2464.'}],{sz:SZ_S}),...eL(1),H('(Продолжение)',SZ_S),tbl(colW,[hdr,...empty])];
+  // Журнал инструктажа на рабочем месте — по образцу
+  const colW = [500, 1000, 2500, 700, 1800, 1300, 800, 1800, 1800, 1800, 1400];
+  const hdr = row([
+    cell('№',                    colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата',                 colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО инструктируемого', colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Год рожд.',            colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',            colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Вид инструктажа',      colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Причина внепл.',       colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Инструктаж проводил',  colW[7],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктора',  colW[8],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктируемого',colW[9],{bold:true,center:true,sz:SZ_S}),
+    cell('Допуск к работе',      colW[10],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emptyRows = Array.from({length:30},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('регистрации инструктажа на рабочем месте',SZ),
+    ...eL(1),
+    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Окончен: «____» __________________ ______ г.'),
+    ...eL(1),
+    tbl(colW,[hdr,...emptyRows]),
+    ...eL(1),
+    p([{t:'Виды инструктажей: ',b:true},{t:'П — первичный; Пв — повторный; Вн — внеплановый; Ц — целевой.'}],{sz:SZ_S}),
+  ];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'06.02_Журнал_инструктажа_рабочее_место.docx');
 }
 
 async function gen_06_03(c,s,dir){
-  const colW=[350,1800,1400,1400,1400,1200,1000,1000,522];
-  const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('ФИО, должность пострадавшего',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Место, дата и время',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Обстоятельства',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Причины',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Характер микротравмы',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Принятые меры',colW[6],{bold:true,center:true,sz:SZ_S}),cell('Последствия',colW[7],{bold:true,center:true,sz:SZ_S}),cell('Кто внёс запись',colW[8],{bold:true,center:true,sz:SZ_S})]);
-  const empty=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[pC(c.name,{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта микроповреждений (микротравм) работников',SZ),...eL(2),pL('Начат: «____» __________________ '+c.doc_year+' г.'),pL('Окончен: «____» __________________ ______ г.'),...eL(1),pL('Ответственный: '+c.ot_position+'  '+c.ot_name),new (require('docx').Paragraph)({children:[]}),tbl(colW,[hdr,...empty])];
+  // Журнал учёта микротравм
+  const colW = [500, 2200, 1800, 2000, 2000, 1800, 1800, 1800, 1500];
+  const hdr = row([
+    cell('№',                           colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО, должность пострадавшего',colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Место, дата и время',         colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Краткие обстоятельства',      colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Причины',                     colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Характер микротравмы',        colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Принятые меры',               colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Последствия',                 colW[7],{bold:true,center:true,sz:SZ_S}),
+    cell('Кто внёс запись',             colW[8],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emptyRows = Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('учёта микроповреждений (микротравм) работников',SZ),
+    ...eL(1),
+    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Окончен: «____» __________________ ______ г.'),
+    pL('Ответственный: '+c.ot_position+'  '+c.ot_name),
+    ...eL(1),
+    tbl(colW,[hdr,...emptyRows]),
+  ];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'06.03_Журнал_учёта_микротравм.docx');
 }
 
 async function gen_06_04(c,s,dir){
-  const colW=[350,1800,1400,700,1600,600,800,700,700,422];
-  const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('ФИО работника',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Таб. №',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Наименование СИЗ',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Кол-во',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Дата выдачи',colW[6],{bold:true,center:true,sz:SZ_S}),cell('Срок носки (мес.)',colW[7],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[8],{bold:true,center:true,sz:SZ_S}),cell('Примечание',colW[9],{bold:true,center:true,sz:SZ_S})]);
-  const empty=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[pC(c.name,{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта выдачи средств индивидуальной защиты',SZ),...eL(2),pL('Начат: «____» __________________ '+c.doc_year+' г.'),pL('Окончен: «____» __________________ ______ г.'),new (require('docx').Paragraph)({children:[]}),tbl(colW,[hdr,...empty])];
+  // Журнал выдачи СИЗ
+  const colW = [500, 2500, 2000, 700, 3000, 700, 1200, 1200, 1200, 1000];
+  // сумма = 14000 — умещается в альбом
+  const hdr = row([
+    cell('№',                   colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО работника',       colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',           colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Таб. №',              colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Наименование СИЗ',    colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Кол-во',              colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата выдачи',         colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Срок носки (мес.)',   colW[7],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись',             colW[8],{bold:true,center:true,sz:SZ_S}),
+    cell('Примечание',          colW[9],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emptyRows = Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('учёта выдачи средств индивидуальной защиты',SZ),
+    ...eL(1),
+    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Окончен: «____» __________________ ______ г.'),
+    ...eL(1),
+    tbl(colW,[hdr,...emptyRows]),
+  ];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'06.04_Журнал_выдачи_СИЗ.docx');
 }
 
 async function gen_06_05(c,s,dir){
-  const colW=[400,900,1400,1200,2000,1500,1672];
-  const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Соответствие комплектации',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Сроки годности',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Выявленные недостатки',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Отметка об устранении',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[6],{bold:true,center:true,sz:SZ_S})]);
-  const empty=Array.from({length:15},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[H('ЖУРНАЛ',28),H('контроля аптечки первой помощи',SZ),H(c.name,SZ),...eL(1),tbl(colW,[hdr,...empty])];
+  // Журнал контроля аптечки — портрет нормально
+  const colW = [600, 1400, 2200, 1800, 3072, 2200, 1800];
+  const hdr = row([
+    cell('№',                       colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата проверки',           colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Соответствие комплектации',colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Сроки годности',          colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Выявленные недостатки',   colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Отметка об устранении',   colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись',                 colW[6],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emptyRows = Array.from({length:15},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('контроля аптечки первой помощи',SZ),
+    ...eL(1),
+    pL('Ответственный: '+c.ot_position+'  '+c.ot_name),
+    ...eL(1),
+    tbl(colW,[hdr,...emptyRows]),
+  ];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('06.05')},children:ch}],dir,'06.05_Журнал_контроля_аптечки.docx');
 }
 
 async function gen_06_06(c,s,dir){
-  const colW=[400,2800,900,800,800,800,800,1972];
-  const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('Наименование СИЗ',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Норма (ед./год)',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Дата выдачи',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Кол-во',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Размер',colW[5],{bold:true,center:true,sz:SZ_S}),cell('% износа',colW[6],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[7],{bold:true,center:true,sz:SZ_S})]);
-  const empty=Array.from({length:12},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[pC(c.name,{bold:true}),...eL(1),H('ЛИЧНАЯ КАРТОЧКА УЧЁТА ВЫДАЧИ СИЗ',SZ),...eL(1),pL('ФИО работника: _______________________________________________________'),pL('Должность: ____________________________________________________________'),pL('Дата приёма: ________________  Таб. №: ________________'),...eL(1),tbl(colW,[hdr,...empty]),...eL(2),pL('Ответственный за ДСИЗ: ________________  '+(c.dsiz_name||c.manager_name))];
+  // Личная карточка СИЗ — альбом
+  const colW = [600, 4000, 1400, 1400, 1200, 1200, 1200, 2800];
+  // сумма = 13800
+  const hdr = row([
+    cell('№',                   colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('Наименование СИЗ',    colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Норма (ед./год)',      colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата выдачи',         colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Кол-во',              colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Размер',              colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('% износа',            colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись работника',   colW[7],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emptyRows = Array.from({length:12},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(c.name,{bold:true}),
+    ...eL(1),
+    H('ЛИЧНАЯ КАРТОЧКА',SZ_H),
+    H('учёта выдачи средств индивидуальной защиты',SZ),
+    ...eL(1),
+    pL('ФИО работника: _______________________________________________________'),
+    pL('Должность: ____________________________________________________________'),
+    pL('Дата приёма на работу: ________________  Таб. №: ________________'),
+    ...eL(1),
+    tbl(colW,[hdr,...emptyRows]),
+    ...eL(2),
+    pL('Ответственный за ДСИЗ: ________________  '+(c.dsiz_name||c.manager_name)),
+  ];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'06.06_Личная_карточка_учёта_СИЗ.docx');
 }
 

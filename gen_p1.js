@@ -69,14 +69,19 @@ function approvalOrder(c,orderNum){
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[new Paragraph('')]}),
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[
         pL('УТВЕРЖДЕНА',{bold:true}),pL('Приказом '+c.manager_position),
-        pL(c.name),pL('от «'+c.doc_date+'» № '+orderNum),
+        pL(c.name),pL('от «'+c.doc_date+'» № ____'),
       ]}),
     ]})],
   });
 }
 function orderHead(c,num,subject){
+  // Город берём как есть из карточки (клиент пишет сам: "г. Новороссийск" или "Новороссийск")
+  const cityStr = (c.city||'').trim() || '________________';
   return [pR(c.name),...eL(1),H('ПРИКАЗ'),
-    new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:80},tabStops:[{type:TabStopType.RIGHT,position:TabStopPosition.MAX}],children:[new TextRun({text:c.city,size:SZ,font:FONT}),new TextRun({text:'\t№ '+num+' от '+c.doc_date,size:SZ,font:FONT})]}),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:80},tabStops:[{type:TabStopType.RIGHT,position:TabStopPosition.MAX}],children:[
+      new TextRun({text:cityStr, size:SZ,font:FONT}),
+      new TextRun({text:'\t№ ____ от '+c.doc_date,size:SZ,font:FONT}),
+    ]}),
     ...eL(1),pC(subject,{bold:true})];
 }
 function orderSign(c){return [...eL(2),pL(c.manager_position+':'),...eL(1),pL('________________  '+c.manager_name)];}

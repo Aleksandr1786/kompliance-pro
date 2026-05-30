@@ -76,7 +76,7 @@ function approvalOrder(c,orderNum){
 }
 function orderHead(c,num,subject){
   return [pR(c.name),...eL(1),H('ПРИКАЗ'),
-    new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:80},tabStops:[{type:TabStopType.RIGHT,position:TabStopPosition.MAX}],children:[new TextRun({text:'г. '+c.city,size:SZ,font:FONT}),new TextRun({text:'\t№ '+num+' от '+c.doc_date,size:SZ,font:FONT})]}),
+    new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:80},tabStops:[{type:TabStopType.RIGHT,position:TabStopPosition.MAX}],children:[new TextRun({text:c.city,size:SZ,font:FONT}),new TextRun({text:'\t№ '+num+' от '+c.doc_date,size:SZ,font:FONT})]}),
     ...eL(1),pC(subject,{bold:true})];
 }
 function orderSign(c){return [...eL(2),pL(c.manager_position+':'),...eL(1),pL('________________  '+c.manager_name)];}
@@ -100,7 +100,8 @@ function devSign(c){return [...eL(2),pL([{t:'Разработал: '},{t:c.manag
 
 function norm(client){
   const c=Object.assign({},client);
-  c.name=c.name||'Организация';c.form=c.form||'ООО';c.city=c.city||'г.';
+  c.name=c.name||'Организация';c.form=c.form||'ООО';
+  c.city=((c.city||'').replace(/^г\.?\s*/i,'').trim())||'б/м';
   c.doc_date=c.doc_date||new Date().toLocaleDateString('ru-RU');
   c.doc_year=c.doc_year||String(new Date().getFullYear());
   c.manager_name=c.manager_name||'Руководитель';

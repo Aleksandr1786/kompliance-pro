@@ -42,7 +42,7 @@ contextBridge.exposeInMainWorld('api', {
   // Генерация документов
   docsGenerate:   (clientId)  => ipcRenderer.invoke('docs:generate', clientId),
   docsOpenFolder: (dir)       => ipcRenderer.invoke('docs:open-folder', dir),
-
+docsOpenFile:  (filepath) => ipcRenderer.invoke('docs:open-file', filepath),
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),
 });

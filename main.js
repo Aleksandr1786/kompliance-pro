@@ -220,37 +220,61 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
   const client = db.get('clients').find({ id: clientId }).value();
   if (!client) return { ok: false, error: 'Клиент не найден' };
   const settings = db.get('settings').value();
-  
-  // Папка для документов рядом с базой данных
-  const outputDir = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
-  if (!require('fs').existsSync(outputDir)) require('fs').mkdirSync(outputDir, { recursive: true });
+
+  // Папка клиента: КомплаенсПро_Документы / Название организации
+  const rootDir  = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
+  const safeName = (client.name || 'Клиент').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 60);
+  const outputDir = path.join(rootDir, safeName);
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  // Подтягиваем сотрудников клиента из базы
+  const employees = db.get('employees').filter({ client_id: clientId }).value();
+  const clientWithEmployees = {
+    ...client,
+    employees: employees.map(e => ({
+      full_name: e.full_name || '',
+      position:  e.position  || '',
+      dative:    e.dative    || '',
+    })),
+  };
 
   try {
-    const result = await generatePackage(client, settings, outputDir);
-    // result.generated — массив строк (имена файлов), result.errors — массив ошибок
+    const result = await generatePackage(clientWithEmployees, settings, outputDir);
+
+    // Сбрасываем старые документы клиента и записываем свежие
+    db.get('documents').remove({ client_id: clientId }).write();
+    let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id));
     for (const filename of result.generated) {
-      const existing = db.get('documents').find({ client_id: clientId, filename }).value();
-      if (existing) {
-        db.get('documents').find({ client_id: clientId, filename })
-          .assign({ status: 'ok', updated_at: new Date().toISOString() }).write();
-      } else {
-        const id = Math.max(0, ...db.get('documents').value().map(d => d.id)) + 1;
-        db.get('documents').push({
-          id, client_id: clientId, module: 'OT', name: filename,
-          filename, status: 'ok',
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-          npa_basis: 'ТК РФ, Постановление Правительства №2464', notes: ''
-        }).write();
-      }
+      maxId++;
+      db.get('documents').push({
+        id:         maxId,
+        client_id:  clientId,
+        module:     'OT',
+        name:       filename,
+        filename:   filename,
+        filepath:   path.join(outputDir, filename),
+        status:     'ok',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        npa_basis:  'ТК РФ, Постановление Правительства №2464',
+        notes:      '',
+      }).write();
     }
+
     return { ok: true, generated: result.generated, errors: result.errors, dir: outputDir };
   } catch(e) {
     return { ok: false, error: e.message };
   }
 });
 
+// Открыть папку с документами клиента
 ipcMain.handle('docs:open-folder', (_, dir) => {
   shell.openPath(dir);
+});
+
+// Открыть конкретный файл документа
+ipcMain.handle('docs:open-file', (_, filepath) => {
+  shell.openPath(filepath);
 });
 
 // ─── ОКНО ────────────────────────────────────────────────

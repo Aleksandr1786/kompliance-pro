@@ -231,6 +231,11 @@ async function renderClientCard(id) {
   const otDocs = docs.filter(d => d.module === 'OT');
   const pdDocs = docs.filter(d => d.module === 'PD');
   const vuDocs = docs.filter(d => d.module === 'VU');
+  // Папка клиента на рабочем столе (для кнопки "Открыть папку")
+  const safeName = (c.name || '').replace(/[\/\\:*?"<>|]/g, '_').slice(0, 60);
+  const clientDocDir = otDocs.length && otDocs[0].filepath
+    ? otDocs[0].filepath.replace(/[\\/][^\\/]+$/, '') // папка из пути первого файла
+    : null;
 
   document.getElementById('content').innerHTML = `
     <div class="hero">
@@ -282,8 +287,16 @@ async function renderClientCard(id) {
 
     <div class="tab-panel" id="tab-ot">
       <div class="panel">
-        <div class="panel-head"><span>🦺</span><div class="panel-title">Документы — Охрана труда</div><div class="panel-count">${otDocs.length} шт.</div><button class="btn btn-primary" style="margin-left:auto;padding:6px 12px;font-size:11px" onclick="generateDocs(${id})">⚡ Сгенерировать</button></div>
-        <div>${otDocs.length ? otDocs.map(d=>renderDocRow(d)).join('') : renderEmptyDocs('ОТ', id)}</div>
+        <div class="panel-head">
+          <span>🦺</span>
+          <div class="panel-title">Документы — Охрана труда</div>
+          <div class="panel-count">${otDocs.length} шт.</div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="window.api.docsOpenFolder('${clientDocDir.replace(/\/g,'\\').replace(/'/g,"\'")}')">📁 Открыть папку</button>` : ''}
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id})">⚡ Сгенерировать</button>
+          </div>
+        </div>
+        <div>${otDocs.length ? renderDocsBySection(otDocs) : renderEmptyDocs('ОТ', id)}</div>
       </div>
     </div>
 
@@ -321,11 +334,18 @@ function switchTab(name) {
 
 function renderDocRow(d) {
   const statusMap = { ok:'✓ Актуален', outdated:'⚠ Обновить', draft:'В работе', missing:'Отсутствует' };
-  const colorMap = { ok:'var(--green)', outdated:'var(--red)', draft:'var(--amber)', missing:'var(--muted2)' };
-  return `<div class="client-row">
+  const colorMap  = { ok:'var(--green)', outdated:'var(--red)', draft:'var(--amber)', missing:'var(--muted2)' };
+  const canOpen   = d.filepath && d.status === 'ok';
+  const openBtn   = canOpen
+    ? `<button onclick="openDocFile('${d.filepath.replace(/\/g,'\\').replace(/'/g,"\'")}', event)" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:4px 6px;border-radius:6px;transition:color .2s" title="Открыть файл" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted2)'">📂</button>`
+    : '';
+  return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${d.filepath.replace(/\/g,'\\').replace(/'/g,"\'")}', event)"`:''}">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
-    <div class="client-info"><div class="client-name">${d.name}</div><div class="client-meta">${d.module} · ${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div></div>
-    <div style="font-size:11px;font-weight:600;color:${colorMap[d.status]||'var(--muted2)'};flex-shrink:0">${statusMap[d.status]||d.status}</div>
+    <div class="client-info"><div class="client-name">${d.name}</div><div class="client-meta">ОТ · ${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div></div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span style="font-size:11px;font-weight:600;color:${colorMap[d.status]||'var(--muted2)'}">${statusMap[d.status]||d.status}</span>
+      ${openBtn}
+    </div>
   </div>`;
 }
 
@@ -336,6 +356,59 @@ function renderEmptyDocs(mod, clientId) {
     <div class="empty-sub">Документы по модулю ${mod} появятся здесь после генерации</div>
     <button class="btn btn-primary" style="margin-top:8px" onclick="showToast('Генерация документов будет доступна после подключения AI')">⚡ Сгенерировать</button>
   </div>`;
+}
+
+// ─── Группировка документов по разделам ───────────────────────
+function renderDocsBySection(docs) {
+  const sections = {
+    'Раздел 1': { icon: '📋', label: 'Раздел 1. Организационно-распорядительная документация', docs: [] },
+    'Раздел 2': { icon: '📜', label: 'Раздел 2. Локальные нормативные акты', docs: [] },
+    'Раздел 3': { icon: '⚡', label: 'Раздел 3. Электробезопасность', docs: [] },
+    'Раздел 5': { icon: '📖', label: 'Раздел 5. Инструкции по охране труда', docs: [] },
+    'Раздел 6': { icon: '📓', label: 'Раздел 6. Журналы учёта', docs: [] },
+    'Раздел 7': { icon: '🎓', label: 'Раздел 7. Программы обучения', docs: [] },
+    'Прочее':   { icon: '📄', label: 'Прочие документы', docs: [] },
+  };
+
+  // Определяем раздел по имени файла
+  docs.forEach(d => {
+    const name = d.name || d.filename || '';
+    if      (/^01\.|Приказ_0[3-9]|Политика|Положение_о_СУОТ|План_мероп|График_пер/.test(name)) sections['Раздел 1'].docs.push(d);
+    else if (/^02\.|Положение_о_порядке|Положение_об_орган|Положение_о_разраб|Положение_об_учёте|ПВТР|Правила_внутр|Положение_об_обеспечении/.test(name)) sections['Раздел 2'].docs.push(d);
+    else if (/^03\.|Журнал_I_группа|Программа_инструктаж_электро/.test(name)) sections['Раздел 3'].docs.push(d);
+    else if (/^05\.|ИОТ|Инструкция/.test(name)) sections['Раздел 5'].docs.push(d);
+    else if (/^06\.|Журнал|Личная_карточка/.test(name)) sections['Раздел 6'].docs.push(d);
+    else if (/^07\.|Программа_вводного|Программа_первичного|Программа_противо/.test(name)) sections['Раздел 7'].docs.push(d);
+    else if (/^00\.|Чек-лист/.test(name)) sections['Прочее'].docs.push(d);
+    else sections['Прочее'].docs.push(d);
+  });
+
+  let html = '';
+  for (const [key, sec] of Object.entries(sections)) {
+    if (!sec.docs.length) continue;
+    html += `
+      <div style="margin-bottom:4px">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:2px;cursor:pointer;user-select:none"
+             onclick="toggleSection(this)">
+          <span style="font-size:16px">${sec.icon}</span>
+          <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${sec.label}</span>
+          <span style="font-size:11px;color:var(--muted2);background:var(--s3);padding:2px 8px;border-radius:10px">${sec.docs.length}</span>
+          <span class="section-arrow" style="color:var(--muted2);font-size:11px;transition:transform .2s">▼</span>
+        </div>
+        <div class="section-docs" style="padding-left:12px">
+          ${sec.docs.map(d => renderDocRow(d)).join('')}
+        </div>
+      </div>`;
+  }
+  return html || '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Документов нет</div></div>';
+}
+
+function toggleSection(header) {
+  const docs = header.nextElementSibling;
+  const arrow = header.querySelector('.section-arrow');
+  const isOpen = docs.style.display !== 'none';
+  docs.style.display = isOpen ? 'none' : 'block';
+  arrow.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
 }
 
 function renderEmpRow(e) {
@@ -779,8 +852,16 @@ async function generateDocs(clientId) {
     return;
   }
   const ok = result.generated.length;
-  showToast('Готово! Создано ' + ok + ' документов');
-  // Открываем папку
-  if (result.dir) window.api.docsOpenFolder(result.dir);
-  setTimeout(function() { navigate('client', clientId); }, 2000);
+  const errCount = result.errors ? result.errors.length : 0;
+  if (errCount > 0) {
+    showToast('Создано ' + ok + ' документов (' + errCount + ' ошибок)', 'var(--amber)');
+  } else {
+    showToast('✅ Готово! Создано ' + ok + ' документов');
+  }
+  setTimeout(function() { navigate('client', clientId); }, 1500);
+}
+
+function openDocFile(filepath, event) {
+  if (event) event.stopPropagation();
+  window.api.docsOpenFile(filepath);
 }

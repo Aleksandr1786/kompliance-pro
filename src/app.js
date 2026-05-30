@@ -236,6 +236,7 @@ async function renderClientCard(id) {
   const clientDocDir = otDocs.length && otDocs[0].filepath
     ? otDocs[0].filepath.replace(/[\\/][^\\/]+$/, '') // папка из пути первого файла
     : null;
+  _currentClientDocDir = clientDocDir;
 
   document.getElementById('content').innerHTML = `
     <div class="hero">
@@ -292,7 +293,7 @@ async function renderClientCard(id) {
           <div class="panel-title">Документы — Охрана труда</div>
           <div class="panel-count">${otDocs.length} шт.</div>
           <div style="margin-left:auto;display:flex;gap:8px">
-            ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="window.api.docsOpenFolder('${clientDocDir.replace(/\/g,'\\').replace(/'/g,"\'")}')">📁 Открыть папку</button>` : ''}
+            ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="openClientFolder()">📁 Открыть папку</button>` : ''}
             <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id})">⚡ Сгенерировать</button>
           </div>
         </div>
@@ -336,10 +337,11 @@ function renderDocRow(d) {
   const statusMap = { ok:'✓ Актуален', outdated:'⚠ Обновить', draft:'В работе', missing:'Отсутствует' };
   const colorMap  = { ok:'var(--green)', outdated:'var(--red)', draft:'var(--amber)', missing:'var(--muted2)' };
   const canOpen   = d.filepath && d.status === 'ok';
+  const fp        = canOpen ? d.filepath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
   const openBtn   = canOpen
-    ? `<button onclick="openDocFile('${d.filepath.replace(/\/g,'\\').replace(/'/g,"\'")}', event)" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:4px 6px;border-radius:6px;transition:color .2s" title="Открыть файл" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted2)'">📂</button>`
+    ? `<button onclick="openDocFile('${fp}', event)" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:4px 6px;border-radius:6px;transition:color .2s" title="Открыть файл" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted2)'">📂</button>`
     : '';
-  return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${d.filepath.replace(/\/g,'\\').replace(/'/g,"\'")}', event)"`:''}">
+  return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${fp}', event)"`:''}">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
     <div class="client-info"><div class="client-name">${d.name}</div><div class="client-meta">ОТ · ${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div></div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -864,4 +866,11 @@ async function generateDocs(clientId) {
 function openDocFile(filepath, event) {
   if (event) event.stopPropagation();
   window.api.docsOpenFile(filepath);
+}
+
+// Глобальная переменная для папки текущего клиента
+let _currentClientDocDir = null;
+
+function openClientFolder() {
+  if (_currentClientDocDir) window.api.docsOpenFolder(_currentClientDocDir);
 }

@@ -427,11 +427,16 @@ function toggleSection(header) {
 }
 
 function renderEmpRow(e) {
+  const birthYear = e.birth_date ? ' · ' + e.birth_date.slice(0,4) + ' г.р.' : '';
   return `<div class="client-row">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:11px;font-weight:700">${e.full_name.split(' ').map(w=>w[0]||'').join('').slice(0,2)}</div>
-    <div class="client-info"><div class="client-name">${e.full_name}</div><div class="client-meta">${e.position||'—'} ${e.is_military?'· ⚔️ Военнообязанный':''}</div></div>
+    <div class="client-info">
+      <div class="client-name">${e.full_name}</div>
+      <div class="client-meta">${e.position||'—'}${birthYear}${e.is_military?' · ⚔️':''}</div>
+    </div>
     <div style="display:flex;gap:6px">
-      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="deleteEmployee(${e.id})">🗑</button>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="editEmployeePrompt(${e.id})">✏️</button>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="deleteEmployee(${e.id})">🗑</button>
     </div>
   </div>`;
 }
@@ -451,6 +456,10 @@ async function addEmployeePrompt(clientId) {
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
         <input id="emp-pos" placeholder="Менеджер по продажам" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
       </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
+        <input id="emp-birth" type="date" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="emp-mil" style="width:16px;height:16px;cursor:pointer">
         <label for="emp-mil" style="font-size:12px;color:#94a3b8;cursor:pointer">⚔️ Военнообязанный</label>
@@ -467,12 +476,13 @@ async function addEmployeePrompt(clientId) {
     document.getElementById('emp-cancel').onclick = () => { modal.remove(); resolve(false); };
     modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(false); } };
     document.getElementById('emp-save').onclick = async () => {
-      const name = document.getElementById('emp-name').value.trim();
-      const pos  = document.getElementById('emp-pos').value.trim();
-      const mil  = document.getElementById('emp-mil').checked ? 1 : 0;
+      const name  = document.getElementById('emp-name').value.trim();
+      const pos   = document.getElementById('emp-pos').value.trim();
+      const birth = document.getElementById('emp-birth').value || '';
+      const mil   = document.getElementById('emp-mil').checked ? 1 : 0;
       if (!name) { document.getElementById('emp-name').style.border = '1px solid #f87171'; return; }
       modal.remove();
-      await window.api.employeeAdd({ client_id: clientId, full_name: name, position: pos, department: '', is_military: mil, hired_at: new Date().toISOString().slice(0,10) });
+      await window.api.employeeAdd({ client_id: clientId, full_name: name, position: pos, birth_date: birth, department: '', is_military: mil, hired_at: new Date().toISOString().slice(0,10) });
       showToast('✅ Сотрудник добавлен');
       await navigate('client', clientId);
       resolve(true);
@@ -481,6 +491,63 @@ async function addEmployeePrompt(clientId) {
     modal.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') document.getElementById('emp-save').click();
       if (e.key === 'Escape') { modal.remove(); resolve(false); }
+    });
+  });
+}
+
+async function editEmployeePrompt(empId) {
+  // Получаем список сотрудников и находим нужного
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">✏️ Редактировать сотрудника</div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью</label>
+        <input id="edit-emp-name" value="${e.full_name||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
+        <input id="edit-emp-pos" value="${e.position||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
+        <input id="edit-emp-birth" type="date" value="${e.birth_date||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="edit-emp-mil" ${e.is_military?'checked':''} style="width:16px;height:16px;cursor:pointer">
+        <label for="edit-emp-mil" style="font-size:12px;color:#94a3b8;cursor:pointer">⚔️ Военнообязанный</label>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="edit-emp-cancel" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button id="edit-emp-save" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Сохранить</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('edit-emp-name').focus();
+
+  await new Promise(resolve => {
+    document.getElementById('edit-emp-cancel').onclick = () => { modal.remove(); resolve(false); };
+    modal.onclick = (ev) => { if (ev.target === modal) { modal.remove(); resolve(false); } };
+    document.getElementById('edit-emp-save').onclick = async () => {
+      const name  = document.getElementById('edit-emp-name').value.trim();
+      const pos   = document.getElementById('edit-emp-pos').value.trim();
+      const birth = document.getElementById('edit-emp-birth').value || '';
+      const mil   = document.getElementById('edit-emp-mil').checked ? 1 : 0;
+      if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
+      modal.remove();
+      await window.api.employeeUpdate(empId, { full_name: name, position: pos, birth_date: birth, is_military: mil });
+      showToast('✅ Сотрудник обновлён');
+      await navigate('client', currentClientId);
+      resolve(true);
+    };
+    modal.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') document.getElementById('edit-emp-save').click();
+      if (ev.key === 'Escape') { modal.remove(); resolve(false); }
     });
   });
 }
@@ -720,14 +787,18 @@ async function submitAddClient() {
     okved_extra: '',
     form:   document.getElementById('c-form')?.value || 'ООО',
     staff:  parseInt(document.getElementById('c-staff')?.value) || 0,
-    region: document.getElementById('c-region')?.value || 'Краснодарский край',
-    czn:    'ФГКУ КК ЦЗН в г. Новороссийске',
-    address:'',
-    phone:  document.getElementById('c-phone')?.value?.trim() || '',
-    email:  '',
-    modules: mods || 'OT',
-    manager_name: document.getElementById('c-manager-name')?.value?.trim() || '',
+    region:           document.getElementById('c-region')?.value || 'Краснодарский край',
+    city:             document.getElementById('c-city')?.value?.trim() || '',
+    address:          document.getElementById('c-address')?.value?.trim() || '',
+    czn:              'ФГКУ КК ЦЗН в г. Новороссийске',
+    phone:            document.getElementById('c-phone')?.value?.trim() || '',
+    order_prefix:     parseInt(document.getElementById('c-order-prefix')?.value) || 1,
+    email:            '',
+    modules:          mods || 'OT',
+    manager_name:     document.getElementById('c-manager-name')?.value?.trim() || '',
     manager_position: document.getElementById('c-manager-position')?.value || 'Руководитель',
+    ot_name:          document.getElementById('c-ot-name')?.value?.trim() || '',
+    ot_position:      document.getElementById('c-ot-position')?.value?.trim() || '',
     color,
     score: 0,
   };
@@ -735,7 +806,7 @@ async function submitAddClient() {
   closeModal('modalAddClient');
   showToast(`Клиент "${name}" добавлен`);
   // Сбрасываем форму
-  ['c-name','c-inn','c-okved','c-staff','c-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-ot-name','c-ot-position'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; }); const op = document.getElementById('c-order-prefix'); if(op) op.value='1';
   document.querySelectorAll('.module-pill').forEach(p => { p.classList.toggle('checked', p.dataset.module !== 'VU'); });
   await navigate('client', result.id);
 }

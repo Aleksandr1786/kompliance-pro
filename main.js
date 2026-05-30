@@ -94,6 +94,11 @@ ipcMain.handle('employees:add', (_, data) => {
   return { id };
 });
 
+ipcMain.handle('employees:update', (_, id, data) => {
+  db.get('employees').find({ id }).assign(data).write();
+  return { ok: true };
+});
+
 ipcMain.handle('employees:delete', (_, id) => {
   db.get('employees').remove({ id }).write();
   return { ok: true };

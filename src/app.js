@@ -343,7 +343,10 @@ function renderDocRow(d) {
     : '';
   return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${fp}', event)"`:''}">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
-    <div class="client-info"><div class="client-name">${d.name}</div><div class="client-meta">ОТ · ${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div></div>
+    <div class="client-info">
+      <div class="client-name" style="font-size:12px">${(d.name||'').replace(/.*[\\/]/,'').replace(/_/g,' ').replace(/\.docx$/,'')}</div>
+      <div class="client-meta">${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div>
+    </div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
       <span style="font-size:11px;font-weight:600;color:${colorMap[d.status]||'var(--muted2)'}">${statusMap[d.status]||d.status}</span>
       ${openBtn}
@@ -362,55 +365,65 @@ function renderEmptyDocs(mod, clientId) {
 
 // ─── Группировка документов по разделам ───────────────────────
 function renderDocsBySection(docs) {
-  const sections = {
-    'Раздел 1': { icon: '📋', label: 'Раздел 1. Организационно-распорядительная документация', docs: [] },
-    'Раздел 2': { icon: '📜', label: 'Раздел 2. Локальные нормативные акты', docs: [] },
-    'Раздел 3': { icon: '⚡', label: 'Раздел 3. Электробезопасность', docs: [] },
-    'Раздел 5': { icon: '📖', label: 'Раздел 5. Инструкции по охране труда', docs: [] },
-    'Раздел 6': { icon: '📓', label: 'Раздел 6. Журналы учёта', docs: [] },
-    'Раздел 7': { icon: '🎓', label: 'Раздел 7. Программы обучения', docs: [] },
-    'Прочее':   { icon: '📄', label: 'Прочие документы', docs: [] },
-  };
+  // Конфигурация разделов — короткие названия для UI
+  const sections = [
+    { key:'s1', icon:'📋', label:'Организационные',    color:'#60a5fa', docs:[] },
+    { key:'s2', icon:'📜', label:'Нормативные акты',   color:'#a78bfa', docs:[] },
+    { key:'s3', icon:'⚡', label:'Электробезопасность', color:'#fbbf24', docs:[] },
+    { key:'s4', icon:'🔍', label:'СОУТ и риски',        color:'#34d399', docs:[] },
+    { key:'s5', icon:'📖', label:'Инструкции',          color:'#f87171', docs:[] },
+    { key:'s6', icon:'📓', label:'Журналы учёта',       color:'#fb923c', docs:[] },
+    { key:'s7', icon:'🎓', label:'Программы обучения',  color:'#e879f9', docs:[] },
+    { key:'s0', icon:'✅', label:'Прочие документы',    color:'#94a3b8', docs:[] },
+  ];
 
-  // Определяем раздел по имени файла
   docs.forEach(d => {
-    const name = d.name || d.filename || '';
-    if      (/^01\.|Приказ_0[3-9]|Политика|Положение_о_СУОТ|План_мероп|График_пер/.test(name)) sections['Раздел 1'].docs.push(d);
-    else if (/^02\.|Положение_о_порядке|Положение_об_орган|Положение_о_разраб|Положение_об_учёте|ПВТР|Правила_внутр|Положение_об_обеспечении/.test(name)) sections['Раздел 2'].docs.push(d);
-    else if (/^03\.|Журнал_I_группа|Программа_инструктаж_электро/.test(name)) sections['Раздел 3'].docs.push(d);
-    else if (/^05\.|ИОТ|Инструкция/.test(name)) sections['Раздел 5'].docs.push(d);
-    else if (/^06\.|Журнал|Личная_карточка/.test(name)) sections['Раздел 6'].docs.push(d);
-    else if (/^07\.|Программа_вводного|Программа_первичного|Программа_противо/.test(name)) sections['Раздел 7'].docs.push(d);
-    else if (/^00\.|Чек-лист/.test(name)) sections['Прочее'].docs.push(d);
-    else sections['Прочее'].docs.push(d);
+    const n = (d.name || d.filename || '').replace(/\\/g, '/');
+    const base = n.split('/').pop(); // только имя файла
+    if      (/^01\./.test(base)) sections[0].docs.push(d);
+    else if (/^02\./.test(base)) sections[1].docs.push(d);
+    else if (/^03\./.test(base)) sections[2].docs.push(d);
+    else if (/^04\./.test(base)) sections[3].docs.push(d);
+    else if (/^05\./.test(base)) sections[4].docs.push(d);
+    else if (/^06\./.test(base)) sections[5].docs.push(d);
+    else if (/^07\./.test(base)) sections[6].docs.push(d);
+    else                          sections[7].docs.push(d);
   });
 
   let html = '';
-  for (const [key, sec] of Object.entries(sections)) {
-    if (!sec.docs.length) continue;
+  sections.forEach(sec => {
+    if (!sec.docs.length) return;
+    const sectionHtml = sec.docs.map(d => renderDocRow(d)).join('');
     html += `
-      <div style="margin-bottom:4px">
-        <div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(255,255,255,0.03);border-radius:10px;margin-bottom:2px;cursor:pointer;user-select:none"
-             onclick="toggleSection(this)">
-          <span style="font-size:16px">${sec.icon}</span>
+      <div class="doc-section" style="margin-bottom:6px">
+        <div class="doc-section-header" onclick="toggleSection(this)"
+             style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+                    background:rgba(255,255,255,0.04);border-radius:10px;
+                    cursor:pointer;user-select:none;border-left:3px solid ${sec.color};
+                    transition:background .15s">
+          <span style="font-size:18px">${sec.icon}</span>
           <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${sec.label}</span>
-          <span style="font-size:11px;color:var(--muted2);background:var(--s3);padding:2px 8px;border-radius:10px">${sec.docs.length}</span>
-          <span class="section-arrow" style="color:var(--muted2);font-size:11px;transition:transform .2s">▼</span>
+          <span style="font-size:11px;color:var(--muted2);background:rgba(255,255,255,0.06);
+                       padding:2px 8px;border-radius:10px;min-width:24px;text-align:center">${sec.docs.length}</span>
+          <span class="section-arrow" style="color:var(--muted2);font-size:10px;
+                transition:transform .2s;transform:rotate(-90deg)">▼</span>
         </div>
-        <div class="section-docs" style="padding-left:12px">
-          ${sec.docs.map(d => renderDocRow(d)).join('')}
+        <div class="section-docs" style="display:none;padding:4px 0 4px 12px">
+          ${sectionHtml}
         </div>
       </div>`;
-  }
+  });
+
   return html || '<div class="empty-state"><div class="empty-icon">📄</div><div class="empty-title">Документов нет</div></div>';
 }
 
 function toggleSection(header) {
-  const docs = header.nextElementSibling;
+  const docs  = header.nextElementSibling;
   const arrow = header.querySelector('.section-arrow');
   const isOpen = docs.style.display !== 'none';
   docs.style.display = isOpen ? 'none' : 'block';
   arrow.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+  header.style.background = isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)';
 }
 
 function renderEmpRow(e) {
@@ -424,13 +437,52 @@ function renderEmpRow(e) {
 }
 
 async function addEmployeePrompt(clientId) {
-  const name = prompt('ФИО сотрудника:');
-  if (!name || !name.trim()) return;
-  const pos = prompt('Должность:') || '';
-  const mil = confirm('Военнообязанный?') ? 1 : 0;
-  await window.api.employeeAdd({ client_id: clientId, full_name: name.trim(), position: pos, department: '', is_military: mil, hired_at: new Date().toISOString().slice(0,10) });
-  showToast('Сотрудник добавлен');
-  await navigate('client', clientId);
+  // Создаём модальное окно вместо prompt (prompt блокируется в Electron)
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">➕ Добавить сотрудника</div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью</label>
+        <input id="emp-name" placeholder="Иванов Иван Иванович" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
+        <input id="emp-pos" placeholder="Менеджер по продажам" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="emp-mil" style="width:16px;height:16px;cursor:pointer">
+        <label for="emp-mil" style="font-size:12px;color:#94a3b8;cursor:pointer">⚔️ Военнообязанный</label>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button id="emp-cancel" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button id="emp-save" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Добавить</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('emp-name').focus();
+
+  await new Promise(resolve => {
+    document.getElementById('emp-cancel').onclick = () => { modal.remove(); resolve(false); };
+    modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(false); } };
+    document.getElementById('emp-save').onclick = async () => {
+      const name = document.getElementById('emp-name').value.trim();
+      const pos  = document.getElementById('emp-pos').value.trim();
+      const mil  = document.getElementById('emp-mil').checked ? 1 : 0;
+      if (!name) { document.getElementById('emp-name').style.border = '1px solid #f87171'; return; }
+      modal.remove();
+      await window.api.employeeAdd({ client_id: clientId, full_name: name, position: pos, department: '', is_military: mil, hired_at: new Date().toISOString().slice(0,10) });
+      showToast('✅ Сотрудник добавлен');
+      await navigate('client', clientId);
+      resolve(true);
+    };
+    // Enter для сохранения
+    modal.addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') document.getElementById('emp-save').click();
+      if (e.key === 'Escape') { modal.remove(); resolve(false); }
+    });
+  });
 }
 
 async function deleteEmployee(id) {

@@ -250,9 +250,9 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
         id:         maxId,
         client_id:  clientId,
         module:     'OT',
-        name:       filename,
-        filename:   filename,
-        filepath:   path.join(outputDir, filename),
+        name:       path.basename(filename), // только имя файла без пути
+        filename:   path.basename(filename),
+        filepath:   filename, // генератор теперь возвращает полный путь
         status:     'ok',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

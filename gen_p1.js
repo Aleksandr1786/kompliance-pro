@@ -121,8 +121,8 @@ async function save(sections,dir,filename){
       {reference:'ordered',levels:[{level:0,format:LevelFormat.DECIMAL,text:'%1.',alignment:AlignmentType.LEFT,style:{paragraph:{indent:{left:720,hanging:360}}}}]},
     ]},sections});
   const buf=await Packer.toBuffer(doc);
-  fs.writeFileSync(path.join(dir,filename),buf);
-  return filename;
+  fs.writeFileSync(path.join(dir, filename), buf);
+  return path.join(dir, filename);
 }
 function oNum(c,offset){return String(c.order_prefix+offset).padStart(2,'0');}
 

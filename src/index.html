@@ -89,8 +89,24 @@
         </select>
       </div>
       <div class="form-group">
+        <div class="form-label">Город</div>
+        <input class="form-input" id="c-city" placeholder="Новороссийск">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group full">
+        <div class="form-label">Юридический адрес</div>
+        <input class="form-input" id="c-address" placeholder="г. Новороссийск, ул. Примерная, д. 1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
         <div class="form-label">Телефон</div>
         <input class="form-input" id="c-phone" placeholder="+7 000 000-00-00">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Начальный № приказа</div>
+        <input class="form-input" id="c-order-prefix" type="number" placeholder="1" min="1" value="1">
       </div>
     </div>
     <div class="form-row">
@@ -107,6 +123,18 @@
       <div class="form-group">
         <div class="form-label">ФИО руководителя</div>
         <input class="form-input" id="c-manager-name" placeholder="Иванов Иван Иванович">
+      </div>
+    </div>
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ОХРАНУ ТРУДА</div>
+    <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Если отличается от руководителя — заполните. Иначе оставьте пустым.</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Должность отв. за ОТ</div>
+        <input class="form-input" id="c-ot-position" placeholder="Специалист по ОТ">
+      </div>
+      <div class="form-group">
+        <div class="form-label">ФИО отв. за ОТ</div>
+        <input class="form-input" id="c-ot-name" placeholder="Петров Пётр Петрович">
       </div>
     </div>
     <div class="form-group" style="margin-top:4px">

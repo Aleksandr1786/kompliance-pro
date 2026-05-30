@@ -344,7 +344,7 @@ function renderDocRow(d) {
   return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${fp}', event)"`:''}">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
     <div class="client-info">
-      <div class="client-name" style="font-size:12px">${(d.name||'').replace(/.*[\\/]/,'').replace(/_/g,' ').replace(/\.docx$/,'')}</div>
+      <div class="client-name" style="font-size:12px">${(d.name||'').replace(/.*[\/\\]/,'').replace(/_/g,' ').replace(/\.docx$/i,'').replace(/^\d{2}\.\d{2}\s*/,'').replace(/^\d+\s+/,'')}</div>
       <div class="client-meta">${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">

@@ -43,6 +43,11 @@ async function navigate(page, clientId = null) {
   if (navItem) navItem.classList.add('active');
   const btn = document.getElementById('topbarAction');
   btn.style.display = 'none';
+  // Скрываем кнопку редактирования клиента на всех страницах кроме карточки
+  if (page !== 'client') {
+    const editBtn = document.getElementById('topbarEdit');
+    if (editBtn) editBtn.style.display = 'none';
+  }
   const titles = {
     dashboard:'Дашборд', clients:'Клиенты', tasks:'Задачи',
     ot:'Охрана труда', pd:'Персональные данные', vu:'Воинский учёт',
@@ -78,6 +83,9 @@ async function renderDashboard() {
   btn.textContent = '+ Добавить клиента';
   btn.style.display = 'flex';
   btn.onclick = () => openModal('modalAddClient');
+  // Скрываем кнопку редактирования клиента если она осталась
+  const editBtn = document.getElementById('topbarEdit');
+  if (editBtn) editBtn.style.display = 'none';
 
   document.getElementById('content').innerHTML = `
     <div class="stats-grid">
@@ -344,7 +352,13 @@ function renderDocRow(d) {
   return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${fp}', event)"`:''}">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
     <div class="client-info">
-      <div class="client-name" style="font-size:12px">${(d.name||'').replace(/.*[\/\\]/,'').replace(/_/g,' ').replace(/\.docx$/i,'').replace(/^\d{2}\.\d{2}\s*/,'').replace(/^\d+\s+/,'')}</div>
+      <div class="client-name" style="font-size:12px">${(()=>{
+        let n=(d.name||'').replace(/.*[\/\\]/,'').replace(/_/g,' ').replace(/\.docx$/i,'');
+        n=n.replace(/^\d{2}\.\d{2}\s*/,'').replace(/^\d+\s+/,'');
+        n=n.replace(/\bПриказ\s+\d+\s*/gi,'Приказ ');
+        n=n.replace(/\bИОТ\s+\d+\s*/gi,'');
+        return n.replace(/\s+/g,' ').trim();
+      })()}</div>
       <div class="client-meta">${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">

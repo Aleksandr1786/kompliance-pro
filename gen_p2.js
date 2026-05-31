@@ -33,7 +33,7 @@ async function gen_02_01(c,s,dir){
     SH('5. Заключительные положения'),
     p('5.1. Лица, не прошедшие обучение, к работе не допускаются.',{indent:true}),
     ...famSheet(c,'02.01')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.01')},children:ch}],dir,'02.01_Положение_о_порядке_обучения_по_ОТ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.01')},children:ch}],dir,'Положение о порядке обучения по охране труда.docx');
 }
 
 async function gen_02_02(c,s,dir){
@@ -60,7 +60,7 @@ async function gen_02_02(c,s,dir){
     p('4.1. Контроль осуществляет '+c.ot_position+' '+c.ot_name+'.',{indent:true}),
     p('4.2. Государственный надзор — ГИТ субъекта РФ.',{indent:true}),
     ...famSheet(c,'02.02')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.02')},children:ch}],dir,'02.02_Положение_об_организации_работы_по_ОТ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.02')},children:ch}],dir,'Положение об организации работы по охране труда.docx');
 }
 
 async function gen_02_03(c,s,dir){
@@ -86,7 +86,7 @@ async function gen_02_03(c,s,dir){
     SH('5. Учёт и хранение'),
     p('5.1. Контрольный экземпляр хранится у '+c.manager_position+'.',{indent:true}),
     ...famSheet(c,'02.03')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.03')},children:ch}],dir,'02.03_Положение_о_разработке_инструкций_по_ОТ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.03')},children:ch}],dir,'Положение о разработке инструкций по охране труда.docx');
 }
 
 async function gen_02_04(c,s,dir){
@@ -104,7 +104,7 @@ async function gen_02_04(c,s,dir){
     SH('3. Документирование'),
     p('3.1. Ежеквартальный анализ данных журнала для выявления системных причин.',{indent:true}),
     ...famSheet(c,'02.04')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.04')},children:ch}],dir,'02.04_Положение_об_учёте_микротравм.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.04')},children:ch}],dir,'Положение об учёте микротравм.docx');
 }
 
 async function gen_02_05(c,s,dir){
@@ -133,7 +133,7 @@ async function gen_02_05(c,s,dir){
     SH('6. Ответственность за нарушение трудовой дисциплины'),
     p('6.1. Взыскания: замечание, выговор, увольнение (ст. 192 ТК РФ).',{indent:true}),
     ...famSheet(c,'ПВТР')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.05')},children:ch}],dir,'02.05_Правила_внутреннего_трудового_распорядка.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.05')},children:ch}],dir,'Правила внутреннего трудового распорядка.docx');
 }
 
 async function gen_02_06(c,s,dir){
@@ -156,7 +156,7 @@ async function gen_02_06(c,s,dir){
     SH('6. Ответственность'),
     p('6.1. Ответственность по ч. 4 ст. 5.27.1 КоАП РФ.',{indent:true}),
     ...famSheet(c,'02.06')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.06')},children:ch}],dir,'02.06_Положение_об_обеспечении_СИЗ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.06')},children:ch}],dir,'Положение об обеспечении работников СИЗ.docx');
 }
 
 // ── РАЗДЕЛ 3 ───────────────────────────────────────────
@@ -166,7 +166,7 @@ async function gen_03_01(c,s,dir){
   const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true,sz:SZ_S}),cell('ФИО работника',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Группа',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Кто проводил инструктаж',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[6],{bold:true,center:true,sz:SZ_S})]);
   const er=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch=[pC(c.name,{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта присвоения группы I по электробезопасности',SZ),H('неэлектротехническому персоналу',SZ),...eL(2),pL('Начат: «___» ____________ '+c.doc_year+' г.'),pL('Окончен: «___» ____________ ______ г.'),...eL(1),pL('Ответственный: '+(c.elec_position||c.manager_position)+'  '+(c.elec_name||c.manager_name)),new (require('docx').Paragraph)({children:[]}),p('Инструктаж с присвоением I группы проводится ежегодно. Основание: Приказ Минэнерго от 12.08.2022 № 811, Приказ Минтруда от 15.12.2020 № 903н.',{sz:SZ_S}),...eL(1),tbl(colW,[hdr,...er])];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('03.01')},children:ch}],dir,'03.01_Журнал_I_группа_электробезопасность.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('03.01')},children:ch}],dir,'Журнал учёта присвоения I группы электробезопасности.docx');
 }
 
 async function gen_03_02(c,s,dir){
@@ -196,7 +196,7 @@ async function gen_03_02(c,s,dir){
     SH('4. Проверка знаний'),
     p('Устный опрос. Результат — в журнале учёта присвоения I группы.',{indent:true}),
     ...devSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('03.02')},children:ch}],dir,'03.02_Программа_инструктаж_электробезопасность.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('03.02')},children:ch}],dir,'Программа инструктажа по электробезопасности.docx');
 }
 
 // ── РАЗДЕЛ 5 ───────────────────────────────────────────
@@ -225,7 +225,7 @@ async function gen_05_01(c,s,dir){
     p('4.2. НС: первая помощь → 103/112 → сохранить обстановку → организовать расследование.',{indent:true}),
     SH('5. Требования по окончании работы'),
     p('5.1. Отключить оргтехнику от сети. Привести рабочее место в порядок.',{indent:true}),
-  ],dir,'05.01_ИОТ_01_'+c.manager_position.replace(/\s+/g,'_').slice(0,30)+'.docx');
+  ],dir,'Инструкция по охране труда для '+c.manager_position+'.docx');
 }
 
 async function gen_05_employees(c,s,dir){
@@ -261,7 +261,7 @@ async function gen_05_employees(c,s,dir){
       p('4.2. НС: первая помощь → 103/112 → сообщить руководителю.',{indent:true}),
       SH('5. Требования по окончании работы'),
       p('5.1. Выключить оборудование. Привести рабочее место в порядок.',{indent:true}),
-    ],dir,'05.'+String(i+2).padStart(2,'0')+'_ИОТ_'+num+'_'+pos.replace(/[\/\\:*?"<>|\s]/g,'_').slice(0,25)+'.docx');
+    ],dir,'Инструкция по охране труда для '+pos.replace(/[\/\\:*?"<>|]/g,'_')+'.docx');
     generated.push(fname);
   }
   return generated;
@@ -291,7 +291,7 @@ async function gen_05_06(c,s,dir){
     p('5.3. Пожар: 101/112 → отключить → эвакуация → огнетушитель (ОУ или ОП).',{indent:true}),
     SH('6. Требования по окончании работы'),
     p('6.1. Сохранить файлы, закрыть программы, выключить ПК и периферию. Отключить электроприборы.',{indent:true}),
-  ],dir,'05.06_ИОТ_06_ПЭВМ_оргтехника.docx');
+  ],dir,'Инструкция по охране труда при работе с ПЭВМ.docx');
 }
 
 async function gen_05_07(c,s,dir){
@@ -312,7 +312,7 @@ async function gen_05_07(c,s,dir){
     p('4.3. Пожар: отключить → 101/112 → ОУ или ОП. Запрещается тушить водой.',{indent:true}),
     SH('5. Требования по окончании работы'),
     p('5.1. Дождаться окончания заданий. Отключить от сети. Убрать рабочее место. Проветрить.',{indent:true}),
-  ],dir,'05.07_ИОТ_07_копировальная_техника.docx');
+  ],dir,'Инструкция по охране труда при работе с копировальной техникой.docx');
 }
 
 async function gen_05_08(c,s,dir){
@@ -338,7 +338,7 @@ async function gen_05_08(c,s,dir){
     p('5.1. Административная ответственность по ч. 1 ст. 5.27.1 КоАП РФ.',{indent:true}),
     ...famSheet(c,'№ 08-ИОТ'),...devSign(c),
     ...eL(2),H('Приложение № 1 к Инструкции № 08-ИОТ',SZ),H('ЖУРНАЛ КОНТРОЛЯ АПТЕЧКИ ПЕРВОЙ ПОМОЩИ',SZ),H(c.name,SZ),...eL(1),tbl(jColW,[jHdr,...jRows])];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('05.08')},children:ch}],dir,'05.08_ИОТ_08_аптечка_первой_помощи.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('05.08')},children:ch}],dir,'Инструкция о порядке использования аптечки.docx');
 }
 
 module.exports={gen_02_01,gen_02_02,gen_02_03,gen_02_04,gen_02_05,gen_02_06,gen_03_01,gen_03_02,gen_05_01,gen_05_employees,gen_05_06,gen_05_07,gen_05_08};

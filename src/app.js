@@ -22,10 +22,19 @@ function applySettings() {
   document.getElementById('userAvatar').textContent = initials;
   document.getElementById('userRole').textContent = settings.user_position || 'Специалист по ОТ';
   const hasKey = settings.ai_key && settings.ai_key.length > 10;
+  const providerNames = { deepseek:'DeepSeek', claude:'Claude', yandex:'YandexGPT', giga:'GigaChat', ollama:'Ollama' };
+  const providerName  = providerNames[settings.ai_provider] || 'AI';
   const dot = document.querySelector('.ai-dot');
   const txt = document.getElementById('aiStatusText');
-  if (hasKey) { dot.classList.add('active'); txt.textContent = 'AI активен'; }
-  else { dot.classList.remove('active'); txt.textContent = 'Базовый режим'; }
+  if (hasKey) {
+    dot.classList.add('active');
+    txt.textContent = providerName + ' активен';
+    txt.style.color = 'var(--green)';
+  } else {
+    dot.classList.remove('active');
+    txt.textContent = 'Базовый режим';
+    txt.style.color = '';
+  }
 }
 
 // ── НАВИГАЦИЯ ────────────────────────────────────────────
@@ -483,6 +492,26 @@ function renderEmpRow(e) {
   </div>`;
 }
 
+// ─── СКЛОНЕНИЕ ФИО ЧЕРЕЗ AI ──────────────────────────────
+async function declineFIO(fullName) {
+  try {
+    const result = await window.api.aiRequest({
+      system: 'Ты — помощник по русской грамматике. Отвечай ТОЛЬКО валидным JSON без markdown и пояснений.',
+      prompt: `Просклоняй ФИО "${fullName}" по падежам. Определи пол автоматически.
+Верни ТОЛЬКО JSON в формате:
+{"nom":"${fullName}","gen":"...","dat":"...","acc":"...","ins":"...","pre":"...","short":"..."}
+где short — краткая форма "Фамилия И.О."`,
+    });
+    if (!result.ok) return null;
+    const text = result.text.replace(/```json|```/g,'').trim();
+    const data = JSON.parse(text);
+    return data;
+  } catch(e) {
+    console.error('declineFIO error:', e);
+    return null;
+  }
+}
+
 async function addEmployeePrompt(clientId) {
   // Создаём модальное окно вместо prompt (prompt блокируется в Electron)
   const modal = document.createElement('div');
@@ -523,9 +552,40 @@ async function addEmployeePrompt(clientId) {
       const birth = document.getElementById('emp-birth').value || '';
       const mil   = document.getElementById('emp-mil').checked ? 1 : 0;
       if (!name) { document.getElementById('emp-name').style.border = '1px solid #f87171'; return; }
+
+      // Показываем индикатор загрузки
+      const saveBtn = document.getElementById('emp-save');
+      saveBtn.textContent = '⏳ Склоняю ФИО...';
+      saveBtn.disabled = true;
+
+      // Склоняем ФИО через AI
+      let declension = null;
+      if (window.api.aiRequest) {
+        declension = await declineFIO(name);
+      }
+
       modal.remove();
-      await window.api.employeeAdd({ client_id: clientId, full_name: name, position: pos, birth_date: birth, department: '', is_military: mil, hired_at: new Date().toISOString().slice(0,10) });
-      showToast('✅ Сотрудник добавлен');
+
+      await window.api.employeeAdd({
+        client_id:    clientId,
+        full_name:    name,
+        position:     pos,
+        birth_date:   birth,
+        department:   '',
+        is_military:  mil,
+        hired_at:     new Date().toISOString().slice(0,10),
+        // Падежи (если AI ответил)
+        name_gen:     declension?.gen  || '',  // родительный: Иванова
+        name_dat:     declension?.dat  || '',  // дательный:   Иванову
+        name_acc:     declension?.acc  || '',  // винительный: Иванова
+        name_ins:     declension?.ins  || '',  // творительный:Ивановым
+        name_short:   declension?.short|| '',  // краткое:     Иванов И.И.
+      });
+      if (declension?.dat) {
+        showToast('✅ Сотрудник добавлен · ' + declension.short);
+      } else {
+        showToast('✅ Сотрудник добавлен' + (window.api.aiRequest ? ' (AI недоступен)' : ''));
+      }
       await navigate('client', clientId);
       resolve(true);
     };
@@ -581,9 +641,33 @@ async function editEmployeePrompt(empId) {
       const birth = document.getElementById('edit-emp-birth').value || '';
       const mil   = document.getElementById('edit-emp-mil').checked ? 1 : 0;
       if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
+
+      const saveBtn2 = document.getElementById('edit-emp-save');
+      saveBtn2.textContent = '⏳ Склоняю ФИО...';
+      saveBtn2.disabled = true;
+
+      let declension = null;
+      if (window.api.aiRequest) {
+        declension = await declineFIO(name);
+      }
+
       modal.remove();
-      await window.api.employeeUpdate(empId, { full_name: name, position: pos, birth_date: birth, is_military: mil });
-      showToast('✅ Сотрудник обновлён');
+      await window.api.employeeUpdate(empId, {
+        full_name:   name,
+        position:    pos,
+        birth_date:  birth,
+        is_military: mil,
+        name_gen:    declension?.gen   || '',
+        name_dat:    declension?.dat   || '',
+        name_acc:    declension?.acc   || '',
+        name_ins:    declension?.ins   || '',
+        name_short:  declension?.short || '',
+      });
+      if (declension?.dat) {
+        showToast('✅ Сотрудник обновлён · ' + declension.short);
+      } else {
+        showToast('✅ Сотрудник обновлён');
+      }
       await navigate('client', currentClientId);
       resolve(true);
     };
@@ -730,6 +814,7 @@ async function renderSettings() {
           <div class="section-body">
             <div style="display:flex;flex-direction:column;gap:8px">
               ${[
+                ['deepseek','⚡','DeepSeek API','Быстрый · Дешёвый · OpenAI-совместимый','Рекомендуем'],
                 ['claude','🤖','Claude API (Anthropic)','Наилучшее качество для юридических текстов','Основной'],
                 ['yandex','🟡','YandexGPT API','Российский · Не блокируется в РФ','РФ'],
                 ['giga','🟢','GigaChat API (Сбер)','Российский · Сертифицирован для ПД','РФ'],

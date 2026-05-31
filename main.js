@@ -282,7 +282,89 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
   shell.openPath(filepath);
 });
 
-// ─── ОКНО ────────────────────────────────────────────────
+// ─── AI ЗАПРОСЫ ──────────────────────────────────────────
+ipcMain.handle('ai:request', async (_, { prompt, system }) => {
+  const s = db.get('settings').value();
+  const provider = s.ai_provider || 'deepseek';
+  const apiKey   = s.ai_key || '';
+
+  if (!apiKey) return { ok: false, error: 'API ключ не указан в настройках' };
+
+  try {
+    let url, headers, body;
+
+    if (provider === 'claude') {
+      url = 'https://api.anthropic.com/v1/messages';
+      headers = {
+        'Content-Type':      'application/json',
+        'x-api-key':         apiKey,
+        'anthropic-version': '2023-06-01',
+      };
+      body = JSON.stringify({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system:     system || 'Ты помощник. Отвечай только JSON без markdown.',
+        messages:   [{ role: 'user', content: prompt }],
+      });
+    } else {
+      // DeepSeek — OpenAI-совместимый формат
+      url = 'https://api.deepseek.com/v1/chat/completions';
+      headers = {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + apiKey,
+      };
+      body = JSON.stringify({
+        model:       'deepseek-chat',
+        max_tokens:  512,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: system || 'Ты помощник. Отвечай только JSON без markdown.' },
+          { role: 'user',   content: prompt },
+        ],
+      });
+    }
+
+    const https  = require('https');
+    const urlObj = new URL(url);
+
+    const result = await new Promise((resolve, reject) => {
+      const req = https.request({
+        hostname: urlObj.hostname,
+        path:     urlObj.pathname,
+        method:   'POST',
+        headers,
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve(json);
+          } catch(e) {
+            reject(new Error('Ошибка парсинга ответа: ' + data.slice(0, 200)));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+
+    // Извлекаем текст ответа
+    let text = '';
+    if (provider === 'claude') {
+      text = result.content?.[0]?.text || '';
+    } else {
+      text = result.choices?.[0]?.message?.content || '';
+    }
+
+    if (!text) return { ok: false, error: 'Пустой ответ от AI', raw: result };
+    return { ok: true, text };
+
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+});
 let mainWindow;
 
 function createWindow() {

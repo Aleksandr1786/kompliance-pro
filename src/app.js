@@ -97,18 +97,18 @@ async function renderDashboard() {
     <div class="grid2">
       <div>
         <div class="panel">
-          <div class="panel-head"><span>🏢</span><div class="panel-title">Клиенты</div><div class="panel-count">${clients.length} орг.</div><div class="panel-action" onclick="navigate('clients')">Все →</div></div>
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Клиенты</div><div class="panel-count">${clients.length} орг.</div><div class="panel-action" onclick="navigate('clients')">Все →</div></div>
           <div class="client-search"><input class="search-input" placeholder="🔍 Поиск клиента..." oninput="filterDashClients(this.value)"></div>
           <div id="dashClientList">${renderClientRows(clients)}</div>
         </div>
         ${tasks.length ? `
         <div class="panel">
-          <div class="panel-head"><span>📋</span><div class="panel-title">Задачи на сегодня</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи на сегодня</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
           <div>${tasks.slice(0,5).map(t => renderTaskRow(t)).join('')}</div>
         </div>` : ''}
       </div>
       <div class="panel">
-        <div class="panel-head"><span>🔔</span><div class="panel-title">Ближайшие события</div></div>
+        <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="panel-title">Ближайшие события</div></div>
         <div>${events.length ? events.slice(0,8).map(e => renderEventRow(e)).join('') : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Событий нет</div><div class="empty-sub">Добавьте клиентов — события появятся автоматически</div></div>'}</div>
       </div>
     </div>
@@ -186,7 +186,7 @@ async function renderClients() {
 
   document.getElementById('content').innerHTML = `
     <div class="panel">
-      <div class="panel-head"><span>🏢</span><div class="panel-title">Все клиенты</div><div class="panel-count">${clients.length} организаций</div></div>
+      <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Все клиенты</div><div class="panel-count">${clients.length} организаций</div></div>
       <div class="client-search"><input class="search-input" placeholder="🔍 Поиск по названию, ИНН, ОКВЭД..." oninput="filterClients(this.value)" id="clientSearch"></div>
       <div id="fullClientList">${renderClientRows(clients)}</div>
     </div>
@@ -281,21 +281,21 @@ async function renderClientCard(id) {
     </div>
 
     <div class="tabs">
-      <div class="tab active" onclick="switchTab('overview')">📊 Обзор</div>
-      ${mods.includes('OT')?`<div class="tab" onclick="switchTab('ot')">🦺 Охрана труда</div>`:''}
-      ${mods.includes('PD')?`<div class="tab" onclick="switchTab('pd')">🔒 Персданные</div>`:''}
-      ${mods.includes('VU')?`<div class="tab" onclick="switchTab('vu')">⚔️ Воинский учёт</div>`:''}
-      <div class="tab" onclick="switchTab('staff')">👥 Сотрудники</div>
+      <div class="tab active" onclick="switchTab('overview')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Обзор</span></div>
+      ${mods.includes('OT')?`<div class="tab" onclick="switchTab('ot')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Охрана труда</span></div>`:''}
+      ${mods.includes('PD')?`<div class="tab" onclick="switchTab('pd')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Персданные</span></div>`:''}
+      ${mods.includes('VU')?`<div class="tab" onclick="switchTab('vu')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Воинский учёт</span></div>`:''}
+      <div class="tab" onclick="switchTab('staff')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Сотрудники</span></div>
     </div>
 
     <div class="tab-panel active" id="tab-overview">
       <div class="grid2">
         <div class="panel">
-          <div class="panel-head"><span>🔔</span><div class="panel-title">Ближайшие события</div></div>
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="panel-title">Ближайшие события</div></div>
           <div>${events.length ? events.slice(0,6).map(e=>renderEventRow(e)).join('') : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Событий нет</div></div>'}</div>
         </div>
         <div class="panel">
-          <div class="panel-head"><span>📋</span><div class="panel-title">Задачи</div><div class="panel-action" onclick="addTaskForClient(${id})">+ Добавить</div></div>
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="addTaskForClient(${id})">+ Добавить</div></div>
           <div>${clientTasks.length ? clientTasks.map(t=>renderTaskRow(t)).join('') : '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">Задач нет</div></div>'}</div>
         </div>
       </div>
@@ -332,7 +332,7 @@ async function renderClientCard(id) {
 
     <div class="tab-panel" id="tab-staff">
       <div class="panel">
-        <div class="panel-head"><span>👥</span><div class="panel-title">Сотрудники</div><div class="panel-count">${emps.length} чел.</div><div class="panel-action" onclick="addEmployeePrompt(${id})">+ Добавить</div></div>
+        <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Сотрудники</div><div class="panel-count">${emps.length} чел.</div><div class="panel-action" onclick="addEmployeePrompt(${id})">+ Добавить</div></div>
         <div>${emps.length ? emps.map(e=>renderEmpRow(e)).join('') : '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>'}</div>
       </div>
     </div>
@@ -649,7 +649,7 @@ async function renderSettings() {
       <div style="flex:1;display:flex;flex-direction:column;gap:14px">
 
         <div class="section" id="s-profile">
-          <div class="section-head"><span class="section-icon">👤</span><div class="section-title">Профиль</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><div class="section-title">Профиль</div></div>
           <div class="section-body">
             <div class="form-row">
               <div class="form-group"><div class="form-label">Имя и фамилия</div><input class="form-input" id="s-user_name" value="${s.user_name||''}"></div>
@@ -663,7 +663,7 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-req">
-          <div class="section-head"><span class="section-icon">🏢</span><div class="section-title">Реквизиты исполнителя</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span><div class="section-title">Реквизиты исполнителя</div></div>
           <div class="section-body">
             <div class="form-group"><div class="form-label">Полное наименование</div><input class="form-input" id="s-company_name" value="${s.company_name||''}" placeholder="ИП Фамилия Имя Отчество"></div>
             <div class="form-row">
@@ -675,7 +675,7 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-tg">
-          <div class="section-head"><span class="section-icon">✈️</span><div class="section-title">Telegram-уведомления</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span><div class="section-title">Telegram-уведомления</div></div>
           <div class="section-body">
             <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;font-size:12.5px;color:var(--muted2);line-height:1.7">
               1. Открой Telegram → найди <b style="color:var(--text)">@BotFather</b> → напиши <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;color:var(--cyan)">/newbot</code><br>
@@ -693,7 +693,7 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-remind">
-          <div class="section-head"><span class="section-icon">🔔</span><div class="section-title">Напоминания</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="section-title">Напоминания</div></div>
           <div class="section-body">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
               ${['30','14','3'].map((d,i) => `<div style="background:var(--s3);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
@@ -708,7 +708,7 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-backup">
-          <div class="section-head"><span class="section-icon">💾</span><div class="section-title">Резервные копии</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg></span><div class="section-title">Резервные копии</div></div>
           <div class="section-body">
             <div class="form-row">
               <div class="form-group" style="grid-column:1/-1"><div class="form-label">Папка для копий</div>
@@ -726,7 +726,7 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-ai">
-          <div class="section-head"><span class="section-icon">🤖</span><div class="section-title">AI-провайдер</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></span><div class="section-title">AI-провайдер</div></div>
           <div class="section-body">
             <div style="display:flex;flex-direction:column;gap:8px">
               ${[

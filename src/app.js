@@ -7,11 +7,34 @@ let currentPage = 'dashboard';
 let currentClientId = null;
 let settings = {};
 
+// ── ADMIN MODE ───────────────────────────────────────────
+// true  = ты (видишь провайдера, технические детали)
+// false = клиент/пользователь (видит только бренд)
+// Переключается тройным кликом на логотип
+let IS_ADMIN = true;
+
 // ── ИНИЦИАЛИЗАЦИЯ ────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   settings = await window.api.settingsGet();
+  // Загружаем admin-режим из настроек
+  IS_ADMIN = settings.is_admin !== '0'; // по умолчанию admin=true
   applySettings();
   setupNav();
+  // Тройной клик на логотип — переключает admin/user режим (секретно)
+  let clickCount = 0, clickTimer;
+  document.querySelector('.logo')?.addEventListener('click', () => {
+    clickCount++;
+    clearTimeout(clickTimer);
+    clickTimer = setTimeout(() => {
+      if (clickCount >= 3) {
+        IS_ADMIN = !IS_ADMIN;
+        window.api.settingsSave({ is_admin: IS_ADMIN ? '1' : '0' });
+        applySettings();
+        showToast(IS_ADMIN ? '🔧 Режим администратора' : '👤 Режим пользователя');
+      }
+      clickCount = 0;
+    }, 400);
+  });
   await navigate('dashboard');
 });
 
@@ -21,14 +44,20 @@ function applySettings() {
   document.getElementById('userName').textContent = name;
   document.getElementById('userAvatar').textContent = initials;
   document.getElementById('userRole').textContent = settings.user_position || 'Специалист по ОТ';
+
   const hasKey = settings.ai_key && settings.ai_key.length > 10;
-  const providerNames = { deepseek:'DeepSeek', claude:'Claude', yandex:'YandexGPT', giga:'GigaChat', ollama:'Ollama' };
-  const providerName  = providerNames[settings.ai_provider] || 'AI';
   const dot = document.querySelector('.ai-dot');
   const txt = document.getElementById('aiStatusText');
+
   if (hasKey) {
     dot.classList.add('active');
-    txt.textContent = providerName + ' активен';
+    // Admin видит название провайдера, пользователь — нейтральный текст
+    if (IS_ADMIN) {
+      const providerNames = { deepseek:'DeepSeek', claude:'Claude', yandex:'YandexGPT', giga:'GigaChat', ollama:'Ollama' };
+      txt.textContent = (providerNames[settings.ai_provider] || 'AI') + ' активен';
+    } else {
+      txt.textContent = '✨ Ассистент активен';
+    }
     txt.style.color = 'var(--green)';
   } else {
     dot.classList.remove('active');
@@ -513,23 +542,41 @@ async function declineFIO(fullName) {
 }
 
 async function addEmployeePrompt(clientId) {
-  // Создаём модальное окно вместо prompt (prompt блокируется в Electron)
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
   modal.innerHTML = `
-    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
       <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">➕ Добавить сотрудника</div>
       <div style="margin-bottom:14px">
-        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью</label>
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью <span style="color:#f87171">*</span></label>
         <input id="emp-name" placeholder="Иванов Иван Иванович" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
       </div>
       <div style="margin-bottom:14px">
-        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность <span style="color:#f87171">*</span></label>
         <input id="emp-pos" placeholder="Менеджер по продажам" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
       </div>
-      <div style="margin-bottom:14px">
-        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
-        <input id="emp-birth" type="date" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Пол</label>
+          <div style="display:flex;gap:8px">
+            <button id="emp-gender-m" onclick="selectGender('m')" style="flex:1;padding:9px;background:rgba(59,130,246,0.15);border:1px solid var(--blue);border-radius:8px;color:#60a5fa;cursor:pointer;font-size:13px;font-weight:600">М</button>
+            <button id="emp-gender-f" onclick="selectGender('f')" style="flex:1;padding:9px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px;font-weight:600">Ж</button>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Табельный №</label>
+          <input id="emp-tab" placeholder="001" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
+          <input id="emp-birth" type="date" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата приёма</label>
+          <input id="emp-hired" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
       </div>
       <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="emp-mil" style="width:16px;height:16px;cursor:pointer">
@@ -543,19 +590,38 @@ async function addEmployeePrompt(clientId) {
   document.body.appendChild(modal);
   document.getElementById('emp-name').focus();
 
+  // Выбор пола
+  window.selectGender = (g) => {
+    const m = document.getElementById('emp-gender-m');
+    const f = document.getElementById('emp-gender-f');
+    if (g === 'm') {
+      m.style.background = 'rgba(59,130,246,0.15)'; m.style.borderColor = '#3b82f6'; m.style.color = '#60a5fa';
+      f.style.background = '#0f1520';               f.style.borderColor = 'rgba(255,255,255,0.1)'; f.style.color = '#94a3b8';
+    } else {
+      f.style.background = 'rgba(236,72,153,0.15)'; f.style.borderColor = '#ec4899'; f.style.color = '#f472b6';
+      m.style.background = '#0f1520';               m.style.borderColor = 'rgba(255,255,255,0.1)'; m.style.color = '#94a3b8';
+    }
+    m.dataset.selected = g === 'm' ? '1' : '';
+    f.dataset.selected = g === 'f' ? '1' : '';
+  };
+
   await new Promise(resolve => {
     document.getElementById('emp-cancel').onclick = () => { modal.remove(); resolve(false); };
     modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(false); } };
     document.getElementById('emp-save').onclick = async () => {
-      const name  = document.getElementById('emp-name').value.trim();
-      const pos   = document.getElementById('emp-pos').value.trim();
-      const birth = document.getElementById('emp-birth').value || '';
-      const mil   = document.getElementById('emp-mil').checked ? 1 : 0;
+      const name   = document.getElementById('emp-name').value.trim();
+      const pos    = document.getElementById('emp-pos').value.trim();
+      const birth  = document.getElementById('emp-birth').value || '';
+      const hired  = document.getElementById('emp-hired').value || new Date().toISOString().slice(0,10);
+      const tab    = document.getElementById('emp-tab').value.trim();
+      const mil    = document.getElementById('emp-mil').checked ? 1 : 0;
+      const genderM = document.getElementById('emp-gender-m');
+      const gender = genderM?.dataset.selected === '1' ? 'm' : 'f';
+
       if (!name) { document.getElementById('emp-name').style.border = '1px solid #f87171'; return; }
 
-      // Показываем индикатор загрузки
       const saveBtn = document.getElementById('emp-save');
-      saveBtn.textContent = '⏳ Склоняю ФИО...';
+      saveBtn.textContent = '⏳ Обработка...';
       saveBtn.disabled = true;
 
       // Склоняем ФИО через AI
@@ -567,29 +633,30 @@ async function addEmployeePrompt(clientId) {
       modal.remove();
 
       await window.api.employeeAdd({
-        client_id:    clientId,
-        full_name:    name,
-        position:     pos,
-        birth_date:   birth,
-        department:   '',
-        is_military:  mil,
-        hired_at:     new Date().toISOString().slice(0,10),
-        // Падежи (если AI ответил)
-        name_gen:     declension?.gen  || '',  // родительный: Иванова
-        name_dat:     declension?.dat  || '',  // дательный:   Иванову
-        name_acc:     declension?.acc  || '',  // винительный: Иванова
-        name_ins:     declension?.ins  || '',  // творительный:Ивановым
-        name_short:   declension?.short|| '',  // краткое:     Иванов И.И.
+        client_id:   clientId,
+        full_name:   name,
+        position:    pos,
+        birth_date:  birth,
+        hired_at:    hired,
+        tab_number:  tab,
+        gender:      gender,
+        department:  '',
+        is_military: mil,
+        name_gen:    declension?.gen   || '',
+        name_dat:    declension?.dat   || '',
+        name_acc:    declension?.acc   || '',
+        name_ins:    declension?.ins   || '',
+        name_short:  declension?.short || '',
       });
+
       if (declension?.dat) {
         showToast('✅ Сотрудник добавлен · ' + declension.short);
       } else {
-        showToast('✅ Сотрудник добавлен' + (window.api.aiRequest ? ' (AI недоступен)' : ''));
+        showToast('✅ Сотрудник добавлен');
       }
       await navigate('client', clientId);
       resolve(true);
     };
-    // Enter для сохранения
     modal.addEventListener('keydown', async (e) => {
       if (e.key === 'Enter') document.getElementById('emp-save').click();
       if (e.key === 'Escape') { modal.remove(); resolve(false); }
@@ -728,7 +795,7 @@ async function renderSettings() {
         <div class="snav-item" onclick="scrollSection('s-tg',this)">✈️ Telegram</div>
         <div class="snav-item" onclick="scrollSection('s-remind',this)">🔔 Напоминания</div>
         <div class="snav-item" onclick="scrollSection('s-backup',this)">💾 Резервные копии</div>
-        <div class="snav-item" onclick="scrollSection('s-ai',this)">🤖 AI-провайдер</div>
+        ${IS_ADMIN ? `<div class="snav-item" onclick="scrollSection('s-ai',this)">🤖 AI-провайдер</div>` : ''}
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:14px">
 
@@ -809,30 +876,21 @@ async function renderSettings() {
           </div>
         </div>
 
+        ${IS_ADMIN ? `
         <div class="section" id="s-ai">
           <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></span><div class="section-title">AI-провайдер</div></div>
           <div class="section-body">
             <div style="display:flex;flex-direction:column;gap:8px">
-              ${[
-                ['deepseek','⚡','DeepSeek API','Быстрый · Дешёвый · OpenAI-совместимый','Рекомендуем'],
-                ['claude','🤖','Claude API (Anthropic)','Наилучшее качество для юридических текстов','Основной'],
-                ['yandex','🟡','YandexGPT API','Российский · Не блокируется в РФ','РФ'],
-                ['giga','🟢','GigaChat API (Сбер)','Российский · Сертифицирован для ПД','РФ'],
-                ['ollama','🟣','Локальная модель (Ollama)','Полностью офлайн · Без интернета','Офлайн'],
-              ].map(([val,icon,name,desc,badge]) => `
-                <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--s3);border:1px solid ${s.ai_provider===val?'var(--blue)':'var(--border)'};border-radius:10px;cursor:pointer;transition:all .15s" onclick="selectAiProvider('${val}',this)">
-                  <div style="font-size:18px">${icon}</div>
-                  <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${name}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${desc}</div></div>
-                  <div style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,0.12);color:var(--blue2)">${badge}</div>
-                </div>`).join('')}
+              ${buildAiProviderList(s)}
             </div>
             <div style="margin-top:4px">
               <div class="form-label" style="margin-bottom:6px">API-ключ выбранного провайдера</div>
               <input class="form-input" id="s-ai_key" type="password" value="${s.ai_key||''}" placeholder="Введите API-ключ когда будет готов">
-              <div style="font-size:11px;color:var(--muted);margin-top:4px">Без ключа приложение работает в базовом режиме (шаблоны без AI-генерации)</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">Без ключа приложение работает в базовом режиме</div>
             </div>
           </div>
         </div>
+        ` : ''}
 
         <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:20px">
           <button class="btn btn-ghost" onclick="renderSettings()">Сбросить</button>
@@ -847,6 +905,23 @@ function scrollSection(id, el) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.querySelectorAll('.snav-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
+}
+
+function buildAiProviderList(s) {
+  const providers = [
+    ['deepseek','⚡','DeepSeek API','Быстрый · Дешёвый · OpenAI-совместимый','Рекомендуем'],
+    ['claude','🤖','Claude API (Anthropic)','Наилучшее качество для юридических текстов','Основной'],
+    ['yandex','🟡','YandexGPT API','Российский · Не блокируется в РФ','РФ'],
+    ['giga','🟢','GigaChat API (Сбер)','Российский · Сертифицирован для ПД','РФ'],
+    ['ollama','🟣','Локальная модель (Ollama)','Полностью офлайн · Без интернета','Офлайн'],
+  ];
+  return providers.map(([val,icon,name,desc,badge]) =>
+    `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--s3);border:1px solid ${s.ai_provider===val?'var(--blue)':'var(--border)'};border-radius:10px;cursor:pointer;transition:all .15s" onclick="selectAiProvider('${val}',this)">
+      <div style="font-size:18px">${icon}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${name}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${desc}</div></div>
+      <div style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,0.12);color:var(--blue2)">${badge}</div>
+    </div>`
+  ).join('');
 }
 
 function selectAiProvider(val, el) {

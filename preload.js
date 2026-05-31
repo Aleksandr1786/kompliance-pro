@@ -44,6 +44,7 @@ employeeUpdate: (id, data) => ipcRenderer.invoke('employees:update', id, data),
   docsGenerate:   (clientId)  => ipcRenderer.invoke('docs:generate', clientId),
   docsOpenFolder: (dir)       => ipcRenderer.invoke('docs:open-folder', dir),
 docsOpenFile:  (filepath) => ipcRenderer.invoke('docs:open-file', filepath),
+aiRequest:    (data) => ipcRenderer.invoke('ai:request', data),
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),
 });

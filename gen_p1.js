@@ -106,7 +106,9 @@ function devSign(c){return [...eL(2),pL([{t:'Разработал: '},{t:c.manag
 function norm(client){
   const c=Object.assign({},client);
   c.name=c.name||'Организация';c.form=c.form||'ООО';
-  c.city=((c.city||'').replace(/^г\.?\s*/i,'').trim())||'б/м';
+  // Город: берём c.city если есть, иначе c.region, убираем префикс "г."
+  const rawCity = (c.city || c.region || '').trim();
+  c.city = rawCity.replace(/^г\.?\s*/i,'').replace(/^город\s*/i,'').trim() || '________________';
   c.doc_date=c.doc_date||new Date().toLocaleDateString('ru-RU');
   c.doc_year=c.doc_year||String(new Date().getFullYear());
   c.manager_name=c.manager_name||'Руководитель';
@@ -161,7 +163,7 @@ async function gen_01_01(c,s,dir){
     SH('5. Заключительные положения'),
     p('Политика обязательна для всех работников. Пересматривается не реже 1 раза в 3 года.',{indent:true}),
     ...famSheet(c,'01.01')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.01')},children:ch}],dir,'01.01_Политика_в_области_охраны_труда.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.01')},children:ch}],dir,'Политика в области охраны труда.docx');
 }
 
 async function gen_01_02(c,s,dir){
@@ -191,7 +193,7 @@ async function gen_01_02(c,s,dir){
     p('8.1. НС — ст. 227–231 ТК РФ, Приказ Минтруда от 20.04.2022 № 223н.',{indent:true}),
     p('8.2. Микротравмы — ст. 226 ТК РФ, Приказ Минтруда от 15.09.2021 № 632н.',{indent:true}),
     ...famSheet(c,'01.02')];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.02')},children:ch}],dir,'01.02_Положение_о_СУОТ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.02')},children:ch}],dir,'Положение о системе управления охраной труда.docx');
 }
 
 async function gen_01_03(c,s,dir){
@@ -212,7 +214,7 @@ async function gen_01_03(c,s,dir){
     p('3. '+c.ot_position+' '+(c.ot_name_full||c.ot_name)+': ознакомить работников с документами под подпись в срок до 5 рабочих дней.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c),...famSheetOrder(c,'№ '+num)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.03')},children:ch}],dir,'01.03_Приказ_'+num+'_утверждение_документации.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.03')},children:ch}],dir,'Приказ об утверждении документации по охране труда.docx');
 }
 
 async function gen_01_04(c,s,dir){
@@ -233,7 +235,7 @@ async function gen_01_04(c,s,dir){
     p('3. Всем работникам выполнять требования ОТ и указания ответственного лица.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c),...famSheetOrder(c,'№ '+num)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.04')},children:ch}],dir,'01.04_Приказ_'+num+'_назначение_ответственных.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.04')},children:ch}],dir,'Приказ о назначении ответственных лиц.docx');
 }
 
 async function gen_01_05(c,s,dir){
@@ -253,7 +255,7 @@ async function gen_01_05(c,s,dir){
     p('3. Инструкции хранить в доступном месте. Пересматривать не реже 1 раза в 5 лет.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.05')},children:ch}],dir,'01.05_Приказ_'+num+'_утверждение_инструкций.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.05')},children:ch}],dir,'Приказ об утверждении инструкций по охране труда.docx');
 }
 
 async function gen_01_06(c,s,dir){
@@ -270,7 +272,7 @@ async function gen_01_06(c,s,dir){
     p('2.4. Пополнение дозаторов смывающими средствами.',{indent:true}),
     p('3. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.06')},children:ch}],dir,'01.06_Приказ_'+num+'_ответственный_ДСИЗ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.06')},children:ch}],dir,'Приказ о назначении ответственного за СИЗ.docx');
 }
 
 async function gen_01_07(c,s,dir){
@@ -287,7 +289,7 @@ async function gen_01_07(c,s,dir){
     p('3. Аптечку разместить в доступном месте, обозначить знаком (зелёный квадрат с белым крестом).'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.07')},children:ch}],dir,'01.07_Приказ_'+num+'_аптечки.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.07')},children:ch}],dir,'Приказ об обеспечении аптечками первой помощи.docx');
 }
 
 async function gen_01_08(c,s,dir){
@@ -303,7 +305,7 @@ async function gen_01_08(c,s,dir){
     p('2.3. Контроль технического состояния электрооборудования.',{indent:true}),
     p('3. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.08')},children:ch}],dir,'01.08_Приказ_'+num+'_электрохозяйство.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.08')},children:ch}],dir,'Приказ о назначении ответственного за электрохозяйство.docx');
 }
 
 async function gen_01_09(c,s,dir){
@@ -319,7 +321,7 @@ async function gen_01_09(c,s,dir){
     p('3. Программы пересматривать не реже 1 раза в 3 года.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.09')},children:ch}],dir,'01.09_Приказ_'+num+'_программы_обучения.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.09')},children:ch}],dir,'Приказ об утверждении программ обучения.docx');
 }
 
 async function gen_01_10(c,s,dir){
@@ -347,7 +349,7 @@ async function gen_01_10(c,s,dir){
   const hdr=row([cell('№',colW[0],{bold:true,center:true}),cell('Наименование мероприятия',colW[1],{bold:true,center:true}),cell('Срок',colW[2],{bold:true,center:true}),cell('Ответственный',colW[3],{bold:true,center:true}),cell('Отметка',colW[4],{bold:true,center:true})]);
   const dr=pd.map(r=>row([cell(r[0],colW[0],{center:true,sz:SZ_S}),cell(r[1],colW[1],{sz:SZ_S}),cell(r[2],colW[2],{sz:SZ_S}),cell(r[3],colW[3],{sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
   const ch=[approvalBlock(c),...eL(1),H('ПЛАН МЕРОПРИЯТИЙ ПО ОХРАНЕ ТРУДА'),H(c.name+' на '+yr+' год',SZ),...eL(1),tbl(colW,[hdr,...dr]),...eL(2),pL(c.ot_position+' (ответственный за ОТ):  ________________  '+otN)];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('01.10')},children:ch}],dir,'01.10_План_мероприятий_по_охране_труда.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('01.10')},children:ch}],dir,'План мероприятий по охране труда.docx');
 }
 
 async function gen_01_11(c,s,dir){
@@ -390,7 +392,7 @@ async function gen_01_11(c,s,dir){
       ['3','Направление на обучение в учебный центр','В течение 60 дней',mN],
       ['4','Первичный инструктаж (если не освобождён)','До начала работы',otN],
     ]),...eL(2),...famSheet(c,'График № 01-ПМ'),...devSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.11')},children:ch}],dir,'01.11_График_периодических_мероприятий.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('01.11')},children:ch}],dir,'График периодических мероприятий.docx');
 }
 
 module.exports={norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW,BALL,BNONE,

@@ -131,7 +131,7 @@ function renderClientRows(clients) {
     const mods = (c.modules||'OT').split(',');
     const dots = mods.map(m => `<div class="mod-dot" style="background:${m==='OT'?'var(--green)':m==='PD'?'var(--amber)':'var(--red)'}" title="${m}"></div>`).join('');
     const initials = c.name.replace(/^(ООО|ИП|ЗАО|АО|МУП|ГУП|НКО)\s*/i,'').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-    const scoreColor = c.score >= 80 ? 'var(--green)' : c.score >= 60 ? 'var(--amber)' : 'var(--red)';
+    const scoreColor = (c.score||0) >= 80 ? 'var(--green)' : (c.score||0) >= 40 ? 'var(--amber)' : 'var(--red)';
     return `<div class="client-row" onclick="navigate('client',${c.id})">
       <div class="client-avatar-sm" style="background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'}">${initials}</div>
       <div class="client-info"><div class="client-name">${c.name}</div><div class="client-meta">ОКВЭД ${c.okved||'—'} · ${c.staff||0} чел. · ${c.region||''}</div></div>
@@ -214,7 +214,14 @@ async function renderClientCard(id) {
   const clientTasks = tasks.filter(t => t.client_id == id);
   const mods = (c.modules||'OT').split(',');
   const initials = c.name.replace(/^(ООО|ИП|ЗАО|АО|МУП|ГУП|НКО)\s*/i,'').split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-  const scoreColor = c.score >= 80 ? 'var(--green)' : c.score >= 60 ? 'var(--amber)' : 'var(--red)';
+
+  // Считаем реальный процент готовности по документам
+  const totalDocs = docs.length;
+  const okDocs    = docs.filter(d => d.status === 'ok').length;
+  const realScore = totalDocs > 0 ? Math.round(okDocs / totalDocs * 100) : 0;
+  // Обновляем score в базе если изменился
+  if (realScore !== (c.score||0)) window.api.clientUpdate(id, { score: realScore });
+  const scoreColor = realScore >= 80 ? 'var(--green)' : realScore >= 40 ? 'var(--amber)' : 'var(--red)';
 
   document.getElementById('topbarTitle').textContent = c.name;
   const btn = document.getElementById('topbarAction');
@@ -261,7 +268,7 @@ async function renderClientCard(id) {
           </div>
         </div>
         <div class="hero-score" style="text-align:right">
-          <div class="score-val" style="color:${scoreColor}">${c.score||0}%</div>
+          <div class="score-val" style="color:${scoreColor}">${realScore}%</div>
           <div class="score-label">Готовность</div>
         </div>
       </div>
@@ -356,7 +363,7 @@ function renderDocRow(d) {
         let n=(d.name||'').replace(/.*[\/\\]/,'').replace(/_/g,' ').replace(/\.docx$/i,'');
         n=n.replace(/^\d{2}\.\d{2}\s*/,'').replace(/^\d+\s+/,'');
         n=n.replace(/\bПриказ\s+\d+\s*/gi,'Приказ ');
-        n=n.replace(/\bИОТ\s+\d+\s*/gi,'');
+        n=n.replace(/\bИОТ\s+№?\s*\d+[\-\w]*\s*/gi,'ИОТ ');
         return n.replace(/\s+/g,' ').trim();
       })()}</div>
       <div class="client-meta">${d.updated_at ? formatDate(d.updated_at) : 'Не создан'}</div>
@@ -392,37 +399,56 @@ function renderDocsBySection(docs) {
   ];
 
   docs.forEach(d => {
-    const n = (d.name || d.filename || '').replace(/\\/g, '/');
-    const base = n.split('/').pop(); // только имя файла
-    if      (/^01\./.test(base)) sections[0].docs.push(d);
-    else if (/^02\./.test(base)) sections[1].docs.push(d);
-    else if (/^03\./.test(base)) sections[2].docs.push(d);
-    else if (/^04\./.test(base)) sections[3].docs.push(d);
-    else if (/^05\./.test(base)) sections[4].docs.push(d);
-    else if (/^06\./.test(base)) sections[5].docs.push(d);
-    else if (/^07\./.test(base)) sections[6].docs.push(d);
-    else                          sections[7].docs.push(d);
+    // Определяем раздел по пути файла (папке) или по ключевым словам имени
+    const fp   = (d.filepath || d.name || '').replace(/\\/g, '/');
+    const name = (d.name || d.filename || '').replace(/\\/g, '/');
+
+    if      (/Раздел.?1|01_Орган|Организационн|Политика|Положение.*СУОТ|Приказ|План.мероприятий|График.*мероприятий/i.test(fp+name)) sections[0].docs.push(d);
+    else if (/Раздел.?2|02_Норм|Нормативн|Положение.*(обучени|организаци|разработк|микротравм|СИЗ)|Правила.*трудов/i.test(fp+name)) sections[1].docs.push(d);
+    else if (/Раздел.?3|03_Электр|Электробезопасн|Журнал.*группа|Программа.*электро/i.test(fp+name)) sections[2].docs.push(d);
+    else if (/Раздел.?4|04_СОУТ|СОУТ|оценк.*риск/i.test(fp+name)) sections[3].docs.push(d);
+    else if (/Раздел.?5|05_Инстр|Инструкци|ИОТ/i.test(fp+name)) sections[4].docs.push(d);
+    else if (/Раздел.?6|06_Журн|Журнал|Личная.карточка/i.test(fp+name)) sections[5].docs.push(d);
+    else if (/Раздел.?7|07_Прогр|Программа.*(вводного|первичного|противопожарн)/i.test(fp+name)) sections[6].docs.push(d);
+    else    sections[7].docs.push(d);
   });
 
   let html = '';
   sections.forEach(sec => {
     if (!sec.docs.length) return;
+    const okCount  = sec.docs.filter(d=>d.status==='ok').length;
+    const pct      = Math.round(okCount / sec.docs.length * 100);
+    const pctColor = pct===100 ? '#34d399' : pct>=50 ? '#fbbf24' : '#f87171';
     const sectionHtml = sec.docs.map(d => renderDocRow(d)).join('');
     html += `
-      <div class="doc-section" style="margin-bottom:6px">
-        <div class="doc-section-header" onclick="toggleSection(this)"
-             style="display:flex;align-items:center;gap:10px;padding:10px 14px;
-                    background:rgba(255,255,255,0.04);border-radius:10px;
-                    cursor:pointer;user-select:none;border-left:3px solid ${sec.color};
-                    transition:background .15s">
-          <span style="font-size:18px">${sec.icon}</span>
-          <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${sec.label}</span>
-          <span style="font-size:11px;color:var(--muted2);background:rgba(255,255,255,0.06);
-                       padding:2px 8px;border-radius:10px;min-width:24px;text-align:center">${sec.docs.length}</span>
-          <span class="section-arrow" style="color:var(--muted2);font-size:10px;
-                transition:transform .2s;transform:rotate(-90deg)">▼</span>
+      <div class="doc-section" style="margin-bottom:8px">
+        <div class="doc-section-header" onclick="toggleSection(this)" style="
+          display:flex;align-items:center;gap:10px;
+          padding:12px 16px;
+          background:linear-gradient(135deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%);
+          backdrop-filter:blur(8px);
+          -webkit-backdrop-filter:blur(8px);
+          border-radius:12px;
+          border:1px solid rgba(255,255,255,0.08);
+          border-left:3px solid ${sec.color};
+          cursor:pointer;user-select:none;
+          box-shadow:0 2px 8px rgba(0,0,0,0.15);
+          transition:all .2s ease">
+          <span style="font-size:18px;filter:drop-shadow(0 0 4px ${sec.color}44)">${sec.icon}</span>
+          <span style="font-size:12px;font-weight:600;color:#f1f5f9;flex:1;letter-spacing:.2px">${sec.label}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:60px;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${pctColor};border-radius:2px;transition:width .3s"></div>
+            </div>
+            <span style="font-size:10px;color:${pctColor};font-weight:600;min-width:28px;text-align:right">${pct}%</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.3);background:rgba(255,255,255,0.07);
+                         padding:2px 8px;border-radius:8px;min-width:20px;text-align:center">${sec.docs.length}</span>
+            <span class="section-arrow" style="color:rgba(255,255,255,0.3);font-size:10px;
+                  transition:transform .2s;transform:rotate(-90deg)">▼</span>
+          </div>
         </div>
-        <div class="section-docs" style="display:none;padding:4px 0 4px 12px">
+        <div class="section-docs" style="display:none;padding:4px 0 4px 8px;
+             border-left:1px solid ${sec.color}33;margin-left:14px">
           ${sectionHtml}
         </div>
       </div>`;
@@ -437,7 +463,9 @@ function toggleSection(header) {
   const isOpen = docs.style.display !== 'none';
   docs.style.display = isOpen ? 'none' : 'block';
   arrow.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
-  header.style.background = isOpen ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.07)';
+  header.style.background = isOpen
+    ? 'linear-gradient(135deg,rgba(255,255,255,0.06) 0%,rgba(255,255,255,0.02) 100%)'
+    : 'linear-gradient(135deg,rgba(255,255,255,0.1) 0%,rgba(255,255,255,0.04) 100%)';
 }
 
 function renderEmpRow(e) {

@@ -354,10 +354,10 @@ function renderDocRow(d) {
   const canOpen   = d.filepath && d.status === 'ok';
   const fp        = canOpen ? d.filepath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '';
   const openBtn   = canOpen
-    ? `<button onclick="openDocFile('${fp}', event)" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:4px 6px;border-radius:6px;transition:color .2s" title="Открыть файл" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted2)'">📂</button>`
+    ? `<button onclick="openDocFile('${fp}', event)" style="background:none;border:none;cursor:pointer;color:var(--muted2);padding:4px 6px;border-radius:6px;transition:color .2s;display:flex;align-items:center" title="Открыть файл" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></button>`
     : '';
   return `<div class="client-row" style="cursor:${canOpen?'pointer':'default'}" ${canOpen?`onclick="openDocFile('${fp}', event)"`:''}">
-    <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:14px">📄</div>
+    <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
     <div class="client-info">
       <div class="client-name" style="font-size:12px">${(()=>{
         let n=(d.name||'').replace(/.*[\/\\]/,'').replace(/_/g,' ').replace(/\.docx$/i,'');
@@ -388,14 +388,14 @@ function renderEmptyDocs(mod, clientId) {
 function renderDocsBySection(docs) {
   // Конфигурация разделов — короткие названия для UI
   const sections = [
-    { key:'s1', icon:'📋', label:'Организационные',    color:'#60a5fa', docs:[] },
-    { key:'s2', icon:'📜', label:'Нормативные акты',   color:'#a78bfa', docs:[] },
-    { key:'s3', icon:'⚡', label:'Электробезопасность', color:'#fbbf24', docs:[] },
-    { key:'s4', icon:'🔍', label:'СОУТ и риски',        color:'#34d399', docs:[] },
-    { key:'s5', icon:'📖', label:'Инструкции',          color:'#f87171', docs:[] },
-    { key:'s6', icon:'📓', label:'Журналы учёта',       color:'#fb923c', docs:[] },
-    { key:'s7', icon:'🎓', label:'Программы обучения',  color:'#e879f9', docs:[] },
-    { key:'s0', icon:'✅', label:'Прочие документы',    color:'#94a3b8', docs:[] },
+    { key:'s1', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`, label:'Организационные',    color:'#60a5fa', docs:[] },
+    { key:'s2', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`, label:'Нормативные акты',   color:'#a78bfa', docs:[] },
+    { key:'s3', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`, label:'Электробезопасность', color:'#fbbf24', docs:[] },
+    { key:'s4', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`, label:'СОУТ и риски',        color:'#34d399', docs:[] },
+    { key:'s5', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>`, label:'Инструкции',          color:'#f87171', docs:[] },
+    { key:'s6', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`, label:'Журналы учёта',       color:'#fb923c', docs:[] },
+    { key:'s7', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>`, label:'Программы обучения',  color:'#e879f9', docs:[] },
+    { key:'s0', icon:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`, label:'Прочие документы',    color:'#94a3b8', docs:[] },
   ];
 
   docs.forEach(d => {

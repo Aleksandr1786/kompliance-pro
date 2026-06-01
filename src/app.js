@@ -36,6 +36,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }, 400);
   });
   await navigate('dashboard');
+  await checkOnboarding();
 });
 
 function applySettings() {
@@ -71,6 +72,163 @@ function setupNav() {
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     item.addEventListener('click', () => navigate(item.dataset.page));
   });
+}
+
+
+// ─── ОНБОРДИНГ ───────────────────────────────────────────
+async function checkOnboarding() {
+  // Показываем только при первом запуске
+  if (settings.onboarding_done === '1') return;
+  showOnboarding();
+}
+
+function showOnboarding() {
+  let step = 1;
+  const modal = document.createElement('div');
+  modal.id = 'onboarding-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px)';
+
+  function render() {
+    const steps = [
+      {
+        icon: '👋',
+        title: 'Добро пожаловать в КомплаенсПро!',
+        sub: 'Давайте настроим всё за 2 минуты — и вы будете готовы к работе',
+        content: `
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Ваше имя</label>
+            <input id="ob-name" value="${settings.user_name||''}" placeholder="Александр Свинцов" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
+            <input id="ob-position" value="${settings.user_position||''}" placeholder="Специалист по охране труда" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Ваша компания</label>
+            <input id="ob-company" value="${settings.company_name||''}" placeholder="ИП Свинцов А.В." style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          </div>
+          <div style="margin-bottom:4px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Телефон</label>
+            <input id="ob-phone" value="${settings.user_phone||''}" placeholder="+7 961 519-24-00" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          </div>`,
+        next: 'Далее →',
+        canSkip: false,
+      },
+      {
+        icon: '🤖',
+        title: 'Подключите ИИ-ассистента',
+        sub: 'Ассистент помогает склонять ФИО и заполнять документы. Можно пропустить и подключить позже.',
+        content: `
+          <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;margin-bottom:16px">
+            <div style="font-size:13px;font-weight:600;color:#60a5fa;margin-bottom:6px">⚡ Рекомендуем DeepSeek</div>
+            <div style="font-size:12px;color:#94a3b8;line-height:1.5">Бесплатный старт · Быстрый · Работает с русским языком<br>Получить ключ: <span style="color:#60a5fa">platform.deepseek.com</span></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">API-ключ (необязательно)</label>
+            <input id="ob-apikey" type="password" placeholder="sk-..." style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          </div>
+          <div style="font-size:11px;color:#64748b;text-align:center">Без ключа приложение работает в базовом режиме — все документы генерируются, ФИО склоняются вручную</div>`,
+        next: 'Далее →',
+        canSkip: true,
+        skipText: 'Пропустить',
+      },
+      {
+        icon: '🎉',
+        title: 'Всё готово!',
+        sub: 'КомплаенсПро настроен и готов к работе. Добавьте первого клиента!',
+        content: `
+          <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:10px">
+              <span style="font-size:20px">📄</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#f1f5f9">Генерация документов</div>
+                <div style="font-size:11px;color:#64748b">34+ документов по охране труда за 30 секунд</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);border-radius:10px">
+              <span style="font-size:20px">🎓</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#f1f5f9">Трекер обучения</div>
+                <div style="font-size:11px;color:#64748b">Напоминания за 30, 14 и 3 дня до истечения</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);border-radius:10px">
+              <span style="font-size:20px">📋</span>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:#f1f5f9">Памятка ГИТ</div>
+                <div style="font-size:11px;color:#64748b">Алгоритм действий при проверке инспектора</div>
+              </div>
+            </div>
+          </div>`,
+        next: '🚀 Добавить первого клиента',
+        canSkip: false,
+      },
+    ];
+
+    const s = steps[step - 1];
+    const dots = [1,2,3].map(i =>
+      `<div style="width:${i===step?'24px':'8px'};height:8px;border-radius:4px;background:${i===step?'var(--blue)':'rgba(255,255,255,0.15)'};transition:all .3s"></div>`
+    ).join('');
+
+    modal.innerHTML = `
+      <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:32px;width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 80px rgba(0,0,0,0.6)">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:48px;margin-bottom:12px">${s.icon}</div>
+          <div style="font-size:18px;font-weight:700;color:#f1f5f9;margin-bottom:8px">${s.title}</div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5">${s.sub}</div>
+        </div>
+        ${s.content}
+        <div style="display:flex;gap:8px;margin-top:20px">
+          ${s.canSkip ? `<button onclick="onboardingSkip()" style="flex:1;padding:11px;background:rgba(255,255,255,0.06);border:none;border-radius:10px;color:#94a3b8;cursor:pointer;font-size:13px">${s.skipText}</button>` : ''}
+          <button onclick="onboardingNext()" style="flex:${s.canSkip?2:1};padding:11px;background:var(--blue);border:none;border-radius:10px;color:#fff;cursor:pointer;font-size:13px;font-weight:700">${s.next}</button>
+        </div>
+        <div style="display:flex;justify-content:center;gap:6px;margin-top:16px">${dots}</div>
+      </div>`;
+  }
+
+  window.onboardingNext = async () => {
+    if (step === 1) {
+      // Сохраняем профиль
+      const name     = document.getElementById('ob-name')?.value?.trim();
+      const position = document.getElementById('ob-position')?.value?.trim();
+      const company  = document.getElementById('ob-company')?.value?.trim();
+      const phone    = document.getElementById('ob-phone')?.value?.trim();
+      if (!name) { document.getElementById('ob-name').style.border='1px solid #f87171'; return; }
+      await window.api.settingsSave({ user_name:name, user_position:position, company_name:company, user_phone:phone });
+      settings = await window.api.settingsGet();
+      applySettings();
+    }
+    if (step === 2) {
+      // Сохраняем API ключ
+      const key = document.getElementById('ob-apikey')?.value?.trim();
+      if (key) await window.api.settingsSave({ ai_provider:'deepseek', ai_key:key });
+      settings = await window.api.settingsGet();
+      applySettings();
+    }
+    if (step === 3) {
+      // Финиш — открываем добавление клиента
+      await finishOnboarding();
+      openModal('modalAddClient');
+      return;
+    }
+    step++;
+    render();
+  };
+
+  window.onboardingSkip = async () => {
+    if (step === 2) { step++; render(); return; }
+    await finishOnboarding();
+  };
+
+  async function finishOnboarding() {
+    await window.api.settingsSave({ onboarding_done: '1' });
+    settings = await window.api.settingsGet();
+    modal.remove();
+    showToast('✅ Настройка завершена! Добавьте первого клиента 🚀');
+  }
+
+  render();
+  document.body.appendChild(modal);
 }
 
 async function navigate(page, clientId = null) {

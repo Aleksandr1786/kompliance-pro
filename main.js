@@ -234,39 +234,106 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
 
   // Подтягиваем сотрудников клиента из базы
   const employees = db.get('employees').filter({ client_id: clientId }).value();
+
+  // Считаем хеш данных клиента для умной генерации
+  const crypto = require('crypto');
+  const clientHash = crypto.createHash('md5')
+    .update(JSON.stringify({ ...client, employees }))
+    .digest('hex');
+
   const clientWithEmployees = {
     ...client,
+    // Нормализуем город — убираем лишний "г."
+    city: (client.city || client.region || '').replace(/^г\.?\s*/i,'').trim() || '',
+    // Передаём все поля СОУТ и особых условий
+    soat_class:        client.soat_class        || '2',
+    hazard_works:      client.hazard_works       || 0,
+    medcheck_required: client.medcheck_required  || 0,
+    // Ответственный за ОТ (если не указан — руководитель)
+    ot_name:           client.ot_name           || client.manager_name || '',
+    ot_position:       client.ot_position       || client.manager_position || '',
+    ot_name_full:      client.ot_name_full      || client.ot_name || client.manager_name || '',
     employees: employees.map(e => ({
-      full_name: e.full_name || '',
-      position:  e.position  || '',
-      dative:    e.dative    || '',
+      full_name:    e.full_name    || '',
+      position:     e.position    || '',
+      // Падежи ФИО для документов
+      name_gen:     e.name_gen    || '',  // родительный
+      name_dat:     e.name_dat    || '',  // дательный (для приказов)
+      name_acc:     e.name_acc    || '',  // винительный
+      name_ins:     e.name_ins    || '',  // творительный
+      name_short:   e.name_short  || '',  // Фамилия И.О.
+      birth_date:   e.birth_date  || '',
+      hired_at:     e.hired_at    || '',
+      tab_number:   e.tab_number  || '',
+      gender:       e.gender      || 'm',
+      is_military:  e.is_military || 0,
     })),
   };
 
   try {
     const result = await generatePackage(clientWithEmployees, settings, outputDir);
 
-    // Сбрасываем старые документы клиента и записываем свежие
+    // Получаем старые документы для сравнения
+    const oldDocs = db.get('documents').filter({ client_id: clientId }).value();
+    const oldDocMap = {};
+    oldDocs.forEach(d => { oldDocMap[d.name] = d; });
+
+    // Сбрасываем старые документы и записываем свежие
     db.get('documents').remove({ client_id: clientId }).write();
-    let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id));
+    let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id), 0);
+
+    const report = { updated: [], added: [], unchanged: [] };
+
     for (const filename of result.generated) {
       maxId++;
+      const baseName = path.basename(filename);
+      // Хеш содержимого файла для сравнения
+      let fileHash = '';
+      try {
+        const buf = fs.readFileSync(filename);
+        fileHash = crypto.createHash('md5').update(buf).digest('hex');
+      } catch(e) {}
+
+      const oldDoc = oldDocMap[baseName];
+      let status = 'ok';
+      let changeType = 'added';
+
+      if (oldDoc) {
+        if (oldDoc.file_hash && oldDoc.file_hash === fileHash) {
+          changeType = 'unchanged';
+        } else {
+          changeType = 'updated';
+        }
+      }
+
+      if (changeType === 'unchanged') report.unchanged.push(baseName);
+      else if (changeType === 'updated') report.updated.push(baseName);
+      else report.added.push(baseName);
+
       db.get('documents').push({
-        id:         maxId,
-        client_id:  clientId,
-        module:     'OT',
-        name:       path.basename(filename), // только имя файла без пути
-        filename:   path.basename(filename),
-        filepath:   filename, // генератор теперь возвращает полный путь
-        status:     'ok',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        npa_basis:  'ТК РФ, Постановление Правительства №2464',
-        notes:      '',
+        id:          maxId,
+        client_id:   clientId,
+        module:      'OT',
+        name:        baseName,
+        filename:    baseName,
+        filepath:    filename,
+        file_hash:   fileHash,
+        client_hash: clientHash,
+        status:      'ok',
+        created_at:  oldDoc?.created_at || new Date().toISOString(),
+        updated_at:  new Date().toISOString(),
+        npa_basis:   'ТК РФ, Постановление Правительства №2464',
+        notes:       '',
       }).write();
     }
 
-    return { ok: true, generated: result.generated, errors: result.errors, dir: outputDir };
+    return {
+      ok:        true,
+      generated: result.generated,
+      errors:    result.errors,
+      dir:       outputDir,
+      report,    // отчёт об изменениях
+    };
   } catch(e) {
     return { ok: false, error: e.message };
   }

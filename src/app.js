@@ -113,24 +113,40 @@ async function updateBadges() {
 
 // ── ДАШБОРД ──────────────────────────────────────────────
 async function renderDashboard() {
-  const stats  = await window.api.dashboardStats();
+  const stats   = await window.api.dashboardStats();
   const clients = await window.api.clientsList();
-  const tasks  = await window.api.tasksList();
-  const events = await window.api.eventsList(null);
+  const tasks   = await window.api.tasksList();
+  const events  = await window.api.eventsList(null);
+  const alerts  = await window.api.trainingAlerts();
+
   const btn = document.getElementById('topbarAction');
   btn.textContent = '+ Добавить клиента';
   btn.style.display = 'flex';
   btn.onclick = () => openModal('modalAddClient');
-  // Скрываем кнопку редактирования клиента если она осталась
   const editBtn = document.getElementById('topbarEdit');
   if (editBtn) editBtn.style.display = 'none';
 
+  // Формируем блок алертов обучения
+  const alertsHtml = alerts.length ? alerts.slice(0,5).map(a => {
+    const color = a.overdue ? 'var(--red)' : a.days_left <= 14 ? 'var(--amber)' : '#fbbf24';
+    const icon  = a.overdue ? '🔴' : a.days_left <= 14 ? '🟠' : '🟡';
+    const label = a.overdue ? `Просрочено ${Math.abs(a.days_left)} дн.` : `${a.days_left} дн.`;
+    return `<div class="event-row" style="cursor:pointer" onclick="navigate('client',${a.client_id})">
+      <div class="ev-dot" style="background:${color}"></div>
+      <div class="ev-body">
+        <div class="ev-title">${a.employee_name} — ${a.training_type}</div>
+        <div class="ev-sub">${a.client_name}</div>
+      </div>
+      <div class="ev-when" style="color:${color}">${icon} ${label}</div>
+    </div>`;
+  }).join('') : '';
+
   document.getElementById('content').innerHTML = `
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">🏢 Клиенты</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">организаций на обслуживании</div><div class="stat-accent">🏢</div></div>
-      <div class="stat-card"><div class="stat-label">📋 Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent} срочных</div><div class="stat-accent">📋</div></div>
-      <div class="stat-card"><div class="stat-label">🔔 Событий</div><div class="stat-value">${events.length}</div><div class="stat-sub">в календаре</div><div class="stat-accent">📅</div></div>
-      <div class="stat-card"><div class="stat-label">⚠️ Просрочено</div><div class="stat-value" style="color:var(--red)">${stats.overdue}</div><div class="stat-sub">требуют немедленных действий</div><div class="stat-accent">⚠️</div></div>
+      <div class="stat-card"><div class="stat-label">🏢 Клиенты</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">организаций на обслуживании</div></div>
+      <div class="stat-card"><div class="stat-label">📋 Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent} срочных</div></div>
+      <div class="stat-card"><div class="stat-label">🎓 Обучение</div><div class="stat-value" style="color:${alerts.length?'var(--amber)':'var(--green)'}">${alerts.length}</div><div class="stat-sub">истекает в 30 дней</div></div>
+      <div class="stat-card"><div class="stat-label">⚠️ Просрочено</div><div class="stat-value" style="color:var(--red)">${stats.overdue}</div><div class="stat-sub">требуют действий</div></div>
     </div>
     <div class="grid2">
       <div>
@@ -141,13 +157,24 @@ async function renderDashboard() {
         </div>
         ${tasks.length ? `
         <div class="panel">
-          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи на сегодня</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
           <div>${tasks.slice(0,5).map(t => renderTaskRow(t)).join('')}</div>
         </div>` : ''}
       </div>
-      <div class="panel">
-        <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="panel-title">Ближайшие события</div></div>
-        <div>${events.length ? events.slice(0,8).map(e => renderEventRow(e)).join('') : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Событий нет</div><div class="empty-sub">Добавьте клиентов — события появятся автоматически</div></div>'}</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        ${alerts.length ? `
+        <div class="panel">
+          <div class="panel-head">
+            <span style="font-size:16px">🎓</span>
+            <div class="panel-title">Обучение — истекает</div>
+            <div class="panel-count">${alerts.length} чел.</div>
+          </div>
+          <div>${alertsHtml}</div>
+        </div>` : ''}
+        <div class="panel">
+          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="panel-title">Ближайшие события</div></div>
+          <div>${events.length ? events.slice(0,8).map(e => renderEventRow(e)).join('') : '<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-title">Событий нет</div><div class="empty-sub">Добавьте клиентов — события появятся автоматически</div></div>'}</div>
+        </div>
       </div>
     </div>
   `;
@@ -508,18 +535,202 @@ function toggleSection(header) {
 
 function renderEmpRow(e) {
   const birthYear = e.birth_date ? ' · ' + e.birth_date.slice(0,4) + ' г.р.' : '';
+  const training  = e.training || {};
+  const TYPES = ['prog_a','first_aid','fire','siz','repeat','medcheck'];
+  const today = new Date();
+
+  // Считаем статус обучения
+  let alertCount = 0;
+  TYPES.forEach(key => {
+    const t = training[key];
+    if (!t?.required || !t?.date) return;
+    const last = new Date(t.date);
+    const next = new Date(last);
+    if (key === 'repeat') next.setMonth(next.getMonth() + 6);
+    else if (key === 'medcheck') next.setFullYear(next.getFullYear() + 1);
+    else next.setFullYear(next.getFullYear() + 3);
+    const days = Math.ceil((next - today) / 86400000);
+    if (days <= 30) alertCount++;
+  });
+
+  const alertBadge = alertCount > 0
+    ? `<span style="background:${alertCount > 0 ? 'var(--red)' : 'var(--amber)'};color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-right:4px">${alertCount}</span>`
+    : '';
+
   return `<div class="client-row">
     <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:11px;font-weight:700">${e.full_name.split(' ').map(w=>w[0]||'').join('').slice(0,2)}</div>
     <div class="client-info">
       <div class="client-name">${e.full_name}</div>
       <div class="client-meta">${e.position||'—'}${birthYear}${e.is_military?' · ⚔️':''}</div>
     </div>
-    <div style="display:flex;gap:6px">
+    <div style="display:flex;gap:6px;align-items:center">
+      ${alertBadge}
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="openTraining(${e.id})" title="Обучение">🎓</button>
       <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="editEmployeePrompt(${e.id})">✏️</button>
       <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="deleteEmployee(${e.id})">🗑</button>
     </div>
   </div>`;
 }
+
+// ─── МОДУЛЬ ОБУЧЕНИЯ ─────────────────────────────────────
+const TRAINING_TYPES_BASE = [
+  { key:'prog_a',    label:'Программа А — общие вопросы ОТ',           period:'3 года',  years:3,   who:'Руководитель, отв. за ОТ',       alwaysRequired: true  },
+  { key:'prog_b',    label:'Программа Б — безопасные методы работы',   period:'3 года',  years:3,   who:'Специалисты, рабочие',            alwaysRequired: false },
+  { key:'prog_v',    label:'Программа В — работы повышенной опасности',period:'1 год',   years:1,   who:'Работники с допуском к РПО',      alwaysRequired: false },
+  { key:'first_aid', label:'Первая помощь пострадавшим',               period:'3 года',  years:3,   who:'Все работники',                   alwaysRequired: true  },
+  { key:'fire',      label:'Пожарно-технический минимум',              period:'3 года',  years:3,   who:'Руководитель, отв. за ПБ',        alwaysRequired: true  },
+  { key:'siz',       label:'Применение СИЗ',                          period:'3 года',  years:3,   who:'Работники применяющие СИЗ',       alwaysRequired: false },
+  { key:'repeat',    label:'Повторный инструктаж на р.м.',             period:'6 мес.',  months:6,  who:'Все (кроме освобождённых)',       alwaysRequired: true  },
+  { key:'medcheck',  label:'Медицинский осмотр',                       period:'1 год',   years:1,   who:'При наличии оснований',           alwaysRequired: false },
+];
+
+// Определяем какие программы нужны для конкретного сотрудника
+// на основе данных клиента и самого сотрудника
+function getRequiredTraining(client, employee, existingTraining) {
+  const soatClass    = parseInt(client?.soat_class || '2');
+  const hazardWorks  = !!client?.hazard_works;
+  const medRequired  = !!client?.medcheck_required || !!employee?.medcheck_required;
+  const isOffice     = soatClass <= 2;
+  const progBExempt  = !!employee?.prog_b_exempt; // освобождён от Б вручную
+
+  return TRAINING_TYPES_BASE.map(tt => {
+    const existing = existingTraining?.[tt.key] || {};
+    let required = existing.required; // сохраняем ручные настройки если есть
+
+    // Если ещё не настраивали — определяем автоматически
+    if (required === undefined) {
+      if (tt.key === 'prog_a')    required = true;
+      if (tt.key === 'prog_b')    required = !isOffice && !progBExempt; // не нужна для офиса
+      if (tt.key === 'prog_v')    required = hazardWorks;
+      if (tt.key === 'first_aid') required = true;
+      if (tt.key === 'fire')      required = true;
+      if (tt.key === 'siz')       required = soatClass >= 31 || hazardWorks;
+      if (tt.key === 'repeat')    required = true;
+      if (tt.key === 'medcheck')  required = medRequired;
+    }
+
+    return { ...tt, required };
+  });
+}
+
+const TRAINING_TYPES = TRAINING_TYPES_BASE; // для обратной совместимости
+
+function calcNextDate(dateStr, tt) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (tt.years)  d.setFullYear(d.getFullYear() + tt.years);
+  if (tt.months) d.setMonth(d.getMonth() + tt.months);
+  return d;
+}
+
+function trainingStatus(tt, t) {
+  if (!t?.required) return { icon:'—', color:'var(--muted)', label:'Не требуется', days:null };
+  if (!t?.date)     return { icon:'❌', color:'var(--red)',   label:'Не пройдено',  days:null };
+  const next = calcNextDate(t.date, tt);
+  const days = Math.ceil((next - new Date()) / 86400000);
+  if (days < 0)   return { icon:'🔴', color:'var(--red)',   label:`Просрочено ${Math.abs(days)} дн.`, days };
+  if (days <= 14) return { icon:'🟠', color:'var(--amber)', label:`${days} дн.`,   days };
+  if (days <= 30) return { icon:'🟡', color:'var(--amber)', label:`${days} дн.`,   days };
+  return { icon:'✅', color:'var(--green)', label:formatDate(next.toISOString()), days };
+}
+
+async function openTraining(empId) {
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  const client   = await window.api.clientGet(currentClientId);
+  const training = e.training || {};
+  const types    = getRequiredTraining(client, e, training);
+
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  const rows = types.map(tt => {
+    const t  = { ...tt, ...(training[tt.key]||{}) };
+    const st = trainingStatus(tt, { required: tt.required, date: training[tt.key]?.date });
+    const nextD = t.date ? calcNextDate(t.date, tt) : null;
+    return `
+      <div style="display:grid;grid-template-columns:1fr 110px 130px 160px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#f1f5f9">${tt.label}</div>
+          <div style="font-size:10px;color:#64748b">${tt.who} · каждые ${tt.period}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="tr-req-${tt.key}" ${t.required?'checked':''} style="width:15px;height:15px;cursor:pointer" onchange="updateTrainingRequired('${tt.key}',this.checked)">
+          <label style="font-size:11px;color:#94a3b8">Требуется</label>
+        </div>
+        <div>
+          <input type="date" id="tr-date-${tt.key}" value="${t.date||''}" style="width:100%;padding:6px 8px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#f1f5f9;font-size:12px;outline:none" ${!t.required?'disabled':''}>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px">${st.icon}</span>
+          <span style="font-size:11px;font-weight:600;color:${st.color}">${st.label}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:680px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">🎓 Обучение</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">${e.full_name} · ${e.position||''}</div>
+        </div>
+        <button onclick="this.closest('.modal-wrap').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 110px 130px 160px;gap:8px;padding-bottom:8px;border-bottom:2px solid rgba(255,255,255,0.08);margin-bottom:4px">
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">ВИД ОБУЧЕНИЯ</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">НУЖЕН</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">ПОСЛЕДНЕЕ</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">СЛЕДУЮЩЕЕ</div>
+      </div>
+      ${rows}
+      <div style="margin-top:16px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Учебная организация</label>
+        <input id="tr-org" value="${training.org||''}" placeholder="ООО УЦ Профессионал" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button onclick="saveTraining(${empId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">💾 Сохранить</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', ev => { if (ev.target === modal) modal.remove(); });
+
+  // Сохраняем текущий training в window для обновления
+  window._currentTraining = JSON.parse(JSON.stringify(training));
+  window._currentTrainingEmpId = empId;
+}
+
+function updateTrainingRequired(key, checked) {
+  if (!window._currentTraining) return;
+  if (!window._currentTraining[key]) window._currentTraining[key] = {};
+  window._currentTraining[key].required = checked;
+  const dateInput = document.getElementById('tr-date-' + key);
+  if (dateInput) dateInput.disabled = !checked;
+}
+
+async function saveTraining(empId) {
+  const training = window._currentTraining || {};
+  training.org = document.getElementById('tr-org')?.value || '';
+
+  TRAINING_TYPES.forEach(tt => {
+    if (!training[tt.key]) training[tt.key] = {};
+    const dateEl = document.getElementById('tr-date-' + tt.key);
+    const reqEl  = document.getElementById('tr-req-' + tt.key);
+    if (dateEl) training[tt.key].date     = dateEl.value;
+    if (reqEl)  training[tt.key].required = reqEl.checked;
+  });
+
+  await window.api.trainingUpdate(empId, training);
+  document.querySelector('[style*="position:fixed"][style*="rgba(0,0,0,0.75)"]')?.remove();
+  showToast('✅ Данные обучения сохранены');
+  await navigate('client', currentClientId);
+}
+
+
 
 // ─── СКЛОНЕНИЕ ФИО ЧЕРЕЗ AI ──────────────────────────────
 async function declineFIO(fullName) {
@@ -578,9 +789,19 @@ async function addEmployeePrompt(clientId) {
           <input id="emp-hired" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
         </div>
       </div>
-      <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="emp-mil" style="width:16px;height:16px;cursor:pointer">
-        <label for="emp-mil" style="font-size:12px;color:#94a3b8;cursor:pointer">⚔️ Военнообязанный</label>
+      <div style="margin-bottom:20px;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="emp-mil" style="width:16px;height:16px;cursor:pointer">
+          ⚔️ Военнообязанный
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="emp-prog-b-exempt" style="width:16px;height:16px;cursor:pointer">
+          📋 Освобождён от Программы Б (только ПЭВМ/офис)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="emp-medcheck" style="width:16px;height:16px;cursor:pointer">
+          🏥 Требуется медосмотр
+        </label>
       </div>
       <div style="display:flex;gap:10px">
         <button id="emp-cancel" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
@@ -614,7 +835,9 @@ async function addEmployeePrompt(clientId) {
       const birth  = document.getElementById('emp-birth').value || '';
       const hired  = document.getElementById('emp-hired').value || new Date().toISOString().slice(0,10);
       const tab    = document.getElementById('emp-tab').value.trim();
-      const mil    = document.getElementById('emp-mil').checked ? 1 : 0;
+      const mil         = document.getElementById('emp-mil').checked ? 1 : 0;
+      const progBExempt = document.getElementById('emp-prog-b-exempt')?.checked ? 1 : 0;
+      const medcheck    = document.getElementById('emp-medcheck')?.checked ? 1 : 0;
       const genderM = document.getElementById('emp-gender-m');
       const gender = genderM?.dataset.selected === '1' ? 'm' : 'f';
 
@@ -633,20 +856,22 @@ async function addEmployeePrompt(clientId) {
       modal.remove();
 
       await window.api.employeeAdd({
-        client_id:   clientId,
-        full_name:   name,
-        position:    pos,
-        birth_date:  birth,
-        hired_at:    hired,
-        tab_number:  tab,
-        gender:      gender,
-        department:  '',
-        is_military: mil,
-        name_gen:    declension?.gen   || '',
-        name_dat:    declension?.dat   || '',
-        name_acc:    declension?.acc   || '',
-        name_ins:    declension?.ins   || '',
-        name_short:  declension?.short || '',
+        client_id:         clientId,
+        full_name:         name,
+        position:          pos,
+        birth_date:        birth,
+        hired_at:          hired,
+        tab_number:        tab,
+        gender:            gender,
+        department:        '',
+        is_military:       mil,
+        prog_b_exempt:     progBExempt,
+        medcheck_required: medcheck,
+        name_gen:          declension?.gen   || '',
+        name_dat:          declension?.dat   || '',
+        name_acc:          declension?.acc   || '',
+        name_ins:          declension?.ins   || '',
+        name_short:        declension?.short || '',
       });
 
       if (declension?.dat) {
@@ -687,9 +912,19 @@ async function editEmployeePrompt(empId) {
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
         <input id="edit-emp-birth" type="date" value="${e.birth_date||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
       </div>
-      <div style="margin-bottom:20px;display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="edit-emp-mil" ${e.is_military?'checked':''} style="width:16px;height:16px;cursor:pointer">
-        <label for="edit-emp-mil" style="font-size:12px;color:#94a3b8;cursor:pointer">⚔️ Военнообязанный</label>
+      <div style="margin-bottom:20px;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="edit-emp-mil" ${e.is_military?'checked':''} style="width:16px;height:16px;cursor:pointer">
+          ⚔️ Военнообязанный
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="edit-emp-prog-b-exempt" ${e.prog_b_exempt?'checked':''} style="width:16px;height:16px;cursor:pointer">
+          📋 Освобождён от Программы Б (только ПЭВМ/офис)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
+          <input type="checkbox" id="edit-emp-medcheck" ${e.medcheck_required?'checked':''} style="width:16px;height:16px;cursor:pointer">
+          🏥 Требуется медосмотр
+        </label>
       </div>
       <div style="display:flex;gap:10px">
         <button id="edit-emp-cancel" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
@@ -706,11 +941,13 @@ async function editEmployeePrompt(empId) {
       const name  = document.getElementById('edit-emp-name').value.trim();
       const pos   = document.getElementById('edit-emp-pos').value.trim();
       const birth = document.getElementById('edit-emp-birth').value || '';
-      const mil   = document.getElementById('edit-emp-mil').checked ? 1 : 0;
+      const mil         = document.getElementById('edit-emp-mil').checked ? 1 : 0;
+      const progBExempt = document.getElementById('edit-emp-prog-b-exempt')?.checked ? 1 : 0;
+      const medcheck    = document.getElementById('edit-emp-medcheck')?.checked ? 1 : 0;
       if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
 
       const saveBtn2 = document.getElementById('edit-emp-save');
-      saveBtn2.textContent = '⏳ Склоняю ФИО...';
+      saveBtn2.textContent = '⏳ Обработка...';
       saveBtn2.disabled = true;
 
       let declension = null;
@@ -720,15 +957,17 @@ async function editEmployeePrompt(empId) {
 
       modal.remove();
       await window.api.employeeUpdate(empId, {
-        full_name:   name,
-        position:    pos,
-        birth_date:  birth,
-        is_military: mil,
-        name_gen:    declension?.gen   || '',
-        name_dat:    declension?.dat   || '',
-        name_acc:    declension?.acc   || '',
-        name_ins:    declension?.ins   || '',
-        name_short:  declension?.short || '',
+        full_name:         name,
+        position:          pos,
+        birth_date:        birth,
+        is_military:       mil,
+        prog_b_exempt:     progBExempt,
+        medcheck_required: medcheck,
+        name_gen:          declension?.gen   || '',
+        name_dat:          declension?.dat   || '',
+        name_acc:          declension?.acc   || '',
+        name_ins:          declension?.ins   || '',
+        name_short:        declension?.short || '',
       });
       if (declension?.dat) {
         showToast('✅ Сотрудник обновлён · ' + declension.short);
@@ -1001,6 +1240,9 @@ async function submitAddClient() {
     manager_position: document.getElementById('c-manager-position')?.value || 'Руководитель',
     ot_name:          document.getElementById('c-ot-name')?.value?.trim() || '',
     ot_position:      document.getElementById('c-ot-position')?.value?.trim() || '',
+    soat_class:       document.getElementById('c-soat-class')?.value || '2',
+    hazard_works:     document.getElementById('c-hazard-works')?.checked ? 1 : 0,
+    medcheck_required:document.getElementById('c-medcheck-required')?.checked ? 1 : 0,
     color,
     score: 0,
   };
@@ -1107,6 +1349,34 @@ async function openEditModal(clientId) {
           </div>
           <div class="form-group"><div class="form-label">ФИО руководителя</div><input class="form-input" id="e-manager-name" placeholder="Иванов Иван Иванович"></div>
         </div>
+        <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">УСЛОВИЯ ТРУДА</div>
+        <div class="form-row">
+          <div class="form-group">
+            <div class="form-label">Класс условий труда (СОУТ)</div>
+            <select class="form-select" id="e-soat-class">
+              <option value="2">Класс 2 — Допустимые (офис, ПЭВМ)</option>
+              <option value="31">Класс 3.1 — Вредные (1 степень)</option>
+              <option value="32">Класс 3.2 — Вредные (2 степень)</option>
+              <option value="33">Класс 3.3 — Вредные (3 степень)</option>
+              <option value="34">Класс 3.4 — Вредные (4 степень)</option>
+              <option value="4">Класс 4 — Опасные</option>
+              <option value="0">СОУТ не проводилась</option>
+            </select>
+          </div>
+          <div class="form-group" style="justify-content:flex-end">
+            <div class="form-label">Особые условия</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+                <input type="checkbox" id="e-hazard-works" style="width:15px;height:15px">
+                ⚠️ Есть работы повышенной опасности
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+                <input type="checkbox" id="e-medcheck-required" style="width:15px;height:15px">
+                🏥 Медосмотры обязательны
+              </label>
+            </div>
+          </div>
+        </div>
         <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ОХРАНУ ТРУДА</div>
         <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Если отличается от руководителя — заполните. Иначе оставьте пустым.</div>
         <div class="form-row">
@@ -1139,6 +1409,14 @@ async function openEditModal(clientId) {
   document.getElementById('e-ot-position').value   = c.ot_position      || '';
   document.getElementById('e-ot-name').value       = c.ot_name          || '';
 
+  // СОУТ и опасные работы
+  const soatSel = document.getElementById('e-soat-class');
+  if (soatSel) { for (let opt of soatSel.options) if (opt.value === String(c.soat_class||'2')) { opt.selected=true; break; } }
+  const hazEl = document.getElementById('e-hazard-works');
+  if (hazEl) hazEl.checked = !!c.hazard_works;
+  const medEl = document.getElementById('e-medcheck-required');
+  if (medEl) medEl.checked = !!c.medcheck_required;
+
   const formSel = document.getElementById('e-form');
   for (let opt of formSel.options) if (opt.value === c.form || opt.text === c.form) { opt.selected = true; break; }
   const regionSel = document.getElementById('e-region');
@@ -1167,8 +1445,11 @@ async function submitEditClient(clientId) {
     order_prefix:     parseInt(document.getElementById('e-order-prefix').value) || 1,
     manager_name:     document.getElementById('e-manager-name').value.trim(),
     manager_position: document.getElementById('e-manager-position').value,
-    ot_name:          document.getElementById('e-ot-name').value.trim(),
-    ot_position:      document.getElementById('e-ot-position').value.trim(),
+    ot_name:           document.getElementById('e-ot-name').value.trim(),
+    ot_position:       document.getElementById('e-ot-position').value.trim(),
+    soat_class:        document.getElementById('e-soat-class')?.value || '2',
+    hazard_works:      document.getElementById('e-hazard-works')?.checked ? 1 : 0,
+    medcheck_required: document.getElementById('e-medcheck-required')?.checked ? 1 : 0,
   };
 
   await window.api.clientUpdate(clientId, data);

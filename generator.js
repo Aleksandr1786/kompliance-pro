@@ -45,7 +45,7 @@ async function gen_06_01(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...empRows,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'06.01_Журнал_вводного_инструктажа.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'Журнал регистрации вводного инструктажа.docx');
 }
 
 async function gen_06_02(c,s,dir){
@@ -78,7 +78,7 @@ async function gen_06_02(c,s,dir){
     ...eL(1),
     p([{t:'Виды инструктажей: ',b:true},{t:'П — первичный; Пв — повторный; Вн — внеплановый; Ц — целевой.'}],{sz:SZ_S}),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'06.02_Журнал_инструктажа_рабочее_место.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'Журнал регистрации инструктажа на рабочем месте.docx');
 }
 
 async function gen_06_03(c,s,dir){
@@ -108,7 +108,7 @@ async function gen_06_03(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'06.03_Журнал_учёта_микротравм.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'Журнал учёта микротравм.docx');
 }
 
 async function gen_06_04(c,s,dir){
@@ -139,7 +139,7 @@ async function gen_06_04(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'06.04_Журнал_выдачи_СИЗ.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'Журнал учёта выдачи СИЗ.docx');
 }
 
 async function gen_06_05(c,s,dir){
@@ -165,7 +165,7 @@ async function gen_06_05(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('06.05')},children:ch}],dir,'06.05_Журнал_контроля_аптечки.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('06.05')},children:ch}],dir,'Журнал контроля аптечки первой помощи.docx');
 }
 
 async function gen_06_06(c,s,dir){
@@ -197,7 +197,7 @@ async function gen_06_06(c,s,dir){
     ...eL(2),
     pL('Ответственный за ДСИЗ: ________________  '+(c.dsiz_name||c.manager_name)),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'06.06_Личная_карточка_учёта_СИЗ.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'Личная карточка учёта выдачи СИЗ.docx');
 }
 
 // ── РАЗДЕЛ 7 ───────────────────────────────────────────
@@ -243,7 +243,7 @@ async function gen_07_01(c,s,dir){
     SH('4. Заключительные положения'),
     p('4.1. Устная проверка знаний. Неудовлетворительный результат — к работе не допускается.',{indent:true}),
     ...devSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.01')},children:ch}],dir,'07.01_Программа_вводного_инструктажа.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.01')},children:ch}],dir,'Программа вводного инструктажа по охране труда.docx');
 }
 
 async function gen_07_02(c,s,dir){
@@ -278,7 +278,7 @@ async function gen_07_02(c,s,dir){
     SH('4. Заключительные положения'),
     p('4.1. Устная проверка знаний. Неудовлетворительный результат — к работе не допускается.',{indent:true}),
     ...devSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.02')},children:ch}],dir,'07.02_Программа_первичного_инструктажа.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.02')},children:ch}],dir,'Программа первичного инструктажа на рабочем месте.docx');
 }
 
 async function gen_07_03(c,s,dir){
@@ -312,7 +312,7 @@ async function gen_07_03(c,s,dir){
     SH('4. Заключительные положения'),
     p('4.1. Устный опрос. Неудовлетворительный результат — к работе не допускается.',{indent:true}),
     ...devSign(c)];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.03')},children:ch}],dir,'07.03_Программа_противопожарного_инструктажа.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.03')},children:ch}],dir,'Программа противопожарного инструктажа.docx');
 }
 
 // ── ЧЕК-ЛИСТ ──────────────────────────────────────────
@@ -333,7 +333,7 @@ async function gen_checklist(c,s,dir){
     tbl(colW,[hdr,mk('6.1','Журнал регистрации вводного инструктажа','—',c.doc_date,'Прошить, пронумеровать'),mk('6.2','Журнал регистрации инструктажа на рабочем месте','—',c.doc_date,'Прошить, пронумеровать'),mk('6.3','Журнал учёта микроповреждений (микротравм)','—',c.doc_date,'Прошить, пронумеровать'),mk('6.4','Журнал учёта выдачи СИЗ','—',c.doc_date,'Прошить, пронумеровать'),mk('6.5','Журнал контроля аптечки первой помощи','—',c.doc_date,''),mk('6.6','Личные карточки учёта выдачи СИЗ','—',c.doc_date,'На каждого работника')]),...eL(1),
     H('ПАПКА Г (Раздел 3) — ЭЛЕКТРОБЕЗОПАСНОСТЬ',SZ),
     tbl(colW,[hdr,mk('3.1','Журнал учёта присвоения I группы электробезопасности','—',c.doc_date,'Прошить, пронумеровать'),mk('3.2','Программа инструктажа по электробезопасности (I группа)','—',c.doc_date,'')])];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('Чек-лист')},children:ch}],dir,'00_Чек-лист_подписания_документов.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('Чек-лист')},children:ch}],dir,'Чек-лист подписания документов.docx');
 }
 
 // ── ГЛАВНАЯ ФУНКЦИЯ ─────────────────────────────────────
@@ -341,17 +341,35 @@ async function gen_checklist(c,s,dir){
 async function generatePackage(client,settings,outputDir){
   const c=norm(client);
   const s=settings||{};
+  const path=require('path');
+  const fs=require('fs');
+
   const dirs={
     root:outputDir,
-    d1:require('path').join(outputDir,'Раздел 1. Организационно-распорядительная документация'),
-    d2:require('path').join(outputDir,'Раздел 2. Локальные нормативные акты'),
-    d3:require('path').join(outputDir,'Раздел 3. Электробезопасность'),
-    d5:require('path').join(outputDir,'Раздел 5. Инструкции по охране труда'),
-    d6:require('path').join(outputDir,'Раздел 6. Журналы учёта'),
-    d7:require('path').join(outputDir,'Раздел 7. Программы обучения'),
+    d1:path.join(outputDir,'Раздел 1. Организационно-распорядительная документация'),
+    d2:path.join(outputDir,'Раздел 2. Локальные нормативные акты'),
+    d3:path.join(outputDir,'Раздел 3. Электробезопасность'),
+    d5:path.join(outputDir,'Раздел 5. Инструкции по охране труда'),
+    d6:path.join(outputDir,'Раздел 6. Журналы учёта'),
+    d7:path.join(outputDir,'Раздел 7. Программы обучения'),
   };
-  const fs=require('fs');
-  for(const d of Object.values(dirs))fs.mkdirSync(d,{recursive:true});
+
+  // Создаём папки и очищаем старые .docx файлы перед генерацией
+  for(const d of Object.values(dirs)){
+    fs.mkdirSync(d,{recursive:true});
+    // Удаляем только .docx файлы — не трогаем подпапки
+    if(fs.existsSync(d)){
+      fs.readdirSync(d)
+        .filter(f=>f.toLowerCase().endsWith('.docx'))
+        .forEach(f=>{ try{fs.unlinkSync(path.join(d,f));}catch(e){} });
+    }
+  }
+  // Очищаем корень (чек-лист)
+  if(fs.existsSync(outputDir)){
+    fs.readdirSync(outputDir)
+      .filter(f=>f.toLowerCase().endsWith('.docx'))
+      .forEach(f=>{ try{fs.unlinkSync(path.join(outputDir,f));}catch(e){} });
+  }
 
   const p1=require('./gen_p1');
   const p2=require('./gen_p2');

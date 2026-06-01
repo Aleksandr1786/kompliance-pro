@@ -112,10 +112,26 @@ function norm(client){
   c.doc_date=c.doc_date||new Date().toLocaleDateString('ru-RU');
   c.doc_year=c.doc_year||String(new Date().getFullYear());
   c.manager_name=c.manager_name||'Руководитель';
+  c.manager_name_full=c.manager_name_full||c.manager_name;
   c.manager_position=c.manager_position||'Руководитель';
-  c.ot_name=c.ot_name||c.manager_name;c.ot_position=c.ot_position||c.manager_position;
+  // Ответственный за ОТ — если не указан отдельно, используем руководителя
+  c.ot_name=c.ot_name||c.manager_name;
+  c.ot_name_full=c.ot_name_full||c.ot_name;
+  c.ot_position=c.ot_position||c.manager_position;
   c.ot_dative=c.ot_dative||c.ot_name_full||c.ot_name;
-  c.employees=Array.isArray(c.employees)?c.employees:[];
+  // СОУТ и условия труда
+  c.soat_class=c.soat_class||'2';
+  c.hazard_works=c.hazard_works||0;
+  c.medcheck_required=c.medcheck_required||0;
+  // Нормализуем сотрудников — добавляем падежи
+  c.employees=Array.isArray(c.employees)?c.employees.map(e=>({
+    ...e,
+    // Дательный падеж — из AI или генерируем из именительного
+    name_dat: e.name_dat || e.full_name || '',
+    name_short: e.name_short || (e.full_name
+      ? e.full_name.split(' ').map((w,i)=>i===0?w:w[0]+'.'||'').join(' ')
+      : ''),
+  })):[];
   c.staff=c.staff||1;c.order_prefix=parseInt(c.order_prefix)||3;
   c.micro=c.staff<=15;c.small=c.staff>15&&c.staff<=100;c.medium=c.staff>100;
   return c;

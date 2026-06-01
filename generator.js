@@ -385,6 +385,26 @@ async function generatePackage(client,settings,outputDir){
   await run(p1.gen_01_07,dirs.d1);await run(p1.gen_01_08,dirs.d1);await run(p1.gen_01_09,dirs.d1);
   await run(p1.gen_01_10,dirs.d1);await run(p1.gen_01_11,dirs.d1);
 
+  // Условные документы Раздела 1
+  const soatClass   = parseInt(c.soat_class||'2');
+  const hasHazard   = !!c.hazard_works;
+  const hasMedcheck = !!c.medcheck_required || (c.employees||[]).some(e=>e.medcheck_required);
+  const isMicro     = c.micro; // ≤15 сотрудников
+  const isSmall     = c.small; // 16-100
+  const isMedium    = c.medium;// >100
+
+  // Медосмотры — если есть основания
+  if(hasMedcheck){
+    await run(p2.gen_01_med,dirs.d1); // приказ
+    await run(p2.gen_02_med,dirs.d2); // список контингента
+  }
+
+  // Работы повышенной опасности
+  if(hasHazard){
+    await run(p2.gen_01_hazard,dirs.d1); // приказ
+    await run(p2.gen_02_hazard,dirs.d7); // программа В
+  }
+
   await run(p2.gen_02_01,dirs.d2);await run(p2.gen_02_02,dirs.d2);await run(p2.gen_02_03,dirs.d2);
   await run(p2.gen_02_04,dirs.d2);await run(p2.gen_02_05,dirs.d2);await run(p2.gen_02_06,dirs.d2);
 
@@ -394,7 +414,12 @@ async function generatePackage(client,settings,outputDir){
   await run(p2.gen_05_06,dirs.d5);await run(p2.gen_05_07,dirs.d5);await run(p2.gen_05_08,dirs.d5);
 
   await run(gen_06_01,dirs.d6);await run(gen_06_02,dirs.d6);await run(gen_06_03,dirs.d6);
-  await run(gen_06_04,dirs.d6);await run(gen_06_05,dirs.d6);await run(gen_06_06,dirs.d6);
+  // Журнал выдачи СИЗ — только если СОУТ 3+ или работы повышенной опасности
+  if(soatClass>=31||hasHazard){
+    await run(gen_06_04,dirs.d6);
+    await run(gen_06_06,dirs.d6); // личная карточка СИЗ
+  }
+  await run(gen_06_05,dirs.d6); // журнал контроля аптечки — всегда
 
   await run(gen_07_01,dirs.d7);await run(gen_07_02,dirs.d7);await run(gen_07_03,dirs.d7);
 

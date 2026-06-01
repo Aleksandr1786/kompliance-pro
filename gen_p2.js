@@ -515,7 +515,7 @@ async function gen_git_memo(c,s,dir){
       width:{size:9072,type:require('docx').WidthType.DXA},
       columnWidths:[4000,5072],
       rows:[
-        row([cell('Направление проверки',[4000],{bold:true,center:true,sz:SZ_S}),cell('Что смотрят',[5072],{bold:true,center:true,sz:SZ_S})]),
+        row([cell('Направление проверки',4000,{bold:true,center:true,sz:SZ_S}),cell('Что смотрят',5072,{bold:true,center:true,sz:SZ_S})]),
         row([cell('Обучение по ОТ',4000,{sz:SZ_S}),cell('Удостоверения, протоколы, журналы инструктажей',5072,{sz:SZ_S})]),
         row([cell('Документация СУОТ',4000,{sz:SZ_S}),cell('Политика ОТ, Положение о СУОТ, приказы',5072,{sz:SZ_S})]),
         row([cell('Инструкции по ОТ',4000,{sz:SZ_S}),cell('Наличие, актуальность, листы ознакомления',5072,{sz:SZ_S})]),

@@ -425,6 +425,14 @@ async function generatePackage(client,settings,outputDir){
 
   await run(gen_checklist,outputDir);
 
+  // ── Документы для клиента (всегда) ─────────────────────
+  // Папка "Прочее" для доп. документов
+  const dExtra = require('path').join(outputDir,'Прочее');
+  require('fs').mkdirSync(dExtra,{recursive:true});
+  await run(p2.gen_git_memo,    dExtra); // Памятка ГИТ
+  await run(p2.gen_elec_contract,dExtra); // Договор на электробезопасность
+  await run(p2.gen_act,         dExtra); // Акт выполненных работ
+
   return{generated,errors};
 }
 

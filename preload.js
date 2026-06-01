@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('api', {
   employeeAdd:    (data)      => ipcRenderer.invoke('employees:add', data),
   employeeDelete: (id)        => ipcRenderer.invoke('employees:delete', id),
 employeeUpdate: (id, data) => ipcRenderer.invoke('employees:update', id, data),
+trainingUpdate: (id, data) => ipcRenderer.invoke('training:save', id, data),
+trainingAlerts: ()         => ipcRenderer.invoke('training:alerts'),
 
   // Документы
   documentsList:  (cid)       => ipcRenderer.invoke('documents:list', cid),

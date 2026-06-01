@@ -365,7 +365,68 @@ ipcMain.handle('ai:request', async (_, { prompt, system }) => {
     return { ok: false, error: e.message };
   }
 });
-let mainWindow;
+// ─── ОБУЧЕНИЕ СОТРУДНИКОВ ────────────────────────────────
+ipcMain.handle('training:get', (_, employeeId) => {
+  const emp = db.get('employees').find({ id: employeeId }).value();
+  return emp?.training || {};
+});
+
+ipcMain.handle('training:save', (_, employeeId, data) => {
+  db.get('employees').find({ id: employeeId }).assign({ training: data }).write();
+  return { ok: true };
+});
+
+// Получить всех сотрудников с просроченным/скоро истекающим обучением
+ipcMain.handle('training:alerts', () => {
+  const today     = new Date();
+  const employees = db.get('employees').value();
+  const clients   = db.get('clients').value();
+  const alerts    = [];
+
+  const TRAINING_TYPES = [
+    { key: 'prog_a',     label: 'Программа А (ОТ)',        years: 3 },
+    { key: 'first_aid',  label: 'Первая помощь',           years: 3 },
+    { key: 'fire',       label: 'Пожарный минимум',        years: 3 },
+    { key: 'siz',        label: 'Применение СИЗ',          years: 3 },
+    { key: 'repeat',     label: 'Повторный инструктаж',    months: 6 },
+    { key: 'medcheck',   label: 'Медосмотр',               years: 1 },
+  ];
+
+  employees.forEach(emp => {
+    if (!emp.training) return;
+    const client = clients.find(c => c.id === emp.client_id);
+    const clientName = client?.name || '';
+
+    TRAINING_TYPES.forEach(tt => {
+      const t = emp.training[tt.key];
+      if (!t?.date || !t?.required) return;
+
+      const lastDate = new Date(t.date);
+      let nextDate = new Date(lastDate);
+      if (tt.years)  nextDate.setFullYear(nextDate.getFullYear() + tt.years);
+      if (tt.months) nextDate.setMonth(nextDate.getMonth() + tt.months);
+
+      const daysLeft = Math.ceil((nextDate - today) / (1000 * 60 * 60 * 24));
+
+      if (daysLeft <= 30) {
+        alerts.push({
+          employee_id:   emp.id,
+          employee_name: emp.full_name,
+          client_name:   clientName,
+          client_id:     emp.client_id,
+          training_type: tt.label,
+          next_date:     nextDate.toISOString().slice(0, 10),
+          days_left:     daysLeft,
+          overdue:       daysLeft < 0,
+        });
+      }
+    });
+  });
+
+  return alerts.sort((a, b) => a.days_left - b.days_left);
+});
+
+// ─── ОКНО ────────────────────────────────────────────────
 
 function createWindow() {
   mainWindow = new BrowserWindow({

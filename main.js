@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { generatePackage } = require('./generator');
 const path = require('path');
 const fs = require('fs');
@@ -1080,6 +1081,85 @@ ipcMain.handle('pin:status', () => {
 
 // ─── ОКНО ────────────────────────────────────────────────
 
+
+// ─── АВТООБНОВЛЕНИЕ ──────────────────────────────────────
+//
+// При каждом запуске программа проверяет GitHub Releases.
+// Если есть новая версия — показывает диалог пользователю.
+// Пользователь может обновить сейчас или отложить.
+// Обновление скачивается в фоне, устанавливается при закрытии.
+
+function setupAutoUpdater() {
+  // Не проверяем обновления в режиме разработки
+  if (!app.isPackaged) {
+    console.log('[Updater] Пропускаем — режим разработки');
+    return;
+  }
+
+  autoUpdater.autoDownload = false;       // Сначала спросим пользователя
+  autoUpdater.autoInstallOnAppQuit = true; // Установить при закрытии если скачано
+
+  // Новая версия найдена
+  autoUpdater.on('update-available', (info) => {
+    console.log(`[Updater] Доступна версия ${info.version}`);
+    if (!mainWindow) return;
+
+    mainWindow.webContents.send('update:available', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+    });
+  });
+
+  // Новой версии нет
+  autoUpdater.on('update-not-available', () => {
+    console.log('[Updater] Версия актуальна');
+  });
+
+  // Прогресс скачивания
+  autoUpdater.on('download-progress', (progress) => {
+    if (!mainWindow) return;
+    mainWindow.webContents.send('update:progress', {
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  // Скачивание завершено
+  autoUpdater.on('update-downloaded', () => {
+    console.log('[Updater] Обновление скачано — установка при закрытии');
+    if (!mainWindow) return;
+    mainWindow.webContents.send('update:downloaded');
+  });
+
+  // Ошибка обновления
+  autoUpdater.on('error', (err) => {
+    console.error('[Updater] Ошибка:', err.message);
+  });
+
+  // Проверяем обновления через 3 секунды после запуска
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch(err => {
+      console.error('[Updater] Не удалось проверить обновления:', err.message);
+    });
+  }, 3000);
+}
+
+// IPC — пользователь согласился скачать обновление
+ipcMain.handle('update:download', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// IPC — установить и перезапустить сейчас
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
 function createWindow() {
   // Восстанавливаем сохранённый размер окна
   let bounds = {};
@@ -1125,6 +1205,7 @@ app.whenReady().then(() => {
   initDB();
   autoBackup();
   createWindow();
+  setupAutoUpdater();
 });
 
 app.on('window-all-closed', () => {

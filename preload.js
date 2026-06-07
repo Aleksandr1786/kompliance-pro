@@ -72,6 +72,13 @@ contextBridge.exposeInMainWorld('api', {
   pinSet:         (pin)       => ipcRenderer.invoke('pin:set', pin),
   pinStatus:      ()          => ipcRenderer.invoke('pin:status'),
 
+  // Автообновление
+  updateDownload:  ()   => ipcRenderer.invoke('update:download'),
+  updateInstall:   ()   => ipcRenderer.invoke('update:install'),
+  onUpdateAvailable:  (cb) => ipcRenderer.on('update:available',  (_, d) => cb(d)),
+  onUpdateProgress:   (cb) => ipcRenderer.on('update:progress',   (_, d) => cb(d)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update:downloaded', ()     => cb()),
+
   // Триал и лицензия
   trialStatus:    ()                    => ipcRenderer.invoke('trial:status'),
   licenseActivate:(key, expire)         => ipcRenderer.invoke('license:activate', key, expire),

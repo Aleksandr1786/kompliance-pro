@@ -131,6 +131,123 @@ function logoutAdmin() {
 }
 
 // ── ИНИЦИАЛИЗАЦИЯ ────────────────────────────────────────
+// ─── АВТООБНОВЛЕНИЕ — UI ─────────────────────────────────
+
+function initAutoUpdater() {
+  if (!window.api.onUpdateAvailable) return;
+
+  window.api.onUpdateAvailable((info) => {
+    showUpdateBanner(info.version);
+  });
+
+  window.api.onUpdateProgress((data) => {
+    const bar = document.getElementById('update-progress-bar');
+    const txt = document.getElementById('update-progress-text');
+    if (bar) bar.style.width = data.percent + '%';
+    if (txt) txt.textContent = `Скачивание... ${data.percent}%`;
+  });
+
+  window.api.onUpdateDownloaded(() => {
+    document.getElementById('update-banner')?.remove();
+    showUpdateReadyBanner();
+  });
+}
+
+function showUpdateBanner(version) {
+  document.getElementById('update-banner')?.remove();
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = `
+    position:fixed;bottom:20px;left:20px;z-index:9001;
+    background:rgba(15,23,42,0.97);border:1px solid rgba(37,99,235,0.5);
+    border-radius:14px;padding:14px 18px;max-width:340px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.5);
+  `;
+  banner.innerHTML = \`
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="font-size:24px;flex-shrink:0">🆕</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px">
+          Доступна версия \${version}
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+          Обновление улучшает стабильность и добавляет новые функции
+        </div>
+        <div id="update-progress-bar-wrap" style="display:none;background:rgba(255,255,255,0.05);
+          border-radius:4px;height:4px;margin-bottom:8px;overflow:hidden">
+          <div id="update-progress-bar" style="height:100%;width:0%;
+            background:linear-gradient(90deg,#2563eb,#7c3aed);transition:width 0.3s"></div>
+        </div>
+        <div id="update-progress-text" style="display:none;font-size:11px;
+          color:#60a5fa;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px">
+          <button id="update-now-btn"
+            style="flex:1;padding:8px;background:linear-gradient(135deg,#2563eb,#7c3aed);
+            border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+            ⬇️ Обновить
+          </button>
+          <button id="update-later-btn"
+            style="padding:8px 12px;background:transparent;border:1px solid rgba(255,255,255,0.1);
+            border-radius:8px;color:#64748b;font-size:12px;cursor:pointer">
+            Позже
+          </button>
+        </div>
+      </div>
+    </div>
+  \`;
+  document.body.appendChild(banner);
+
+  document.getElementById('update-now-btn').onclick = async () => {
+    document.getElementById('update-now-btn').textContent = 'Скачивание...';
+    document.getElementById('update-now-btn').disabled = true;
+    document.getElementById('update-later-btn').style.display = 'none';
+    document.getElementById('update-progress-bar-wrap').style.display = 'block';
+    document.getElementById('update-progress-text').style.display = 'block';
+    await window.api.updateDownload();
+  };
+
+  document.getElementById('update-later-btn').onclick = () => {
+    banner.style.transition = 'opacity 0.3s';
+    banner.style.opacity = '0';
+    setTimeout(() => banner.remove(), 300);
+  };
+}
+
+function showUpdateReadyBanner() {
+  document.getElementById('update-ready-banner')?.remove();
+  const banner = document.createElement('div');
+  banner.id = 'update-ready-banner';
+  banner.style.cssText = \`
+    position:fixed;bottom:20px;left:20px;z-index:9001;
+    background:rgba(15,23,42,0.97);border:1px solid rgba(52,211,153,0.5);
+    border-radius:14px;padding:14px 18px;max-width:320px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.5);
+  \`;
+  banner.innerHTML = \`
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="font-size:24px;flex-shrink:0">✅</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px">
+          Обновление готово к установке
+        </div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+          Установится автоматически при следующем запуске
+        </div>
+        <button id="update-install-btn"
+          style="width:100%;padding:8px;background:rgba(52,211,153,0.15);
+          border:1px solid rgba(52,211,153,0.3);border-radius:8px;
+          color:#34d399;font-size:12px;font-weight:700;cursor:pointer">
+          🔄 Перезапустить сейчас
+        </button>
+      </div>
+    </div>
+  \`;
+  document.body.appendChild(banner);
+  document.getElementById('update-install-btn').onclick = async () => {
+    await window.api.updateInstall();
+  };
+}
+
 // ─── ТРИАЛ И ЛИЦЕНЗИЯ ────────────────────────────────────
 
 async function activateLicensePublic() {
@@ -523,6 +640,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.head.appendChild(pinStyle);
 
   settings = await window.api.settingsGet();
+
+  // ── Автообновление ─────────────────────────────────────
+  initAutoUpdater();
 
   // ── Проверка триала при запуске ───────────────────────
   await checkTrialOnStartup();

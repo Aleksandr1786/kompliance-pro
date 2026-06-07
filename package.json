@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -36,7 +36,8 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "publisherName": "ИП Свинцова Д.И."
+      "publisherName": "ИП Свинцова Д.И.",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,

@@ -1206,6 +1206,12 @@ function createWindow() {
   // Убираем стандартное английское меню (File/Edit/View...)
   Menu.setApplicationMenu(null);
 
+  // Ctrl+Shift+I — открыть DevTools (временно для отладки)
+  const { globalShortcut } = require('electron');
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    if (mainWindow) mainWindow.webContents.toggleDevTools();
+  });
+
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
 

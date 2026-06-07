@@ -145,18 +145,33 @@ function initAutoUpdater() {
     showUpdateBanner(info.version);
   });
 
+  let updateReadyShown = false;
+  let updateFallbackTimer = null;
+
+  function showReadyOnce() {
+    if (updateReadyShown) return;
+    updateReadyShown = true;
+    if (updateFallbackTimer) { clearTimeout(updateFallbackTimer); updateFallbackTimer = null; }
+    console.log('[Updater] Показываем баннер готовности');
+    document.getElementById('update-banner')?.remove();
+    showUpdateReadyBanner();
+  }
+
   window.api.onUpdateProgress((data) => {
     console.log('[Updater] Прогресс:', data.percent);
     const bar = document.getElementById('update-progress-bar');
     const txt = document.getElementById('update-progress-text');
     if (bar) bar.style.width = data.percent + '%';
     if (txt) txt.textContent = `Скачивание... ${data.percent}%`;
+    // Фолбэк: если update:downloaded не пришёл за 5 сек после 100% — показываем сами
+    if (data.percent >= 100) {
+      updateFallbackTimer = setTimeout(showReadyOnce, 5000);
+    }
   });
 
   window.api.onUpdateDownloaded(() => {
-    console.log('[Updater] Скачано, показываем баннер готовности');
-    document.getElementById('update-banner')?.remove();
-    showUpdateReadyBanner();
+    console.log('[Updater] Скачано (событие update:downloaded)');
+    showReadyOnce();
   });
 }
 function showUpdateBanner(version) {

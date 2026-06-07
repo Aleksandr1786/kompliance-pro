@@ -7,6 +7,7 @@ const {
 } = require('docx');
 const fs = require('fs');
 const path = require('path');
+const { safe } = require('./utils');
 
 const FONT='Times New Roman', SZ=24, SZ_S=20, SZ_H=28;
 const MP={top:1134,right:851,bottom:1134,left:1701};
@@ -56,8 +57,8 @@ function approvalBlock(c){
     rows:[new TableRow({children:[
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[new Paragraph('')]}),
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[
-        pL('УТВЕРЖДАЮ',{bold:true}),pL(c.manager_position),
-        pL('__________  '+c.manager_name),pL('«___» ____________ '+c.doc_year+' г.'),
+        pL('УТВЕРЖДАЮ',{bold:true}),pL(safe(c.manager_position)),
+        pL('__________  '+safe(c.manager_name)),pL('«___» ____________ '+safe(c.doc_year)+' г.'),
       ]}),
     ]})],
   });
@@ -68,8 +69,8 @@ function approvalOrder(c,orderNum){
     rows:[new TableRow({children:[
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[new Paragraph('')]}),
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[
-        pL('УТВЕРЖДЕНА',{bold:true}),pL('Приказом '+c.manager_position),
-        pL(c.name),pL('от «'+c.doc_date+'» № ____'),
+        pL('УТВЕРЖДЕНА',{bold:true}),pL('Приказом '+safe(c.manager_position)),
+        pL(safe(c.name)),pL('от «'+safe(c.doc_date)+'» № ____'),
       ]}),
     ]})],
   });
@@ -77,31 +78,31 @@ function approvalOrder(c,orderNum){
 function orderHead(c,num,subject){
   // Город берём как есть из карточки (клиент пишет сам: "г. Новороссийск" или "Новороссийск")
   const cityStr = (c.city||'').trim() || '________________';
-  return [pR(c.name),...eL(1),H('ПРИКАЗ'),
+  return [pR(safe(c.name)),...eL(1),H('ПРИКАЗ'),
     new Paragraph({alignment:AlignmentType.CENTER,spacing:{before:0,after:80},tabStops:[{type:TabStopType.RIGHT,position:TabStopPosition.MAX}],children:[
       new TextRun({text:cityStr, size:SZ,font:FONT}),
-      new TextRun({text:'\t№ ____ от '+c.doc_date,size:SZ,font:FONT}),
+      new TextRun({text:'\t№ ____ от '+safe(c.doc_date),size:SZ,font:FONT}),
     ]}),
     ...eL(1),pC(subject,{bold:true})];
 }
-function orderSign(c){return [...eL(2),pL(c.manager_position+':'),...eL(1),pL('________________  '+c.manager_name)];}
+function orderSign(c){return [...eL(2),pL(safe(c.manager_position)+':'),...eL(1),pL('________________  '+safe(c.manager_name))];}
 function famSheet(c,label){
   const emp=c.employees||[];
   const colW=[500,2500,2500,1200,1372];
   const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true}),cell('Фамилия И.О.',colW[1],{bold:true,center:true}),cell('Должность',colW[2],{bold:true,center:true}),cell('Дата',colW[3],{bold:true,center:true}),cell('Подпись',colW[4],{bold:true,center:true})]);
-  const dr=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell(e.position,colW[2],{sz:SZ_S}),cell(c.doc_date,colW[3],{center:true,sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
+  const dr=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell(e.position,colW[2],{sz:SZ_S}),cell(safe(c.doc_date),colW[3],{center:true,sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
   const er=[1,2,3].map((_,i)=>row([cell(String(emp.length+i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell('',colW[2],{sz:SZ_S}),cell('',colW[3],{sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
-  return [...eL(2),H('Лист ознакомления — '+label,SZ),...eL(1),tbl(colW,[hdr,...dr,...er]),...eL(1),pL('Ответственный за ознакомление:'),pL(c.manager_position+'  _______________  '+c.manager_name)];
+  return [...eL(2),H('Лист ознакомления — '+label,SZ),...eL(1),tbl(colW,[hdr,...dr,...er]),...eL(1),pL('Ответственный за ознакомление:'),pL(safe(c.manager_position)+'  _______________  '+safe(c.manager_name))];
 }
 function famSheetOrder(c,label){
   const emp=c.employees||[];
   const colW=[500,2500,2500,1200,1372];
   const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true}),cell('Фамилия И.О.',colW[1],{bold:true,center:true}),cell('Должность',colW[2],{bold:true,center:true}),cell('Дата',colW[3],{bold:true,center:true}),cell('Подпись',colW[4],{bold:true,center:true})]);
-  const dr=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell(e.position,colW[2],{sz:SZ_S}),cell(c.doc_date,colW[3],{center:true,sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
+  const dr=emp.map((e,i)=>row([cell(String(i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell(e.position,colW[2],{sz:SZ_S}),cell(safe(c.doc_date),colW[3],{center:true,sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
   const er=[1,2,3].map((_,i)=>row([cell(String(emp.length+i+1),colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell('',colW[2],{sz:SZ_S}),cell('',colW[3],{sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
   return [...eL(2),H('Лист ознакомления с приказом '+label,SZ),...eL(1),tbl(colW,[hdr,...dr,...er])];
 }
-function devSign(c){return [...eL(2),pL([{t:'Разработал: '},{t:c.manager_position+'  _______________  '+c.manager_name}]),pL('«'+c.doc_date+'»')];}
+function devSign(c){return [...eL(2),pL([{t:'Разработал: '},{t:c.manager_position+'  _______________  '+safe(c.manager_name)}]),pL('«'+safe(c.doc_date)+'»')];}
 
 function norm(client){
   const c=Object.assign({},client);
@@ -155,7 +156,7 @@ function oNum(c,offset){return String(c.order_prefix+offset).padStart(2,'0');}
 async function gen_01_01(c,s,dir){
   const ch=[approvalBlock(c),...eL(1),H('ПОЛИТИКА В ОБЛАСТИ ОХРАНЫ ТРУДА'),H(c.name.toUpperCase(),SZ),...eL(1),
     SH('1. Общие положения'),
-    p(c.name+' осознаёт ответственность за жизнь и здоровье работников. Политика разработана в соответствии с ТК РФ (ст.209–231), ПП РФ от 24.12.2021 № 2464.',{indent:true}),
+    p(safe(c.name)+' осознаёт ответственность за жизнь и здоровье работников. Политика разработана в соответствии с ТК РФ (ст.209–231), ПП РФ от 24.12.2021 № 2464.',{indent:true}),
     SH('2. Основные принципы'),
     p('Организация основывает деятельность в сфере ОТ на следующих принципах:',{indent:true}),
     bul('приоритет сохранения жизни и здоровья работников;'),
@@ -172,7 +173,7 @@ async function gen_01_01(c,s,dir){
     p('3.5. Организовывать обучение, инструктажи в установленные сроки.',{indent:true}),
     p('3.6. Расследовать НС и микротравмы, устранять причины.',{indent:true}),
     p('3.7. Обеспечивать целевое финансирование мероприятий по ОТ.',{indent:true}),
-    SH('4. Цели на '+c.doc_year+' год'),
+    SH('4. Цели на '+safe(c.doc_year)+' год'),
     p('4.1. Нулевой производственный травматизм.',{indent:true}),
     p('4.2. Своевременное обучение по ОТ 100% работников.',{indent:true}),
     p('4.3. Актуализация инструкций по ОТ и документации СУОТ.',{indent:true}),
@@ -183,18 +184,18 @@ async function gen_01_01(c,s,dir){
 }
 
 async function gen_01_02(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о системе управления охраной труда (СУОТ)',SZ),H(c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о системе управления охраной труда (СУОТ)',SZ),H(safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Положение устанавливает структуру, цели, задачи СУОТ в Организации.',{indent:true}),
     p('1.2. Разработано в соответствии с ТК РФ (раздел X), Приказом Минтруда от 29.10.2021 № 776н, ПП РФ от 24.12.2021 № 2464.',{indent:true}),
-    p('1.3. Действует для всех работников '+c.name+'.',{indent:true}),
+    p('1.3. Действует для всех работников '+safe(c.name)+'.',{indent:true}),
     ...(c.micro?[p('1.4. Организация — микропредприятие (до 15 работников), применяет упрощённый порядок документооборота (ст. 309.2 ТК РФ).',{indent:true})]:[]),
     SH('2. Политика и цели'),
     p('2.1. Политика ОТ — основополагающий документ СУОТ.',{indent:true}),
     p('2.2. Цели устанавливаются ежегодно Планом мероприятий.',{indent:true}),
     SH('3. Структура управления'),
-    p('3.1. Общее руководство — '+c.manager_position+' '+c.manager_name+'.',{indent:true}),
-    p('3.2. Организацию работы по ОТ осуществляет '+c.ot_position+' '+c.ot_name+', назначенный приказом.',{indent:true}),
+    p('3.1. Общее руководство — '+safe(c.manager_position)+' '+safe(c.manager_name)+'.',{indent:true}),
+    p('3.2. Организацию работы по ОТ осуществляет '+safe(c.ot_position)+' '+safe(c.ot_name)+', назначенный приказом.',{indent:true}),
     SH('4. Ресурсное обеспечение'),
     p('4.1. Финансирование — не менее 0,2% затрат на производство (ст. 225 ТК РФ).',{indent:true}),
     SH('5. Управление профессиональными рисками'),
@@ -239,7 +240,7 @@ async function gen_01_04(c,s,dir){
   const ch=[...orderHead(c,num,'«О назначении ответственных лиц по охране труда»'),...eL(1),
     p('В соответствии с требованиями ст. 214, 217 ТК РФ,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Назначить ответственным за организацию работы по ОТ в '+c.name+' '+otP+' '+otN+'.'),
+    p('1. Назначить ответственным за организацию работы по ОТ в '+safe(c.name)+' '+otP+' '+otN+'.'),
     p('2. Возложить на '+otD+' следующие обязанности:'),
     p('2.1. Организация и контроль работы по охране труда.',{indent:true}),
     p('2.2. Проведение вводных инструктажей.',{indent:true}),
@@ -262,7 +263,7 @@ async function gen_01_05(c,s,dir){
   const ch=[...orderHead(c,num,'«Об утверждении инструкций по охране труда»'),...eL(1),
     p('В соответствии со ст. 214 ТК РФ, Приказа Минтруда от 29.10.2021 № 772н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Утвердить с '+c.doc_date+' инструкции по охране труда:'),
+    p('1. Утвердить с '+safe(c.doc_date)+' инструкции по охране труда:'),
     ...iList,
     p('1.N. № 06-ИОТ — при работе с ПЭВМ, оргтехникой и электроприборами.',{indent:true}),
     p('1.N. № 07-ИОТ — при эксплуатации копировально-множительной техники.',{indent:true}),
@@ -296,7 +297,7 @@ async function gen_01_07(c,s,dir){
   const ch=[...orderHead(c,num,'«Об обеспечении работников аптечками первой помощи»'),...eL(1),
     p('В соответствии со ст. 223 ТК РФ, Приказа Минтруда России от 09.08.2024 № 398н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Обеспечить наличие аптечки первой помощи в офисе '+c.name+'.'),
+    p('1. Обеспечить наличие аптечки первой помощи в офисе '+safe(c.name)+'.'),
     p('2. Назначить '+c.ot_position+' '+(c.ot_name_full||c.ot_name)+' ответственным за:'),
     p('2.1. Приобретение, комплектацию и пополнение аптечки.',{indent:true}),
     p('2.2. Проверку комплектации не реже 1 раза в 3 месяца.',{indent:true}),
@@ -314,7 +315,7 @@ async function gen_01_08(c,s,dir){
   const ch=[...orderHead(c,num,'«О назначении ответственного за электрохозяйство»'),...eL(1),
     p('В соответствии с Приказом Минэнерго России от 12.08.2022 № 811, Приказом Минтруда России от 15.12.2020 № 903н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Назначить ответственным за эксплуатацию электроустановок '+c.name+' '+eP+' '+eN+'.'),
+    p('1. Назначить ответственным за эксплуатацию электроустановок '+safe(c.name)+' '+eP+' '+eN+'.'),
     p('2. Возложить обязанности:'),
     p('2.1. Организация безопасной эксплуатации электрооборудования.',{indent:true}),
     p('2.2. Присвоение I группы электробезопасности неэлектротехническому персоналу.',{indent:true}),
@@ -329,7 +330,7 @@ async function gen_01_09(c,s,dir){
   const ch=[...orderHead(c,num,'«Об утверждении программ обучения по охране труда»'),...eL(1),
     p('В соответствии с ПП РФ от 24.12.2021 № 2464,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Утвердить с '+c.doc_date+' программы обучения:'),
+    p('1. Утвердить с '+safe(c.doc_date)+' программы обучения:'),
     p('1.1. № 01-ПИ — Программа вводного инструктажа по охране труда.',{indent:true}),
     p('1.2. № 02-ПИ — Программа первичного инструктажа на рабочем месте.',{indent:true}),
     p('1.3. № 03-ПИ — Программа противопожарного инструктажа.',{indent:true}),
@@ -364,7 +365,7 @@ async function gen_01_10(c,s,dir){
   ];
   const hdr=row([cell('№',colW[0],{bold:true,center:true}),cell('Наименование мероприятия',colW[1],{bold:true,center:true}),cell('Срок',colW[2],{bold:true,center:true}),cell('Ответственный',colW[3],{bold:true,center:true}),cell('Отметка',colW[4],{bold:true,center:true})]);
   const dr=pd.map(r=>row([cell(r[0],colW[0],{center:true,sz:SZ_S}),cell(r[1],colW[1],{sz:SZ_S}),cell(r[2],colW[2],{sz:SZ_S}),cell(r[3],colW[3],{sz:SZ_S}),cell('',colW[4],{sz:SZ_S})]));
-  const ch=[approvalBlock(c),...eL(1),H('ПЛАН МЕРОПРИЯТИЙ ПО ОХРАНЕ ТРУДА'),H(c.name+' на '+yr+' год',SZ),...eL(1),tbl(colW,[hdr,...dr]),...eL(2),pL(c.ot_position+' (ответственный за ОТ):  ________________  '+otN)];
+  const ch=[approvalBlock(c),...eL(1),H('ПЛАН МЕРОПРИЯТИЙ ПО ОХРАНЕ ТРУДА'),H(safe(c.name)+' на '+yr+' год',SZ),...eL(1),tbl(colW,[hdr,...dr]),...eL(2),pL(safe(c.ot_position)+' (ответственный за ОТ):  ________________  '+otN)];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('01.10')},children:ch}],dir,'План мероприятий по охране труда.docx');
 }
 
@@ -374,7 +375,7 @@ async function gen_01_11(c,s,dir){
     const h=row(headers.map((t,i)=>cell(t,colW[i],{bold:true,center:true,sz:SZ_S})));
     return tbl(colW,[h,...data.map(r=>row(r.map((t,i)=>cell(t,colW[i],{sz:SZ_S}))))]);
   }
-  const ch=[approvalBlock(c),...eL(1),H('ГРАФИК № 01-ПМ'),H('ПЕРИОДИЧЕСКИХ МЕРОПРИЯТИЙ ПО ОХРАНЕ ТРУДА'),H(c.name+' на '+yr+' год',SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ГРАФИК № 01-ПМ'),H('ПЕРИОДИЧЕСКИХ МЕРОПРИЯТИЙ ПО ОХРАНЕ ТРУДА'),H(safe(c.name)+' на '+yr+' год',SZ),...eL(1),
     SH('1. Ежегодные мероприятия'),
     sub(['№','Мероприятие','Срок','Ответственный','Отметка'],[300,4500,1500,1700,1072],[
       ['1','Противопожарный инструктаж (повторный)','Апрель '+yr,mN,''],

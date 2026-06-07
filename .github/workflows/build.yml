@@ -1,0 +1,40 @@
+name: Сборка и релиз КомплаенсПро
+
+on:
+  push:
+    tags:
+      - 'v*'          # Запускается при пуше тега: v1.0.1, v1.2.0 и т.д.
+
+jobs:
+  build:
+    runs-on: windows-latest   # Сборка на Windows — для корректного .exe
+
+    steps:
+      # 1. Получаем код из репозитория
+      - name: Получить код
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Node.js
+      - name: Установить Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Устанавливаем зависимости
+      - name: Установить зависимости
+        run: npm ci
+
+      # 4. Собираем installer.exe и публикуем на GitHub Releases
+      - name: Собрать и опубликовать
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win
+
+      # 5. Загружаем артефакты (дополнительно — для истории)
+      - name: Сохранить артефакты
+        uses: actions/upload-artifact@v4
+        with:
+          name: КомплаенсПро-Setup
+          path: dist/*.exe
+          retention-days: 30

@@ -2,19 +2,20 @@
 // КомплаенсПро generator.js v2.0 — PART 2: Разделы 2, 3, 5
 
 const base=require('./gen_p1');
+const { safe } = require('./utils');
 const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW,BALL,BNONE}=base;
 const {PageOrientation}=require('docx');
 
 // ── РАЗДЕЛ 2 ───────────────────────────────────────────
 
 async function gen_02_01(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о порядке обучения по охране труда',SZ),H('и проверки знания требований охраны труда',SZ),H('в '+c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о порядке обучения по охране труда',SZ),H('и проверки знания требований охраны труда',SZ),H('в '+safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Разработано в соответствии с ТК РФ и ПП РФ от 24.12.2021 № 2464.',{indent:true}),
     p('1.2. Устанавливает порядок проведения инструктажей и направления на обучение в учебные центры.',{indent:true}),
     p('1.3. Обучение по охране труда обязательно для всех работников.',{indent:true}),
     SH('2. Виды инструктажей'),
-    p([{t:'2.1.1. Вводный инструктаж',b:true},{t:' — до начала работы со всеми принимаемыми. Проводит '+c.manager_position+' по программе № 01-ПИ.'}],{indent:true}),
+    p([{t:'2.1.1. Вводный инструктаж',b:true},{t:' — до начала работы со всеми принимаемыми. Проводит '+safe(c.manager_position)+' по программе № 01-ПИ.'}],{indent:true}),
     p([{t:'2.1.2. Первичный инструктаж',b:true},{t:' — до начала самостоятельной работы (кроме освобождённых). Проводит непосредственный руководитель.'}],{indent:true}),
     p([{t:'2.1.3. Повторный инструктаж',b:true},{t:' — не реже 1 раза в 6 месяцев.'}],{indent:true}),
     p([{t:'2.1.4. Внеплановый инструктаж',b:true},{t:' — при изменении условий труда, после НС, по требованию надзора.'}],{indent:true}),
@@ -22,9 +23,9 @@ async function gen_02_01(c,s,dir){
     p('2.2. Каждый инструктаж завершается устной проверкой знаний и записью в журнале.',{indent:true}),
     SH('3. Обучение в учебных центрах'),
     p('3.1. Проводится только в аккредитованных учебных центрах (п. 44, 52 ПП № 2464):',{indent:true}),
-    p([{t:'3.1.1. Программа А',b:true},{t:' (СУОТ) — '+c.manager_position+'; 1 раз в 3 года.'}],{indent:true}),
+    p([{t:'3.1.1. Программа А',b:true},{t:' (СУОТ) — '+safe(c.manager_position)+'; 1 раз в 3 года.'}],{indent:true}),
     p([{t:'3.1.2. Оказание первой помощи',b:true},{t:' — все работники; 1 раз в 3 года.'}],{indent:true}),
-    p([{t:'3.1.3. Пожарно-технический минимум',b:true},{t:' — '+c.manager_position+'; 1 раз в 3 года.'}],{indent:true}),
+    p([{t:'3.1.3. Пожарно-технический минимум',b:true},{t:' — '+safe(c.manager_position)+'; 1 раз в 3 года.'}],{indent:true}),
     p([{t:'3.1.4. Применение СИЗ',b:true},{t:' — работники, применяющие СИЗ, требующие навыков.'}],{indent:true}),
     p('3.2. Вновь принятые — направляются на обучение не позднее 60 дней после трудового договора.',{indent:true}),
     p('3.3. Оплата обучения — за счёт Организации.',{indent:true}),
@@ -37,7 +38,7 @@ async function gen_02_01(c,s,dir){
 }
 
 async function gen_02_02(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об организации работы по охране труда',SZ),H('в '+c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об организации работы по охране труда',SZ),H('в '+safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Определяет порядок организации работы по охране труда в соответствии с разделом X ТК РФ.',{indent:true}),
     ...(c.micro?[p('1.2. Организация — микропредприятие, применяет упрощённый порядок (ст. 309.2 ТК РФ).',{indent:true})]:[]),
@@ -64,7 +65,7 @@ async function gen_02_02(c,s,dir){
 }
 
 async function gen_02_03(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о разработке инструкций по охране труда',SZ),H('в '+c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('о разработке инструкций по охране труда',SZ),H('в '+safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Устанавливает порядок разработки, утверждения, хранения и пересмотра инструкций по ОТ.',{indent:true}),
     p('1.2. Разработано в соответствии с Приказом Минтруда от 29.10.2021 № 772н.',{indent:true}),
@@ -80,23 +81,23 @@ async function gen_02_03(c,s,dir){
     p('3.4. Требования в аварийных ситуациях.',{indent:true}),
     p('3.5. Требования по окончании работы.',{indent:true}),
     SH('4. Порядок утверждения и пересмотра'),
-    p('4.1. Инструкции утверждаются приказом '+c.manager_position+'.',{indent:true}),
+    p('4.1. Инструкции утверждаются приказом '+safe(c.manager_position)+'.',{indent:true}),
     p('4.2. Работники знакомятся с инструкциями под подпись в листе ознакомления.',{indent:true}),
     p('4.3. Пересмотр — не реже 1 раза в 5 лет, а также при изменении условий труда, НПА, по результатам НС.',{indent:true}),
     SH('5. Учёт и хранение'),
-    p('5.1. Контрольный экземпляр хранится у '+c.manager_position+'.',{indent:true}),
+    p('5.1. Контрольный экземпляр хранится у '+safe(c.manager_position)+'.',{indent:true}),
     ...famSheet(c,'02.03')];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('02.03')},children:ch}],dir,'Положение о разработке инструкций по охране труда.docx');
 }
 
 async function gen_02_04(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об особенностях рассмотрения и учёта микроповреждений (микротравм)',SZ),H('работников '+c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об особенностях рассмотрения и учёта микроповреждений (микротравм)',SZ),H('работников '+safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Разработано в соответствии со ст. 226 ТК РФ и Приказом Минтруда от 15.09.2021 № 632н.',{indent:true}),
     p('1.2. Микротравма — ссадины, ушибы, поверхностные раны, не повлёкшие потери трудоспособности.',{indent:true}),
     SH('2. Порядок учёта и рассмотрения'),
     p('2.1. Работник, получивший микротравму, обязан немедленно сообщить непосредственному руководителю.',{indent:true}),
-    p('2.2. '+c.manager_position+' в течение суток:',{indent:true}),
+    p('2.2. '+safe(c.manager_position)+' в течение суток:',{indent:true}),
     bul('рассматривает обстоятельства и причины;'),
     bul('фиксирует факт в журнале учёта микротравм;'),
     bul('разрабатывает меры по предотвращению аналогичных случаев.'),
@@ -108,14 +109,14 @@ async function gen_02_04(c,s,dir){
 }
 
 async function gen_02_05(c,s,dir){
-  const ch=[approvalBlock(c),...eL(1),H('ПРАВИЛА'),H('внутреннего трудового распорядка',SZ),H(c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПРАВИЛА'),H('внутреннего трудового распорядка',SZ),H(safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Определяют трудовой распорядок, порядок приёма и увольнения, обязанности сторон, режим рабочего времени.',{indent:true}),
     p('1.2. Разработаны в соответствии с ТК РФ (ст. 189, 190).',{indent:true}),
     SH('2. Порядок приёма и увольнения'),
     p('2.1. Приём на работу — по трудовому договору в письменной форме.',{indent:true}),
     p('2.2. При приёме предъявляются: паспорт; трудовая книжка (при наличии); СНИЛС; документы воинского учёта; документ об образовании.',{indent:true}),
-    p('2.3. '+c.manager_position+' проводит вводный инструктаж по ОТ и знакомит с ЛНА.',{indent:true}),
+    p('2.3. '+safe(c.manager_position)+' проводит вводный инструктаж по ОТ и знакомит с ЛНА.',{indent:true}),
     p('2.4. Прекращение трудового договора — по основаниям ТК РФ.',{indent:true}),
     SH('3. Основные права и обязанности работников'),
     p('3.1. Работник вправе: получать работу по договору; иметь безопасное рабочее место; получать зарплату в срок; проходить профобучение.',{indent:true}),
@@ -138,7 +139,7 @@ async function gen_02_05(c,s,dir){
 
 async function gen_02_06(c,s,dir){
   const dN=c.dsiz_position||c.manager_position,dP=c.dsiz_name||c.manager_name;
-  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об обеспечении работников средствами индивидуальной защиты',SZ),H('и смывающими средствами',SZ),H(c.name,SZ),...eL(1),
+  const ch=[approvalBlock(c),...eL(1),H('ПОЛОЖЕНИЕ'),H('об обеспечении работников средствами индивидуальной защиты',SZ),H('и смывающими средствами',SZ),H(safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Разработано в соответствии со ст. 221 ТК РФ и Приказом Минтруда от 29.10.2021 № 766н.',{indent:true}),
     p('1.2. Ответственный за ДСИЗ — '+dN+' '+dP+'.',{indent:true}),
@@ -165,7 +166,7 @@ async function gen_03_01(c,s,dir){
   const colW=[500,2300,1800,900,700,1500,1372];
   const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true,sz:SZ_S}),cell('ФИО работника',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Группа',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Кто проводил инструктаж',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[6],{bold:true,center:true,sz:SZ_S})]);
   const er=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[pC(c.name,{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта присвоения группы I по электробезопасности',SZ),H('неэлектротехническому персоналу',SZ),...eL(2),pL('Начат: «___» ____________ '+c.doc_year+' г.'),pL('Окончен: «___» ____________ ______ г.'),...eL(1),pL('Ответственный: '+(c.elec_position||c.manager_position)+'  '+(c.elec_name||c.manager_name)),new (require('docx').Paragraph)({children:[]}),p('Инструктаж с присвоением I группы проводится ежегодно. Основание: Приказ Минэнерго от 12.08.2022 № 811, Приказ Минтруда от 15.12.2020 № 903н.',{sz:SZ_S}),...eL(1),tbl(colW,[hdr,...er])];
+  const ch=[pC(safe(c.name),{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта присвоения группы I по электробезопасности',SZ),H('неэлектротехническому персоналу',SZ),...eL(2),pL('Начат: «___» ____________ '+safe(c.doc_year)+' г.'),pL('Окончен: «___» ____________ ______ г.'),...eL(1),pL('Ответственный: '+(c.elec_position||c.manager_position)+'  '+(c.elec_name||c.manager_name)),new (require('docx').Paragraph)({children:[]}),p('Инструктаж с присвоением I группы проводится ежегодно. Основание: Приказ Минэнерго от 12.08.2022 № 811, Приказ Минтруда от 15.12.2020 № 903н.',{sz:SZ_S}),...eL(1),tbl(colW,[hdr,...er])];
   return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('03.01')},children:ch}],dir,'Журнал учёта присвоения I группы электробезопасности.docx');
 }
 
@@ -176,7 +177,7 @@ async function gen_03_02(c,s,dir){
   const pD=[['1','Опасность электрического тока. Виды электротравм','20'],['2','Безопасная эксплуатация электроприборов и оргтехники','20'],['3','Действия при поражении электрическим током','10']];
   const pR2=pD.map(r=>row([cell(r[0],pColW[0],{center:true,sz:SZ_S}),cell(r[1],pColW[1],{sz:SZ_S}),cell(r[2],pColW[2],{center:true,sz:SZ_S})]));
   const pT=row([cell('ИТОГО:',pColW[0]+pColW[1],{bold:true}),cell('50',pColW[2],{bold:true,center:true})]);
-  const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА'),H('инструктажа по электробезопасности',SZ),H('с присвоением I группы неэлектротехническому персоналу',SZ),H(c.name,SZ),...eL(1),
+  const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА'),H('инструктажа по электробезопасности',SZ),H('с присвоением I группы неэлектротехническому персоналу',SZ),H(safe(c.name),SZ),...eL(1),
     SH('1. Цель и область применения'),
     p('1.1. Для работников, использующих ПЭВМ, оргтехнику и электроприборы.',{indent:true}),
     p('1.2. Основание: Приказ Минэнерго от 12.08.2022 № 811; Приказ Минтруда от 15.12.2020 № 903н.',{indent:true}),
@@ -203,12 +204,12 @@ async function gen_03_02(c,s,dir){
 
 async function buildIOT(c,num,title,sections,dir,filename){
   const orderN=oNum(c,2);
-  const ch=[approvalOrder(c,orderN),...eL(1),H('ИНСТРУКЦИЯ '+num),H('ПО ОХРАНЕ ТРУДА',SZ),H(title.toUpperCase(),SZ),H(c.name,SZ),...eL(1),...sections,...famSheet(c,num),...devSign(c)];
+  const ch=[approvalOrder(c,orderN),...eL(1),H('ИНСТРУКЦИЯ '+num),H('ПО ОХРАНЕ ТРУДА',SZ),H(title.toUpperCase(),SZ),H(safe(c.name),SZ),...eL(1),...sections,...famSheet(c,num),...devSign(c)];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer(num)},children:ch}],dir,filename);
 }
 
 async function gen_05_01(c,s,dir){
-  return buildIOT(c,'№ 01-ИОТ','для '+c.manager_position,[
+  return buildIOT(c,'№ 01-ИОТ','для '+safe(c.manager_position),[
     SH('1. Общие требования охраны труда'),
     p('1.1. Допуск: высшее образование, пройдены: вводный инструктаж; обучение по ОТ (программа А); оказание первой помощи; пожарно-технический минимум; I группа электробезопасности.',{indent:true}),
     p('1.2. Вредные факторы: нервно-психические перегрузки, недостаточная освещённость. Факторы при работе с ПЭВМ — см. Инструкцию № 06-ИОТ.',{indent:true}),
@@ -225,7 +226,7 @@ async function gen_05_01(c,s,dir){
     p('4.2. НС: первая помощь → 103/112 → сохранить обстановку → организовать расследование.',{indent:true}),
     SH('5. Требования по окончании работы'),
     p('5.1. Отключить оргтехнику от сети. Привести рабочее место в порядок.',{indent:true}),
-  ],dir,'Инструкция по охране труда для '+c.manager_position+'.docx');
+  ],dir,'Инструкция по охране труда для '+safe(c.manager_position)+'.docx');
 }
 
 async function gen_05_employees(c,s,dir){
@@ -320,7 +321,7 @@ async function gen_05_08(c,s,dir){
   const jColW=[400,900,1400,1200,1800,1400,1072];
   const jHdr=row([cell('№',jColW[0],{bold:true,center:true,sz:SZ_S}),cell('Дата проверки',jColW[1],{bold:true,center:true,sz:SZ_S}),cell('Соответствие комплектации',jColW[2],{bold:true,center:true,sz:SZ_S}),cell('Сроки годности',jColW[3],{bold:true,center:true,sz:SZ_S}),cell('Выявленные недостатки',jColW[4],{bold:true,center:true,sz:SZ_S}),cell('Отметка об устранении',jColW[5],{bold:true,center:true,sz:SZ_S}),cell('Подпись',jColW[6],{bold:true,center:true,sz:SZ_S})]);
   const jRows=Array.from({length:10},(_,i)=>row(jColW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
-  const ch=[approvalOrder(c,orderN),...eL(1),H('ИНСТРУКЦИЯ № 08-ИОТ'),H('О ПОРЯДКЕ РАЗМЕЩЕНИЯ, ХРАНЕНИЯ И ИСПОЛЬЗОВАНИЯ',SZ),H('АПТЕЧКИ ПЕРВОЙ ПОМОЩИ',SZ),H(c.name,SZ),...eL(1),
+  const ch=[approvalOrder(c,orderN),...eL(1),H('ИНСТРУКЦИЯ № 08-ИОТ'),H('О ПОРЯДКЕ РАЗМЕЩЕНИЯ, ХРАНЕНИЯ И ИСПОЛЬЗОВАНИЯ',SZ),H('АПТЕЧКИ ПЕРВОЙ ПОМОЩИ',SZ),H(safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Разработана в соответствии с Приказом Минтруда России от 09.08.2024 № 398н.',{indent:true}),
     p('1.2. Ответственный — '+c.ot_position+' '+c.ot_name+'.',{indent:true}),
@@ -337,7 +338,7 @@ async function gen_05_08(c,s,dir){
     SH('5. Ответственность'),
     p('5.1. Административная ответственность по ч. 1 ст. 5.27.1 КоАП РФ.',{indent:true}),
     ...famSheet(c,'№ 08-ИОТ'),...devSign(c),
-    ...eL(2),H('Приложение № 1 к Инструкции № 08-ИОТ',SZ),H('ЖУРНАЛ КОНТРОЛЯ АПТЕЧКИ ПЕРВОЙ ПОМОЩИ',SZ),H(c.name,SZ),...eL(1),tbl(jColW,[jHdr,...jRows])];
+    ...eL(2),H('Приложение № 1 к Инструкции № 08-ИОТ',SZ),H('ЖУРНАЛ КОНТРОЛЯ АПТЕЧКИ ПЕРВОЙ ПОМОЩИ',SZ),H(safe(c.name),SZ),...eL(1),tbl(jColW,[jHdr,...jRows])];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('05.08')},children:ch}],dir,'Инструкция о порядке использования аптечки.docx');
 }
 
@@ -354,7 +355,7 @@ async function gen_01_med(c,s,dir){
     ...eL(1),
     p('В соответствии со ст. 214, 220 Трудового кодекса РФ, Приказом Минздрава России от 28.01.2021 № 29н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Организовать проведение обязательных предварительных и периодических медицинских осмотров работников '+c.name+', занятых на работах с вредными и (или) опасными условиями труда.'),
+    p('1. Организовать проведение обязательных предварительных и периодических медицинских осмотров работников '+safe(c.name)+', занятых на работах с вредными и (или) опасными условиями труда.'),
     p('2. Назначить ответственным за организацию медицинских осмотров '+c.ot_position+' '+(c.ot_name_full||c.ot_name)+'.'),
     p('3. Ответственному лицу:'),
     p('3.1. Составить и утвердить список контингента работников, подлежащих медицинским осмотрам.',{indent:true}),
@@ -399,7 +400,7 @@ async function gen_02_med(c,s,dir){
   ])];
   const ch=[approvalBlock(c),...eL(1),
     H('СПИСОК КОНТИНГЕНТА РАБОТНИКОВ'),
-    H(c.name,SZ),
+    H(safe(c.name),SZ),
     H('подлежащих обязательным предварительным и периодическим медицинским осмотрам',SZ),
     ...eL(1),
     p('Основание: Приказ Минздрава России от 28.01.2021 № 29н',{sz:SZ_S}),
@@ -421,7 +422,7 @@ async function gen_01_hazard(c,s,dir){
     ...eL(1),
     p('В соответствии с требованиями ст. 214 ТК РФ, Приказа Минтруда России от 29.10.2021 № 772н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Установить, что к работам повышенной опасности в '+c.name+' относятся работы, выполнение которых требует оформления наряда-допуска.'),
+    p('1. Установить, что к работам повышенной опасности в '+safe(c.name)+' относятся работы, выполнение которых требует оформления наряда-допуска.'),
     p('2. К выполнению работ повышенной опасности допускаются работники, прошедшие:'),
     p('2.1. Обучение безопасным методам и приёмам выполнения работ (Программа В).',{indent:true}),
     p('2.2. Стажировку на рабочем месте.',{indent:true}),
@@ -441,7 +442,7 @@ async function gen_02_hazard(c,s,dir){
   const ch=[approvalBlock(c),...eL(1),
     H('ПРОГРАММА В'),
     H('обучения безопасным методам и приёмам выполнения работ повышенной опасности',SZ),
-    H(c.name,SZ),...eL(1),
+    H(safe(c.name),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Программа разработана в соответствии с Постановлением Правительства РФ от 24.12.2021 № 2464 и Приказом Минтруда России от 29.10.2021 № 772н.',{indent:true}),
     p('1.2. Обучение по Программе В проходят работники, выполняющие работы повышенной опасности (по наряду-допуску).',{indent:true}),
@@ -486,7 +487,7 @@ async function gen_git_memo(c,s,dir){
     H('ПАМЯТКА'),
     H('действия работодателя при проведении проверки',SZ),
     H('Государственной инспекции труда (ГИТ)',SZ),
-    H(c.name,SZ),
+    H(safe(c.name),SZ),
     ...eL(1),
 
     SH('1. Виды проверок ГИТ'),
@@ -550,7 +551,7 @@ async function gen_git_memo(c,s,dir){
     p('ГИТ '+c.region+': уточните на сайте своего регионального отделения.',{indent:true}),
     ...eL(1),
     pL('Специалист по охране труда: ________________  '+(c.ot_name||c.manager_name)),
-    pL('Дата: «___» ____________ '+c.doc_year+' г.'),
+    pL('Дата: «___» ____________ '+safe(c.doc_year)+' г.'),
   ];
 
   return save([{
@@ -568,7 +569,7 @@ async function gen_elec_contract(c,s,dir){
   const base=require('./gen_p1');
   const {save,H,SH,p,pL,pR,pC,eL,cell,row,tbl,footer,MP,SZ,SZ_S}=base;
 
-  const contractNum = '____/'+c.doc_year;
+  const contractNum = '____/'+safe(c.doc_year);
   const execCompany = s.company_name||'ИП Свинцов Александр Викторович';
   const execName    = s.user_name||'Свинцов А.В.';
   const execPosition= s.user_position||'Специалист по охране труда';
@@ -583,13 +584,13 @@ async function gen_elec_contract(c,s,dir){
       columnWidths:[4536,4536],
       borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'},insideH:{style:'none'},insideV:{style:'none'}},
       rows:[row([
-        cell('г. '+c.city,4536,{nb:true}),
-        cell(c.doc_date,4536,{nb:true,center:true}),
+        cell('г. '+safe(c.city),4536,{nb:true}),
+        cell(safe(c.doc_date),4536,{nb:true,center:true}),
       ])],
     }),
     ...eL(1),
     p(execCompany+', именуемый(-ая) в дальнейшем «Исполнитель», в лице '+execPosition+' '+execName+', действующего на основании свидетельства о государственной регистрации, с одной стороны, и'),
-    p(c.name+', именуемое в дальнейшем «Заказчик», в лице '+c.manager_position+' '+(c.manager_name_full||c.manager_name)+', действующего на основании Устава, с другой стороны, заключили настоящий Договор о нижеследующем:'),
+    p(safe(c.name)+', именуемое в дальнейшем «Заказчик», в лице '+safe(c.manager_position)+' '+(c.manager_name_full||c.manager_name)+', действующего на основании Устава, с другой стороны, заключили настоящий Договор о нижеследующем:'),
     ...eL(1),
 
     SH('1. ПРЕДМЕТ ДОГОВОРА'),
@@ -598,7 +599,7 @@ async function gen_elec_contract(c,s,dir){
     p('1.1.2. Назначение ответственного за электрохозяйство из числа работников Заказчика.',{indent:true}),
     p('1.1.3. Оформление необходимой документации (журнал учёта, программа инструктажа).',{indent:true}),
     p('1.1.4. Консультационная поддержка по вопросам электробезопасности.',{indent:true}),
-    p('1.2. Услуги оказываются на объекте Заказчика: '+c.address+'.',{indent:true}),
+    p('1.2. Услуги оказываются на объекте Заказчика: '+safe(c.address)+'.',{indent:true}),
 
     SH('2. ПРАВА И ОБЯЗАННОСТИ СТОРОН'),
     p('2.1. Исполнитель обязуется:',{indent:true}),
@@ -639,12 +640,12 @@ async function gen_elec_contract(c,s,dir){
         row([
           cell(execCompany,4436,{nb:true}),
           cell('',200,{nb:true}),
-          cell(c.name,4436,{nb:true}),
+          cell(safe(c.name),4436,{nb:true}),
         ]),
         row([
           cell(execPosition+' '+execName,4436,{nb:true}),
           cell('',200,{nb:true}),
-          cell(c.manager_position+' '+(c.manager_name_full||c.manager_name),4436,{nb:true}),
+          cell(safe(c.manager_position)+' '+(c.manager_name_full||c.manager_name),4436,{nb:true}),
         ]),
         row([
           cell('________________  /'+execName+'/',4436,{nb:true}),
@@ -676,7 +677,7 @@ async function gen_act(c,s,dir){
   const {save,H,SH,p,pL,pR,pC,eL,cell,row,tbl,footer,MP,SZ,SZ_S}=base;
   const {WidthType,BorderStyle}=require('docx');
 
-  const actNum      = '____/'+c.doc_year;
+  const actNum      = '____/'+safe(c.doc_year);
   const execCompany = s.company_name||'ИП Свинцов Александр Викторович';
   const execName    = s.user_name||'Свинцов А.В.';
   const execPosition= s.user_position||'Специалист по охране труда';
@@ -706,11 +707,11 @@ async function gen_act(c,s,dir){
       width:{size:9072,type:WidthType.DXA},
       columnWidths:[4536,4536],
       borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'},insideH:{style:'none'},insideV:{style:'none'}},
-      rows:[row([cell('г. '+c.city,4536,{nb:true}),cell(c.doc_date,4536,{nb:true,center:true})])],
+      rows:[row([cell('г. '+safe(c.city),4536,{nb:true}),cell(safe(c.doc_date),4536,{nb:true,center:true})])],
     }),
     ...eL(1),
     p(execCompany+', именуемый(-ая) в дальнейшем «Исполнитель», в лице '+execPosition+' '+execName+', и'),
-    p(c.name+', именуемое в дальнейшем «Заказчик», в лице '+c.manager_position+' '+(c.manager_name_full||c.manager_name)+', составили настоящий Акт о нижеследующем:'),
+    p(safe(c.name)+', именуемое в дальнейшем «Заказчик», в лице '+safe(c.manager_position)+' '+(c.manager_name_full||c.manager_name)+', составили настоящий Акт о нижеследующем:'),
     ...eL(1),
     p('1. Исполнитель оказал, а Заказчик принял следующие услуги:',{indent:true}),
     ...eL(1),
@@ -725,8 +726,8 @@ async function gen_act(c,s,dir){
       borders:{top:{style:'none'},bottom:{style:'none'},left:{style:'none'},right:{style:'none'},insideH:{style:'none'},insideV:{style:'none'}},
       rows:[
         row([cell('ИСПОЛНИТЕЛЬ',4436,{nb:true,bold:true}),cell('',200,{nb:true}),cell('ЗАКАЗЧИК',4436,{nb:true,bold:true})]),
-        row([cell(execCompany,4436,{nb:true}),cell('',200,{nb:true}),cell(c.name,4436,{nb:true})]),
-        row([cell(execPosition,4436,{nb:true}),cell('',200,{nb:true}),cell(c.manager_position,4436,{nb:true})]),
+        row([cell(execCompany,4436,{nb:true}),cell('',200,{nb:true}),cell(safe(c.name),4436,{nb:true})]),
+        row([cell(execPosition,4436,{nb:true}),cell('',200,{nb:true}),cell(safe(c.manager_position),4436,{nb:true})]),
         row([cell('________________  /'+execName+'/',4436,{nb:true}),cell('',200,{nb:true}),cell('________________  /'+(c.manager_name||'')+'/',4436,{nb:true})]),
         row([cell('М.П.',4436,{nb:true}),cell('',200,{nb:true}),cell('М.П.',4436,{nb:true})]),
       ],

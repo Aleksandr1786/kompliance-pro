@@ -8,13 +8,20 @@ contextBridge.exposeInMainWorld('api', {
   clientUpdate:   (id, data)  => ipcRenderer.invoke('clients:update', id, data),
   clientDelete:   (id)        => ipcRenderer.invoke('clients:delete', id),
 
+  // Подразделения
+  divisionsList:  (cid)       => ipcRenderer.invoke('divisions:list', cid),
+  divisionsAdd:   (data)      => ipcRenderer.invoke('divisions:add', data),
+  divisionsUpdate:(id, data)  => ipcRenderer.invoke('divisions:update', id, data),
+  divisionsDelete:(id)        => ipcRenderer.invoke('divisions:delete', id),
+
   // Сотрудники
   employeesList:  (cid)       => ipcRenderer.invoke('employees:list', cid),
   employeeAdd:    (data)      => ipcRenderer.invoke('employees:add', data),
   employeeDelete: (id)        => ipcRenderer.invoke('employees:delete', id),
-employeeUpdate: (id, data) => ipcRenderer.invoke('employees:update', id, data),
-trainingUpdate: (id, data) => ipcRenderer.invoke('training:save', id, data),
-trainingAlerts: ()         => ipcRenderer.invoke('training:alerts'),
+  employeeUpdate: (id, data)  => ipcRenderer.invoke('employees:update', id, data),
+  trainingGet:    (id)        => ipcRenderer.invoke('training:get', id),
+  trainingUpdate: (id, data)  => ipcRenderer.invoke('training:save', id, data),
+  trainingAlerts: ()          => ipcRenderer.invoke('training:alerts'),
 
   // Документы
   documentsList:  (cid)       => ipcRenderer.invoke('documents:list', cid),
@@ -45,8 +52,29 @@ trainingAlerts: ()         => ipcRenderer.invoke('training:alerts'),
   // Генерация документов
   docsGenerate:   (clientId)  => ipcRenderer.invoke('docs:generate', clientId),
   docsOpenFolder: (dir)       => ipcRenderer.invoke('docs:open-folder', dir),
-docsOpenFile:  (filepath) => ipcRenderer.invoke('docs:open-file', filepath),
-aiRequest:    (data) => ipcRenderer.invoke('ai:request', data),
+  docsOpenFile:   (filepath)  => ipcRenderer.invoke('docs:open-file', filepath),
+  vuGenerateReports: (clientId, docs) => ipcRenderer.invoke('vu:generate-reports', clientId, docs),
+
+  // PDF (паспорт безопасности и др.)
+  pdfGenerate:    (data)      => ipcRenderer.invoke('pdf:generate', data),
+
+  // Word / DOCX (справки, протоколы)
+  docxGenerate:   (data)      => ipcRenderer.invoke('docx:generate', data),
+
+  // AI / Ассистент
+  aiRequest:      (data)      => ipcRenderer.invoke('ai:request', data),
+
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),
+
+  // PIN-код
+  pinCheck:       (pin)       => ipcRenderer.invoke('pin:check', pin),
+  pinSet:         (pin)       => ipcRenderer.invoke('pin:set', pin),
+  pinStatus:      ()          => ipcRenderer.invoke('pin:status'),
+
+  // Триал и лицензия
+  trialStatus:    ()                    => ipcRenderer.invoke('trial:status'),
+  licenseActivate:(key, expire)         => ipcRenderer.invoke('license:activate', key, expire),
+  machineId:      ()                    => ipcRenderer.invoke('machine:id'),
+  trialReset:     ()                    => ipcRenderer.invoke('trial:reset'),
 });

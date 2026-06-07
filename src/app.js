@@ -163,7 +163,7 @@ function showUpdateBanner(version) {
     border-radius:14px;padding:14px 18px;max-width:340px;
     box-shadow:0 4px 24px rgba(0,0,0,0.5);
   `;
-  banner.innerHTML = \`
+  banner.innerHTML = `
     <div style="display:flex;align-items:flex-start;gap:12px">
       <div style="font-size:24px;flex-shrink:0">🆕</div>
       <div style="flex:1">
@@ -194,7 +194,7 @@ function showUpdateBanner(version) {
         </div>
       </div>
     </div>
-  \`;
+  `;
   document.body.appendChild(banner);
 
   document.getElementById('update-now-btn').onclick = async () => {
@@ -217,13 +217,13 @@ function showUpdateReadyBanner() {
   document.getElementById('update-ready-banner')?.remove();
   const banner = document.createElement('div');
   banner.id = 'update-ready-banner';
-  banner.style.cssText = \`
+  banner.style.cssText = `
     position:fixed;bottom:20px;left:20px;z-index:9001;
     background:rgba(15,23,42,0.97);border:1px solid rgba(52,211,153,0.5);
     border-radius:14px;padding:14px 18px;max-width:320px;
     box-shadow:0 4px 24px rgba(0,0,0,0.5);
-  \`;
-  banner.innerHTML = \`
+  `;
+  banner.innerHTML = `
     <div style="display:flex;align-items:flex-start;gap:12px">
       <div style="font-size:24px;flex-shrink:0">✅</div>
       <div style="flex:1">
@@ -241,7 +241,7 @@ function showUpdateReadyBanner() {
         </button>
       </div>
     </div>
-  \`;
+  `;
   document.body.appendChild(banner);
   document.getElementById('update-install-btn').onclick = async () => {
     await window.api.updateInstall();

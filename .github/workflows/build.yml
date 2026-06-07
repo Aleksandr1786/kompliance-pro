@@ -25,16 +25,20 @@ jobs:
       - name: Установить зависимости
         run: npm ci
 
-      - name: Собрать и опубликовать
+      - name: Собрать
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:win
 
-      - name: Сохранить артефакты
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Опубликовать релиз
+        uses: softprops/action-gh-release@v2
         with:
-          name: КомплаенсПро-Setup
-          path: dist/*.exe
-          retention-days: 30
+          files: dist/*.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          name: "КомплаенсПро ${{ github.ref_name }}"
+          body: "Установщик КомплаенсПро версии ${{ github.ref_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

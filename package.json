@@ -44,7 +44,7 @@
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "language": "1049",
-      "artifactName": "КомплаенсПро-Setup-${version}.exe",
+      "artifactName": "KomplainsPro-Setup-${version}.exe",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "КомплаенсПро",

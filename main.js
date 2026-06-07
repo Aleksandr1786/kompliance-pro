@@ -12,6 +12,15 @@ let db;
 let mainWindow = null;
 let pendingUpdate = null;
 
+// Лог автообновления в файл (для диагностики в packaged-режиме)
+function updateLog(msg) {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'update.log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch(_) {}
+  console.log(`[Updater] ${msg}`);
+}
+
 // ─── ВЕРСИОНИРОВАНИЕ СХЕМЫ ДАННЫХ ────────────────────────
 //
 // Как добавить новую миграцию:
@@ -1102,21 +1111,24 @@ function setupAutoUpdater() {
 
   // Новая версия найдена
   autoUpdater.on('update-available', (info) => {
-    console.log(`[Updater] Доступна версия ${info.version}`);
-    if (!mainWindow) return;
+    updateLog(`update-available: ${info.version}`);
+    if (!mainWindow) { updateLog('mainWindow null — пропускаем'); return; }
 
     pendingUpdate = { version: info.version, releaseDate: info.releaseDate };
 
     // Если страница уже загружена — отправляем сразу
     if (!mainWindow.webContents.isLoading()) {
+      updateLog(`страница загружена — отправляем сразу`);
       mainWindow.webContents.send('update:available', pendingUpdate);
       pendingUpdate = null;
+    } else {
+      updateLog(`страница ещё грузится — сохраняем в pendingUpdate`);
     }
   });
 
   // Новой версии нет
   autoUpdater.on('update-not-available', () => {
-    console.log('[Updater] Версия актуальна');
+    updateLog('update-not-available — версия актуальна');
   });
 
   // Прогресс скачивания
@@ -1131,20 +1143,22 @@ function setupAutoUpdater() {
 
   // Скачивание завершено
   autoUpdater.on('update-downloaded', () => {
-    console.log('[Updater] Обновление скачано — установка при закрытии');
+    updateLog('update-downloaded');
     if (!mainWindow) return;
     mainWindow.webContents.send('update:downloaded');
   });
 
   // Ошибка обновления
   autoUpdater.on('error', (err) => {
-    console.error('[Updater] Ошибка:', err.message);
+    updateLog(`error: ${err.message}`);
   });
 
   // Проверяем обновления через 10 секунд после запуска
+  updateLog('таймер запущен (10 сек)');
   setTimeout(() => {
+    updateLog('checkForUpdates...');
     autoUpdater.checkForUpdates().catch(err => {
-      console.error('[Updater] Не удалось проверить обновления:', err.message);
+      updateLog(`checkForUpdates failed: ${err.message}`);
     });
   }, 10000);
 }
@@ -1197,14 +1211,16 @@ function createWindow() {
 
   // Отправляем отложенное уведомление об обновлении после загрузки страницы
   mainWindow.webContents.on('did-finish-load', () => {
+    updateLog(`did-finish-load, pendingUpdate: ${JSON.stringify(pendingUpdate)}`);
     if (pendingUpdate) {
-      // Задержка 3 сек — даём время на инициализацию PIN/триал экранов
+      // Задержка 5 сек — даём время на инициализацию PIN/триал экранов
       setTimeout(() => {
         if (pendingUpdate && mainWindow) {
+          updateLog(`отправляем update:available после did-finish-load`);
           mainWindow.webContents.send('update:available', pendingUpdate);
           pendingUpdate = null;
         }
-      }, 3000);
+      }, 5000);
     }
   });
   // Сохраняем размер окна при изменении

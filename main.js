@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const { generatePackage } = require('./generator');
 const path = require('path');
 const fs = require('fs');
@@ -8,9 +8,130 @@ const low    = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 
 let db;
+let mainWindow = null;
+
+// ─── ВЕРСИОНИРОВАНИЕ СХЕМЫ ДАННЫХ ────────────────────────
+//
+// Как добавить новую миграцию:
+// 1. Увеличь DB_VERSION на 1
+// 2. Добавь новый объект в конец массива MIGRATIONS
+// 3. В функции up(db) опиши что нужно изменить в базе
+//
+// Правила:
+// - Каждая миграция идемпотентна (можно запустить дважды — результат тот же)
+// - Никогда не удаляй существующие миграции
+// - Нумерация строго последовательная: 1, 2, 3...
+
+const DB_VERSION = 1;
+
+const MIGRATIONS = [
+  {
+    version: 1,
+    description: 'Начальная схема: базовые поля клиентов и сотрудников',
+    up(db) {
+      // Добавляем недостающие поля клиентам
+      db.get('clients').each(c => {
+        if (c.score       === undefined) c.score       = 0;
+        if (c.modules     === undefined) c.modules     = 'OT';
+        if (c.color       === undefined) c.color       = '#3b82f6';
+        if (c.archived    === undefined) c.archived    = 0;
+        if (c.okved_extra === undefined) c.okved_extra = '';
+        if (c.czn         === undefined) c.czn         = '';
+        if (c.soat_class  === undefined) c.soat_class  = '2';
+        if (c.hazard_works      === undefined) c.hazard_works      = 0;
+        if (c.medcheck_required === undefined) c.medcheck_required = 0;
+      }).write();
+
+      // Добавляем недостающие поля сотрудникам
+      db.get('employees').each(e => {
+        if (e.gender          === undefined) e.gender          = 'm';
+        if (e.division_id     === undefined) e.division_id     = null;
+        if (e.is_military     === undefined) e.is_military     = 0;
+        if (e.prog_b_exempt   === undefined) e.prog_b_exempt   = 0;
+        if (e.medcheck_required === undefined) e.medcheck_required = 0;
+        if (e.name_gen        === undefined) e.name_gen        = '';
+        if (e.name_dat        === undefined) e.name_dat        = '';
+        if (e.name_acc        === undefined) e.name_acc        = '';
+        if (e.name_ins        === undefined) e.name_ins        = '';
+        if (e.name_short      === undefined) e.name_short      = '';
+        if (e.vu_category     === undefined) e.vu_category     = '';
+        if (e.vu_rank         === undefined) e.vu_rank         = '';
+        if (e.vu_mobpredpisanie === undefined) e.vu_mobpredpisanie = 0;
+        if (e.training        === undefined) e.training        = {};
+      }).write();
+
+      // Добавляем недостающие поля задачам
+      db.get('tasks').each(t => {
+        if (t.priority  === undefined) t.priority  = 'normal';
+        if (t.module    === undefined) t.module    = null;
+        if (t.due_date  === undefined) t.due_date  = '';
+        if (t.client_id === undefined) t.client_id = null;
+      }).write();
+    }
+  },
+
+  // ── Шаблон для следующей миграции ──────────────────────
+  // {
+  //   version: 2,
+  //   description: 'Описание что меняется',
+  //   up(db) {
+  //     db.get('clients').each(c => {
+  //       if (c.new_field === undefined) c.new_field = 'default';
+  //     }).write();
+  //   }
+  // },
+];
+
+function runMigrations(db) {
+  // Читаем текущую версию схемы из базы (0 если не было)
+  const currentVersion = db.get('settings.db_version').value() || 0;
+
+  if (currentVersion >= DB_VERSION) return; // всё актуально
+
+  const pending = MIGRATIONS.filter(m => m.version > currentVersion);
+  if (!pending.length) return;
+
+  console.log(`[Migration] База версии ${currentVersion}, нужна ${DB_VERSION}. Запускаем ${pending.length} миграций...`);
+
+  for (const migration of pending) {
+    try {
+      console.log(`[Migration] v${migration.version}: ${migration.description}`);
+      migration.up(db);
+      // Обновляем версию после каждой успешной миграции
+      db.set('settings.db_version', migration.version).write();
+      console.log(`[Migration] v${migration.version}: ✅ выполнена`);
+    } catch (e) {
+      console.error(`[Migration] v${migration.version}: ❌ ошибка — ${e.message}`);
+      // Останавливаемся — не накатываем следующие
+      break;
+    }
+  }
+}
 
 function initDB() {
   const dbPath = path.join(app.getPath('userData'), 'kompliance.json');
+
+  // Защита от повреждённой базы: если JSON битый — восстанавливаем из последнего бэкапа
+  if (fs.existsSync(dbPath)) {
+    try {
+      JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+    } catch (e) {
+      // База повреждена — пытаемся восстановить
+      const corruptPath = dbPath + '.corrupt_' + Date.now();
+      try { fs.renameSync(dbPath, corruptPath); } catch(_) {}
+      // Ищем последний авто-бэкап
+      try {
+        const autoDir = path.join(app.getPath('userData'), 'autobackup');
+        if (fs.existsSync(autoDir)) {
+          const backups = fs.readdirSync(autoDir).filter(f => f.endsWith('.json')).sort().reverse();
+          if (backups.length) {
+            fs.copyFileSync(path.join(autoDir, backups[0]), dbPath);
+          }
+        }
+      } catch(_) {}
+    }
+  }
+
   const adapter = new FileSync(dbPath);
   db = low(adapter);
   db.defaults({
@@ -19,6 +140,7 @@ function initDB() {
     documents: [],
     events: [],
     tasks: [],
+    divisions: [],
     settings: {
       user_name: 'Александр Свинцов',
       user_position: 'Специалист по охране труда',
@@ -41,8 +163,23 @@ function initDB() {
       ai_key: '',
       remind_weekends: '1',
       remind_escalate: '1',
+      window_bounds: '',
+      eula_accepted: '',
+      eula_date: '',
+      db_version: 0,
+      pin_hash: '',
+      pin_enabled: '0',
+      trial_start: '',
+      trial_status: '',
+      license_key: '',
+      license_email: '',
+      license_plan: '',
+      license_expire: '',
     }
   }).write();
+
+  // Накатываем миграции схемы
+  runMigrations(db);
 }
 
 function nextId(collection) {
@@ -63,6 +200,20 @@ ipcMain.handle('clients:get', (_, id) => {
 });
 
 ipcMain.handle('clients:add', (_, data) => {
+  if (!data.name?.trim()) return { error: 'Название организации обязательно' };
+  if (!data.okved?.trim()) return { error: 'ОКВЭД обязателен' };
+  const inn = (data.inn || '').trim();
+  if (inn && !/^\d{10}$|^\d{12}$/.test(inn)) return { error: 'ИНН должен содержать 10 или 12 цифр' };
+
+  // Ограничение триала: максимум 2 клиента
+  const trial = checkTrial(db);
+  if (trial.status === 'trial' || trial.status === 'expired') {
+    const count = db.get('clients').filter({ archived: 0 }).value().length;
+    if (count >= 2) {
+      return { error: 'В пробной версии можно добавить не более 2 клиентов. Приобретите лицензию для снятия ограничения.' };
+    }
+  }
+
   const id = nextId('clients');
   const client = { ...data, id, created_at: now(), score: 0 };
   db.get('clients').push(client).write();
@@ -88,7 +239,32 @@ ipcMain.handle('employees:list', (_, clientId) => {
   return db.get('employees').filter({ client_id: clientId }).sortBy('full_name').value();
 });
 
+// ─── ПОДРАЗДЕЛЕНИЯ ───────────────────────────────────────
+ipcMain.handle('divisions:list', (_, clientId) => {
+  return db.get('divisions').filter({ client_id: clientId }).value();
+});
+
+ipcMain.handle('divisions:add', (_, data) => {
+  const id = Date.now();
+  db.get('divisions').push({ ...data, id }).write();
+  return id;
+});
+
+ipcMain.handle('divisions:update', (_, id, data) => {
+  db.get('divisions').find({ id }).assign(data).write();
+});
+
+ipcMain.handle('divisions:delete', (_, id) => {
+  // При удалении подразделения — снимаем привязку с сотрудников
+  db.get('employees').filter({ division_id: id }).each(e => {
+    db.get('employees').find({ id: e.id }).assign({ division_id: null }).write();
+  }).value();
+  db.get('divisions').remove({ id }).write();
+});
+
 ipcMain.handle('employees:add', (_, data) => {
+  if (!data.full_name?.trim()) return { error: 'ФИО сотрудника обязательно' };
+  if (!data.position?.trim()) return { error: 'Должность обязательна' };
   const id = nextId('employees');
   db.get('employees').push({ ...data, id }).write();
   return { id };
@@ -150,6 +326,7 @@ ipcMain.handle('tasks:list', () => {
 });
 
 ipcMain.handle('tasks:add', (_, data) => {
+  if (!data.title?.trim()) return { error: 'Текст задачи обязателен' };
   const id = nextId('tasks');
   db.get('tasks').push({ ...data, id, done: 0, created_at: now() }).write();
   return { id };
@@ -217,10 +394,60 @@ ipcMain.handle('backup:choose-folder', async () => {
   return res.filePaths[0];
 });
 
-ipcMain.handle('open-external', (_, url) => shell.openExternal(url));
+ipcMain.handle('open-external', async (_, url) => {
+  const cleanUrl = (url || '').trim();
+  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) return;
+  const { exec } = require('child_process');
+  if (process.platform === 'win32') {
+    exec(`start chrome "${cleanUrl}"`);
+  } else if (process.platform === 'darwin') {
+    exec(`open "${cleanUrl}"`);
+  } else {
+    exec(`xdg-open "${cleanUrl}"`);
+  }
+});
 
 
 // ─── ГЕНЕРАЦИЯ ДОКУМЕНТОВ ────────────────────────────────────
+ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
+  const client = db.get('clients').find({ id: clientId }).value();
+  if (!client) return { ok: false, error: 'Клиент не найден' };
+  const settings = db.get('settings').value();
+
+  const rootDir  = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
+  const safeName = (client.name || 'Клиент').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 60);
+  const outputDir = path.join(rootDir, safeName);
+  fs.mkdirSync(outputDir, { recursive: true });
+
+  const employees = db.get('employees').filter({ client_id: clientId }).value();
+  const clientWithEmployees = {
+    ...client,
+    city: (client.city || client.region || '').replace(/^г\.?\s*/i,'').trim() || '',
+    employees: employees.map(e => ({
+      full_name:   e.full_name   || '',
+      position:    e.position    || '',
+      vu_category: e.vu_category || '',
+      vu_rank:     e.vu_rank     || '',
+      vu_mobpredpisanie: e.vu_mobpredpisanie || false,
+    })),
+  };
+
+  // Подгружаем vu_data из settings
+  try {
+    const vuKey = `vu_data_${clientId}`;
+    clientWithEmployees.vu_data = settings[vuKey] || '{}';
+  } catch(_) {}
+
+  try {
+    const { generateVuReports } = require('./gen_vu');
+    const result = await generateVuReports(clientWithEmployees, settings, outputDir, docs);
+    const vuDir = require('path').join(outputDir, 'Воинский учёт');
+    return { ok: true, generated: result.generated, errors: result.errors, folder: vuDir };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 ipcMain.handle('docs:generate', async (_, clientId) => {
   const client = db.get('clients').find({ id: clientId }).value();
   if (!client) return { ok: false, error: 'Клиент не найден' };
@@ -270,23 +497,37 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
     })),
   };
 
+  // Получаем старые документы для сравнения
+  const oldDocs = db.get('documents').filter({ client_id: clientId }).value();
+  const oldDocMap = {};
+  oldDocs.forEach(d => { oldDocMap[d.name] = d; });
+
+  // Собираем карту хэшей файлов на диске (для умной генерации)
+  const { buildDiskHashMap } = require('./utils');
+  const diskHashMap = buildDiskHashMap(oldDocs);
+
   try {
-    const result = await generatePackage(clientWithEmployees, settings, outputDir);
+    const result = await generatePackage(clientWithEmployees, {
+      ...settings,
+      diskHashMap,
+      currentClientHash: clientHash,
+    }, outputDir);
 
-    // Получаем старые документы для сравнения
-    const oldDocs = db.get('documents').filter({ client_id: clientId }).value();
-    const oldDocMap = {};
-    oldDocs.forEach(d => { oldDocMap[d.name] = d; });
-
-    // Сбрасываем старые документы и записываем свежие
+    // Обновляем документы в БД — upsert по имени файла (без дублей)
+    // Сначала удаляем ВСЕ старые записи клиента
     db.get('documents').remove({ client_id: clientId }).write();
     let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id), 0);
 
     const report = { updated: [], added: [], unchanged: [] };
+    const seenNames = new Set(); // защита от дублей внутри одной генерации
 
     for (const filename of result.generated) {
       maxId++;
       const baseName = path.basename(filename);
+
+      // Пропускаем дубли (один и тот же файл не может быть два раза)
+      if (seenNames.has(baseName)) continue;
+      seenNames.add(baseName);
       // Хеш содержимого файла для сравнения
       let fileHash = '';
       try {
@@ -310,10 +551,17 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
       else if (changeType === 'updated') report.updated.push(baseName);
       else report.added.push(baseName);
 
+      // Определяем модуль по папке файла
+      const filePath = filename.replace(/\\/g, '/');
+      const docModule = filePath.includes('Персональные данные') ? 'PD' : 'OT';
+      const npaText   = docModule === 'PD'
+        ? 'ФЗ-152 от 27.07.2006, ФЗ-266 от 14.07.2022, ПП РФ №1119'
+        : 'ТК РФ, Постановление Правительства №2464';
+
       db.get('documents').push({
         id:          maxId,
         client_id:   clientId,
-        module:      'OT',
+        module:      docModule,
         name:        baseName,
         filename:    baseName,
         filepath:    filename,
@@ -322,17 +570,20 @@ ipcMain.handle('docs:generate', async (_, clientId) => {
         status:      'ok',
         created_at:  oldDoc?.created_at || new Date().toISOString(),
         updated_at:  new Date().toISOString(),
-        npa_basis:   'ТК РФ, Постановление Правительства №2464',
+        npa_basis:   npaText,
         notes:       '',
       }).write();
     }
 
     return {
-      ok:        true,
-      generated: result.generated,
-      errors:    result.errors,
-      dir:       outputDir,
-      report,    // отчёт об изменениях
+      ok:           true,
+      generated:    result.generated,
+      errors:       result.errors,
+      dir:          outputDir,
+      report: {
+        ...report,
+        userModified: result.report?.userModified || [],
+      },
     };
   } catch(e) {
     return { ok: false, error: e.message };
@@ -493,12 +744,355 @@ ipcMain.handle('training:alerts', () => {
   return alerts.sort((a, b) => a.days_left - b.days_left);
 });
 
+// ─── ГЕНЕРАЦИЯ DOCX (справки, протоколы в Word) ──────────
+ipcMain.handle('docx:generate', async (_, { rows, title, subtitle, filename }) => {
+  try {
+    const { Document, Packer, Paragraph, Table, TableRow, TableCell,
+            TextRun, WidthType, BorderStyle, AlignmentType,
+            HeadingLevel, VerticalAlign } = require('docx');
+
+    // Строим таблицу из строк { cells: [{text, bold, width, colspan}] }
+    const tableRows = rows.map(row =>
+      new TableRow({
+        children: row.cells.map(cell =>
+          new TableCell({
+            width: cell.width ? { size: cell.width, type: WidthType.DXA } : undefined,
+            columnSpan: cell.colspan || 1,
+            verticalAlign: VerticalAlign.CENTER,
+            borders: {
+              top:    { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+              bottom: { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+              left:   { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+              right:  { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+            },
+            shading: cell.shading ? { fill: cell.shading } : undefined,
+            children: [new Paragraph({
+              alignment: cell.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+              children: [new TextRun({
+                text: String(cell.text ?? ''),
+                bold: cell.bold || false,
+                size: cell.size || 20,
+                font: 'Times New Roman',
+              })],
+            })],
+          })
+        ),
+      })
+    );
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: { top: 1000, right: 1000, bottom: 1000, left: 1440 },
+          },
+        },
+        children: [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: title, bold: true, size: 24, font: 'Times New Roman' })],
+          }),
+          ...(subtitle ? [new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+            children: [new TextRun({ text: subtitle, size: 20, font: 'Times New Roman', color: '555555' })],
+          })] : [new Paragraph({ spacing: { after: 200 }, children: [] })]),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: tableRows,
+          }),
+          new Paragraph({
+            spacing: { before: 300 },
+            children: [new TextRun({
+              text: `Сформировано: ${new Date().toLocaleDateString('ru-RU')} · КомплаенсПро`,
+              size: 16, color: '888888', font: 'Times New Roman',
+            })],
+          }),
+        ],
+      }],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    const safeName = (filename || 'Документ').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: 'Сохранить документ',
+      defaultPath: path.join(app.getPath('desktop'), safeName + '.docx'),
+      filters: [{ name: 'Word документ', extensions: ['docx'] }],
+    });
+
+    if (res.canceled) return { ok: false, canceled: true };
+    fs.writeFileSync(res.filePath, buffer);
+    return { ok: true, path: res.filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ─── ГЕНЕРАЦИЯ PDF (Паспорт безопасности и др.) ──────────
+ipcMain.handle('pdf:generate', async (_, { html, filename }) => {
+  try {
+    // Создаём скрытое окно для рендера PDF
+    const pdfWin = new BrowserWindow({
+      width: 800,
+      height: 1130,
+      show: false,
+      webPreferences: { offscreen: true },
+    });
+
+    // Загружаем HTML
+    await pdfWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+    // Ждём отрисовки
+    await new Promise(r => setTimeout(r, 400));
+
+    const pdfData = await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: 'A4',
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    });
+
+    pdfWin.close();
+
+    // Сохраняем
+    const safeName = (filename || 'Документ').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: 'Сохранить PDF',
+      defaultPath: path.join(app.getPath('desktop'), safeName + '.pdf'),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+
+    if (res.canceled) return { ok: false, canceled: true };
+
+    fs.writeFileSync(res.filePath, pdfData);
+    return { ok: true, path: res.filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ─── АВТО-БЭКАП (тихий, раз в день при запуске) ──────────
+function autoBackup() {
+  try {
+    const src = path.join(app.getPath('userData'), 'kompliance.json');
+    if (!fs.existsSync(src)) return;
+
+    const autoDir = path.join(app.getPath('userData'), 'autobackup');
+    fs.mkdirSync(autoDir, { recursive: true });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const dest = path.join(autoDir, `auto_${today}.json`);
+
+    // Бэкап раз в день
+    if (!fs.existsSync(dest)) {
+      fs.copyFileSync(src, dest);
+    }
+
+    // Чистим старые: оставляем последние 30
+    const backups = fs.readdirSync(autoDir).filter(f => f.endsWith('.json')).sort();
+    while (backups.length > 30) {
+      const old = backups.shift();
+      try { fs.unlinkSync(path.join(autoDir, old)); } catch(_) {}
+    }
+  } catch (e) {
+    console.error('autoBackup error:', e);
+  }
+}
+
+// ─── ТРИАЛ И ЛИЦЕНЗИЯ ────────────────────────────────────
+//
+// Логика:
+// ─── ТРИАЛ (14 дней) + ЛИЦЕНЗИЯ (привязка к машине) ─────
+//
+// Триал:
+//   - 14 дней, максимум 2 клиента
+//   - Напоминания: день 7, 11, 13
+//   - День 14: экран блокировки с ID устройства и инструкцией
+//
+// Лицензия:
+//   - Ключ привязан к конкретной машине (серийник диска + имя ПК)
+//   - Передать другому — невозможно, ключ не сработает
+//   - Клиент видит свой ID в Настройках → Подписка
+//   - Ты генерируешь ключ через keygen.js
+
+const TRIAL_DAYS      = 14;
+const TRIAL_MAX_CLIENTS = 2;
+const LICENSE_SECRET  = 'KP-2026-SECRET-XJ9'; // не менять после релиза!
+
+// Уникальный ID машины — серийник диска C: + имя компьютера
+function getMachineId() {
+  const crypto = require('crypto');
+  const os     = require('os');
+  try {
+    const { execSync } = require('child_process');
+    const vol = execSync('vol C:', { encoding: 'utf8', timeout: 3000 })
+      .match(/[A-F0-9]{4}-[A-F0-9]{4}/i)?.[0] || '';
+    const raw = os.hostname() + ':' + vol;
+    return crypto.createHash('sha256').update(raw).digest('hex').substring(0, 12).toUpperCase();
+  } catch(e) {
+    return crypto.createHash('sha256').update(os.hostname()).digest('hex').substring(0, 12).toUpperCase();
+  }
+}
+
+// Генерация ключа: SECRET + тип + дата + ID машины
+function generateMachineKey(type, expireDate, machineId) {
+  const crypto = require('crypto');
+  const raw = LICENSE_SECRET + ':' + type + ':' + expireDate + ':' + machineId;
+  return 'KP-' + crypto.createHash('sha256').update(raw).digest('hex').substring(0, 24).toUpperCase();
+}
+
+function checkTrial(db) {
+  const settings  = db.get('settings').value();
+  const machineId = getMachineId();
+
+  // ── Активная лицензия ───────────────────────────────
+  if (settings.trial_status === 'licensed' && settings.license_key) {
+
+    // Проверяем привязку к машине (DEV-MODE пропускаем)
+    if (settings.license_key !== 'DEV-MODE' && settings.license_machine &&
+        settings.license_machine !== machineId) {
+      return { status: 'wrong_machine', machineId };
+    }
+
+    // Проверяем срок
+    if (settings.license_expires) {
+      const daysLeft = Math.ceil(
+        (new Date(settings.license_expires) - new Date()) / (1000 * 60 * 60 * 24)
+      );
+      if (daysLeft <= 0) {
+        db.get('settings').assign({ trial_status: 'subscription_expired' }).write();
+        return { status: 'subscription_expired', machineId };
+      }
+      return { status: 'licensed', daysLeft, machineId };
+    }
+    return { status: 'licensed', daysLeft: null, machineId };
+  }
+
+  // ── Подписка истекла ────────────────────────────────
+  if (settings.trial_status === 'subscription_expired') {
+    return { status: 'subscription_expired', machineId };
+  }
+
+  // ── Первый запуск — фиксируем дату ─────────────────
+  if (!settings.trial_start) {
+    const today = new Date().toISOString().slice(0, 10);
+    db.get('settings').assign({ trial_start: today, trial_status: 'trial' }).write();
+    return { status: 'trial', daysLeft: TRIAL_DAYS, maxClients: TRIAL_MAX_CLIENTS, machineId };
+  }
+
+  // ── Считаем дни триала ──────────────────────────────
+  const diffDays = Math.floor(
+    (new Date() - new Date(settings.trial_start)) / (1000 * 60 * 60 * 24)
+  );
+  const daysLeft = Math.max(0, TRIAL_DAYS - diffDays);
+
+  if (daysLeft === 0) {
+    return { status: 'expired', daysLeft: 0, machineId };
+  }
+
+  return { status: 'trial', daysLeft, maxClients: TRIAL_MAX_CLIENTS, machineId };
+}
+
+// Получить статус триала/лицензии
+ipcMain.handle('trial:status', () => checkTrial(db));
+
+// Получить ID машины
+ipcMain.handle('machine:id', () => ({ machineId: getMachineId() }));
+
+// Активировать лицензию
+ipcMain.handle('license:activate', (_, key, expireDate, type) => {
+  if (!key || !expireDate) return { ok: false, error: 'Заполните все поля' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expireDate)) return { ok: false, error: 'Неверный формат даты' };
+
+  const machineId = getMachineId();
+
+  // DEV-MODE — для разработчика, без привязки к машине
+  if (key.trim() === 'DEV-MODE-KP2026') {
+    db.get('settings').assign({
+      license_key:     'DEV-MODE',
+      license_expires: expireDate,
+      license_machine: machineId,
+      license_type:    'OUTSOURCE',
+      license_modules: 'OT,PD,VU',
+      trial_status:    'licensed',
+    }).write();
+    return { ok: true };
+  }
+
+  // Проверяем ключ с привязкой к машине
+  for (const t of ['OUTSOURCE', 'SOLO']) {
+    const expected = generateMachineKey(t, expireDate, machineId);
+    if (key.trim().toUpperCase() === expected) {
+      db.get('settings').assign({
+        license_key:     key.trim().toUpperCase(),
+        license_expires: expireDate,
+        license_machine: machineId,
+        license_type:    t,
+        license_modules: 'OT,PD,VU',
+        trial_status:    'licensed',
+      }).write();
+      return { ok: true, type: t };
+    }
+  }
+
+  return { ok: false, error: 'Неверный ключ. Ключ привязан к другому устройству или неверная дата.' };
+});
+
+// Сброс триала (только через admin-режим)
+ipcMain.handle('trial:reset', () => {
+  db.get('settings').assign({
+    trial_start:     '',
+    trial_status:    '',
+    license_key:     '',
+    license_expires: '',
+    license_machine: '',
+    license_type:    '',
+    license_modules: '',
+  }).write();
+  return { ok: true };
+});
+
+// ─── PIN-КОД ─────────────────────────────────────────────
+ipcMain.handle('pin:check', (_, pin) => {
+  const crypto = require('crypto');
+  const stored = db.get('settings.pin_hash').value() || '';
+  if (!stored) return { ok: true, noPin: true };
+  const hash = crypto.createHash('sha256').update(String(pin)).digest('hex');
+  return { ok: hash === stored };
+});
+
+ipcMain.handle('pin:set', (_, pin) => {
+  const crypto = require('crypto');
+  if (!pin) {
+    // Отключить PIN
+    db.get('settings').assign({ pin_hash: '', pin_enabled: '0' }).write();
+    return { ok: true };
+  }
+  const hash = crypto.createHash('sha256').update(String(pin)).digest('hex');
+  db.get('settings').assign({ pin_hash: hash, pin_enabled: '1' }).write();
+  return { ok: true };
+});
+
+ipcMain.handle('pin:status', () => {
+  const enabled = db.get('settings.pin_enabled').value();
+  return { enabled: enabled === '1' };
+});
+
 // ─── ОКНО ────────────────────────────────────────────────
 
 function createWindow() {
+  // Восстанавливаем сохранённый размер окна
+  let bounds = {};
+  try {
+    const saved = db.get('settings').value().window_bounds;
+    if (saved) bounds = JSON.parse(saved);
+  } catch(_) {}
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width:  bounds.width  || 1280,
+    height: bounds.height || 800,
+    x:      bounds.x,
+    y:      bounds.y,
     minWidth: 960,
     minHeight: 600,
     title: 'КомплаенсПро',
@@ -510,15 +1104,33 @@ function createWindow() {
     backgroundColor: '#080c14',
     show: false,
   });
+
+  // Убираем стандартное английское меню (File/Edit/View...)
+  Menu.setApplicationMenu(null);
+
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  // Сохраняем размер окна при изменении
+  const saveBounds = () => {
+    if (!mainWindow) return;
+    try {
+      db.get('settings').assign({ window_bounds: JSON.stringify(mainWindow.getBounds()) }).write();
+    } catch(_) {}
+  };
+  mainWindow.on('resize', saveBounds);
+  mainWindow.on('move', saveBounds);
 }
 
 app.whenReady().then(() => {
   initDB();
+  autoBackup();
   createWindow();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });

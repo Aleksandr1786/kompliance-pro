@@ -2,6 +2,7 @@
 // КомплаенсПро generator.js v2.0 — PART 3: Разделы 6, 7, чек-лист, главная функция
 
 const base=require('./gen_p1');
+const { safe } = require('./utils');
 const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW}=base;
 const {PageOrientation}=require('docx');
 
@@ -25,7 +26,7 @@ async function gen_06_01(c,s,dir){
   const emp = c.employees||[];
   const empRows = emp.map((e,i)=>row([
     cell(String(i+1),colW[0],{center:true,sz:SZ_S}),
-    cell(c.doc_date, colW[1],{sz:SZ_S}),
+    cell(safe(c.doc_date), colW[1],{sz:SZ_S}),
     cell('',         colW[2],{sz:SZ_S}),
     cell('',         colW[3],{sz:SZ_S}),
     cell(e.position, colW[4],{sz:SZ_S}),
@@ -35,12 +36,12 @@ async function gen_06_01(c,s,dir){
   ]));
   const emptyRows = Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(emp.length+i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЖУРНАЛ'),
     H('регистрации вводного инструктажа по охране труда',SZ),
     ...eL(1),
-    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Начат: «____» __________________ '+safe(c.doc_year)+' г.'),
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...empRows,...emptyRows]),
@@ -66,12 +67,12 @@ async function gen_06_02(c,s,dir){
   ]);
   const emptyRows = Array.from({length:30},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЖУРНАЛ'),
     H('регистрации инструктажа на рабочем месте',SZ),
     ...eL(1),
-    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Начат: «____» __________________ '+safe(c.doc_year)+' г.'),
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
@@ -97,14 +98,14 @@ async function gen_06_03(c,s,dir){
   ]);
   const emptyRows = Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЖУРНАЛ'),
     H('учёта микроповреждений (микротравм) работников',SZ),
     ...eL(1),
-    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Начат: «____» __________________ '+safe(c.doc_year)+' г.'),
     pL('Окончен: «____» __________________ ______ г.'),
-    pL('Ответственный: '+c.ot_position+'  '+c.ot_name),
+    pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
@@ -129,12 +130,12 @@ async function gen_06_04(c,s,dir){
   ]);
   const emptyRows = Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЖУРНАЛ'),
     H('учёта выдачи средств индивидуальной защиты',SZ),
     ...eL(1),
-    pL('Начат: «____» __________________ '+c.doc_year+' г.'),
+    pL('Начат: «____» __________________ '+safe(c.doc_year)+' г.'),
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
@@ -156,12 +157,12 @@ async function gen_06_05(c,s,dir){
   ]);
   const emptyRows = Array.from({length:15},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЖУРНАЛ'),
     H('контроля аптечки первой помощи',SZ),
     ...eL(1),
-    pL('Ответственный: '+c.ot_position+'  '+c.ot_name),
+    pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
@@ -184,7 +185,7 @@ async function gen_06_06(c,s,dir){
   ]);
   const emptyRows = Array.from({length:12},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch = [
-    pC(c.name,{bold:true}),
+    pC(safe(c.name),{bold:true}),
     ...eL(1),
     H('ЛИЧНАЯ КАРТОЧКА',SZ_H),
     H('учёта выдачи средств индивидуальной защиты',SZ),
@@ -211,15 +212,15 @@ async function gen_07_01(c,s,dir){
   const pT=row([cell('ИТОГО:',pColW[0]+pColW[1],{bold:true}),cell('30',pColW[2],{bold:true,center:true})]);
   const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА № 01-ПИ'),H('ВВОДНОГО ИНСТРУКТАЖА ПО ОХРАНЕ ТРУДА'),H(c.name.toUpperCase(),SZ),...eL(1),
     SH('1. Общие положения'),
-    p('1.1. Определяет порядок и темы вводного инструктажа с работниками '+c.name+'.',{indent:true}),
-    p('1.2. Проводит '+c.manager_position+' со всеми вновь принимаемыми, командированными, практикантами.',{indent:true}),
+    p('1.1. Определяет порядок и темы вводного инструктажа с работниками '+safe(c.name)+'.',{indent:true}),
+    p('1.2. Проводит '+safe(c.manager_position)+' со всеми вновь принимаемыми, командированными, практикантами.',{indent:true}),
     p('1.3. Инструктаж — в день оформления на работу. Продолжительность: не менее 30 минут.',{indent:true}),
     p('1.4. Результат фиксируется в Журнале вводного инструктажа.',{indent:true}),
     SH('2. Тематический план'),
     tbl(pColW,[pH,...pR,pT]),
     SH('3. Содержание'),
     p([{t:'Тема 1. ',b:true},{t:'Общие сведения об организации'}]),
-    bul(c.name+', г. '+c.city+'. ОКВЭД: '+c.okved+(c.okved_name?' — '+c.okved_name:'')+'.'),
+    bul(safe(c.name)+', г. '+safe(c.city)+'. ОКВЭД: '+safe(c.okved)+(safe(c.okved_name)?' — '+safe(c.okved_name):'')+'.'),
     bul('Расположение помещений, санитарно-бытовых зон.'),
     p([{t:'Тема 2. ',b:true},{t:'Законодательство об охране труда'}]),
     bul('Ст. 212, 214, 215, 221, 223 ТК РФ — права и обязанности сторон.'),
@@ -256,7 +257,7 @@ async function gen_07_02(c,s,dir){
   const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА № 02-ПИ'),H('ПЕРВИЧНОГО ИНСТРУКТАЖА НА РАБОЧЕМ МЕСТЕ'),H(c.name.toUpperCase(),SZ),...eL(1),
     SH('1. Общие положения'),
     p('1.1. Определяет порядок первичного инструктажа на рабочем месте.',{indent:true}),
-    p('1.2. Проводит '+c.ot_position+' с работниками, не освобождёнными от инструктажа.',{indent:true}),
+    p('1.2. Проводит '+safe(c.ot_position)+' с работниками, не освобождёнными от инструктажа.',{indent:true}),
     p('1.3. Продолжительность: не менее 30 минут. Повторный — не реже 1 раза в 6 месяцев.',{indent:true}),
     SH('2. Тематический план'),
     tbl(pColW,[pH,...pR,pT]),
@@ -290,8 +291,8 @@ async function gen_07_03(c,s,dir){
   const pT=row([cell('ИТОГО:',pColW[0]+pColW[1],{bold:true}),cell('25',pColW[2],{bold:true,center:true})]);
   const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА № 03-ПИ'),H('ПРОТИВОПОЖАРНОГО ИНСТРУКТАЖА'),H(c.name.toUpperCase(),SZ),...eL(1),
     SH('1. Общие положения'),
-    p('1.1. Определяет порядок противопожарного инструктажа с работниками '+c.name+'.',{indent:true}),
-    p('1.2. Проводит '+c.manager_position+'. Виды: вводный; первичный; повторный (не реже 1 раза в год); внеплановый; целевой.',{indent:true}),
+    p('1.1. Определяет порядок противопожарного инструктажа с работниками '+safe(c.name)+'.',{indent:true}),
+    p('1.2. Проводит '+safe(c.manager_position)+'. Виды: вводный; первичный; повторный (не реже 1 раза в год); внеплановый; целевой.',{indent:true}),
     SH('2. Тематический план'),
     tbl(pColW,[pH,...pR,pT]),
     SH('3. Содержание'),
@@ -322,21 +323,32 @@ async function gen_checklist(c,s,dir){
   const hdr=row([cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),cell('Документ',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Номер',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Подп. □',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Примечание',colW[5],{bold:true,center:true,sz:SZ_S})]);
   const mk=(num,doc,dNum,date,note='')=>row([cell(num,colW[0],{center:true,sz:SZ_S}),cell(doc,colW[1],{sz:SZ_S}),cell(dNum,colW[2],{center:true,sz:SZ_S}),cell(date,colW[3],{center:true,sz:SZ_S}),cell('□',colW[4],{center:true,sz:SZ_S}),cell(note,colW[5],{sz:SZ_S})]);
   const n=oNum(c,0),n1=oNum(c,1),n2=oNum(c,2),n3=oNum(c,3),n4=oNum(c,4),n5=oNum(c,5),n6=oNum(c,6);
-  const ch=[H('ЧЕК-ЛИСТ ПОДПИСАНИЯ ДОКУМЕНТОВ ПО ОХРАНЕ ТРУДА'),H(c.name,SZ),...eL(1),
-    pL([{t:'Дата подписания: ',b:true},{t:'«___» ___________ '+c.doc_year+' г.'}]),
+  const ch=[H('ЧЕК-ЛИСТ ПОДПИСАНИЯ ДОКУМЕНТОВ ПО ОХРАНЕ ТРУДА'),H(safe(c.name),SZ),...eL(1),
+    pL([{t:'Дата подписания: ',b:true},{t:'«___» ___________ '+safe(c.doc_year)+' г.'}]),
     pL([{t:'Подписывает: ',b:true},{t:c.manager_position+' '+(c.manager_name_full||c.manager_name)}]),...eL(1),
     H('ПАПКА А (Разделы 1–2) — ОСНОВНАЯ ДОКУМЕНТАЦИЯ',SZ),
-    tbl(colW,[hdr,mk('1.1','Политика в области охраны труда','—',c.doc_date),mk('1.2','Положение о СУОТ','—',c.doc_date),mk('1.3','Приказ «Об утверждении документации по ОТ»','№ '+n,c.doc_date),mk('1.4','Приказ «О назначении ответственных лиц»','№ '+n1,c.doc_date),mk('1.5','Приказ «Об утверждении инструкций по ОТ»','№ '+n2,c.doc_date),mk('1.6','Приказ «О назначении ответственного за ДСИЗ»','№ '+n3,c.doc_date),mk('1.7','Приказ «Об аптечках первой помощи»','№ '+n4,c.doc_date),mk('1.8','Приказ «Об ответственном за электрохозяйство»','№ '+n5,c.doc_date),mk('1.9','Приказ «Об утверждении программ обучения»','№ '+n6,c.doc_date),mk('1.10','План мероприятий по охране труда на '+c.doc_year+' год','—',c.doc_date),mk('1.11','График периодических мероприятий № 01-ПМ','—',c.doc_date),mk('2.1','Положение о порядке обучения по ОТ','—',c.doc_date),mk('2.2','Положение об организации работы по ОТ','—',c.doc_date),mk('2.3','Положение о разработке инструкций по ОТ','—',c.doc_date),mk('2.4','Положение об учёте микротравм','—',c.doc_date),mk('2.5','Правила внутреннего трудового распорядка','—',c.doc_date),mk('2.6','Положение об обеспечении работников СИЗ','—',c.doc_date)]),...eL(1),
+    tbl(colW,[hdr,mk('1.1','Политика в области охраны труда','—',safe(c.doc_date)),mk('1.2','Положение о СУОТ','—',safe(c.doc_date)),mk('1.3','Приказ «Об утверждении документации по ОТ»','№ '+n,safe(c.doc_date)),mk('1.4','Приказ «О назначении ответственных лиц»','№ '+n1,safe(c.doc_date)),mk('1.5','Приказ «Об утверждении инструкций по ОТ»','№ '+n2,safe(c.doc_date)),mk('1.6','Приказ «О назначении ответственного за ДСИЗ»','№ '+n3,safe(c.doc_date)),mk('1.7','Приказ «Об аптечках первой помощи»','№ '+n4,safe(c.doc_date)),mk('1.8','Приказ «Об ответственном за электрохозяйство»','№ '+n5,safe(c.doc_date)),mk('1.9','Приказ «Об утверждении программ обучения»','№ '+n6,safe(c.doc_date)),mk('1.10','План мероприятий по охране труда на '+safe(c.doc_year)+' год','—',safe(c.doc_date)),mk('1.11','График периодических мероприятий № 01-ПМ','—',safe(c.doc_date)),mk('2.1','Положение о порядке обучения по ОТ','—',safe(c.doc_date)),mk('2.2','Положение об организации работы по ОТ','—',safe(c.doc_date)),mk('2.3','Положение о разработке инструкций по ОТ','—',safe(c.doc_date)),mk('2.4','Положение об учёте микротравм','—',safe(c.doc_date)),mk('2.5','Правила внутреннего трудового распорядка','—',safe(c.doc_date)),mk('2.6','Положение об обеспечении работников СИЗ','—',safe(c.doc_date))]),...eL(1),
     H('ПАПКА Б (Разделы 5+7) — ОБУЧЕНИЕ',SZ),
     tbl(colW,[hdr,...(c.employees||[]).map((e,i)=>mk('5.'+(i+1),'Инструкция № '+String(i+2).padStart(2,'0')+'-ИОТ для '+e.position,'№ '+String(i+2).padStart(2,'0')+'-ИОТ',c.doc_date)),mk('5.N','Инструкция № 06-ИОТ при работе с ПЭВМ','№ 06-ИОТ',c.doc_date),mk('5.N','Инструкция № 07-ИОТ КМТ','№ 07-ИОТ',c.doc_date),mk('5.N','Инструкция № 08-ИОТ аптечка','№ 08-ИОТ',c.doc_date),mk('7.1','Программа вводного инструктажа № 01-ПИ','№ 01-ПИ',c.doc_date),mk('7.2','Программа первичного инструктажа № 02-ПИ','№ 02-ПИ',c.doc_date),mk('7.3','Программа противопожарного инструктажа № 03-ПИ','№ 03-ПИ',c.doc_date)]),...eL(1),
     H('ПАПКА В (Раздел 6) — ЖУРНАЛЫ',SZ),
-    tbl(colW,[hdr,mk('6.1','Журнал регистрации вводного инструктажа','—',c.doc_date,'Прошить, пронумеровать'),mk('6.2','Журнал регистрации инструктажа на рабочем месте','—',c.doc_date,'Прошить, пронумеровать'),mk('6.3','Журнал учёта микроповреждений (микротравм)','—',c.doc_date,'Прошить, пронумеровать'),mk('6.4','Журнал учёта выдачи СИЗ','—',c.doc_date,'Прошить, пронумеровать'),mk('6.5','Журнал контроля аптечки первой помощи','—',c.doc_date,''),mk('6.6','Личные карточки учёта выдачи СИЗ','—',c.doc_date,'На каждого работника')]),...eL(1),
+    tbl(colW,[hdr,mk('6.1','Журнал регистрации вводного инструктажа','—',safe(c.doc_date),'Прошить, пронумеровать'),mk('6.2','Журнал регистрации инструктажа на рабочем месте','—',safe(c.doc_date),'Прошить, пронумеровать'),mk('6.3','Журнал учёта микроповреждений (микротравм)','—',safe(c.doc_date),'Прошить, пронумеровать'),mk('6.4','Журнал учёта выдачи СИЗ','—',safe(c.doc_date),'Прошить, пронумеровать'),mk('6.5','Журнал контроля аптечки первой помощи','—',safe(c.doc_date),''),mk('6.6','Личные карточки учёта выдачи СИЗ','—',safe(c.doc_date),'На каждого работника')]),...eL(1),
     H('ПАПКА Г (Раздел 3) — ЭЛЕКТРОБЕЗОПАСНОСТЬ',SZ),
-    tbl(colW,[hdr,mk('3.1','Журнал учёта присвоения I группы электробезопасности','—',c.doc_date,'Прошить, пронумеровать'),mk('3.2','Программа инструктажа по электробезопасности (I группа)','—',c.doc_date,'')])];
+    tbl(colW,[hdr,mk('3.1','Журнал учёта присвоения I группы электробезопасности','—',safe(c.doc_date),'Прошить, пронумеровать'),mk('3.2','Программа инструктажа по электробезопасности (I группа)','—',safe(c.doc_date),'')])];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('Чек-лист')},children:ch}],dir,'Чек-лист подписания документов.docx');
 }
 
 // ── ГЛАВНАЯ ФУНКЦИЯ ─────────────────────────────────────
+
+// Определяем — нужно ли перезаписывать файл
+// true  = перезаписать (файла нет / не изменялся / данные клиента изменились)
+// false = НЕ трогать  (пользователь изменил И данные клиента те же)
+function shouldOverwrite(basename, diskHashMap, currentClientHash) {
+  const info = diskHashMap && diskHashMap[basename];
+  if (!info) return true;                              // файла нет на диске → создать
+  if (info.diskHash === info.storedFileHash) return true; // не изменялся пользователем → перезаписать
+  if (info.storedClientHash !== currentClientHash) return true; // данные клиента изменились → перезаписать
+  return false; // файл изменён пользователем, данные те же → НЕ трогать
+}
 
 async function generatePackage(client,settings,outputDir){
   const c=norm(client);
@@ -354,30 +366,45 @@ async function generatePackage(client,settings,outputDir){
     d7:path.join(outputDir,'Раздел 7. Программы обучения'),
   };
 
-  // Создаём папки и очищаем старые .docx файлы перед генерацией
-  for(const d of Object.values(dirs)){
-    fs.mkdirSync(d,{recursive:true});
-    // Удаляем только .docx файлы — не трогаем подпапки
-    if(fs.existsSync(d)){
-      fs.readdirSync(d)
-        .filter(f=>f.toLowerCase().endsWith('.docx'))
-        .forEach(f=>{ try{fs.unlinkSync(path.join(d,f));}catch(e){} });
-    }
-  }
-  // Очищаем корень (чек-лист)
-  if(fs.existsSync(outputDir)){
-    fs.readdirSync(outputDir)
-      .filter(f=>f.toLowerCase().endsWith('.docx'))
-      .forEach(f=>{ try{fs.unlinkSync(path.join(outputDir,f));}catch(e){} });
-  }
+  // Создаём папки — НЕ удаляем файлы заранее
+  for(const d of Object.values(dirs)) fs.mkdirSync(d,{recursive:true});
+
+  // Временная папка для генерации
+  const tmpRoot = path.join(outputDir, '__tmp_gen');
+  fs.mkdirSync(tmpRoot, {recursive:true});
 
   const p1=require('./gen_p1');
   const p2=require('./gen_p2');
   const generated=[],errors=[];
+  const report={ updated:[], added:[], unchanged:[], userModified:[] };
 
-  const run=async(fn,dir,...args)=>{
-    try{const f=await fn(c,s,dir,...args);if(Array.isArray(f))generated.push(...f);else generated.push(f);}
-    catch(e){errors.push(fn.name+': '+e.message);}
+  const run=async(fn, finalDir)=>{
+    // Генерируем во временную папку с такой же структурой
+    const relPath = path.relative(outputDir, finalDir);
+    const tmpDir = relPath ? path.join(tmpRoot, relPath) : tmpRoot;
+    fs.mkdirSync(tmpDir, {recursive:true});
+
+    try {
+      const result = await fn(c, s, tmpDir);
+      const files = Array.isArray(result) ? result : [result];
+
+      for (const tmpFile of files) {
+        const basename = path.basename(tmpFile);
+        const finalFile = path.join(finalDir, basename);
+
+        if (shouldOverwrite(basename, s.diskHashMap, s.currentClientHash)) {
+          fs.copyFileSync(tmpFile, finalFile);
+          generated.push(finalFile);
+        } else {
+          // Пользователь изменил файл, данные клиента те же — не трогаем
+          generated.push(finalFile); // уже существует с правками пользователя
+          report.userModified.push(basename);
+        }
+        try { fs.unlinkSync(tmpFile); } catch(e) {}
+      }
+    } catch(e) {
+      errors.push(fn.name+': '+e.message);
+    }
   };
 
   await run(p1.gen_01_01,dirs.d1);await run(p1.gen_01_02,dirs.d1);await run(p1.gen_01_03,dirs.d1);
@@ -389,14 +416,13 @@ async function generatePackage(client,settings,outputDir){
   const soatClass   = parseInt(c.soat_class||'2');
   const hasHazard   = !!c.hazard_works;
   const hasMedcheck = !!c.medcheck_required || (c.employees||[]).some(e=>e.medcheck_required);
-  const isMicro     = c.micro; // ≤15 сотрудников
-  const isSmall     = c.small; // 16-100
-  const isMedium    = c.medium;// >100
+  const isMicro     = c.micro;
+  const isSmall     = c.small;
+  const isMedium    = c.medium;
 
-  // Медосмотры — если есть основания
   if(hasMedcheck){
-    await run(p2.gen_01_med,dirs.d1); // приказ
-    await run(p2.gen_02_med,dirs.d2); // список контингента
+    await run(p2.gen_01_med,dirs.d1);
+    await run(p2.gen_02_med,dirs.d2);
   }
 
   // Работы повышенной опасности
@@ -433,7 +459,47 @@ async function generatePackage(client,settings,outputDir){
   await run(p2.gen_elec_contract,dExtra); // Договор на электробезопасность
   await run(p2.gen_act,         dExtra); // Акт выполненных работ
 
-  return{generated,errors};
+  // ── Документы ПДн (если модуль подключён) ──────────────
+  if ((client.modules || '').includes('PD')) {
+    try {
+      const { generatePdPackage } = require('./gen_pd');
+      const pdResult = await generatePdPackage(client, settings, outputDir);
+      generated.push(...pdResult.generated);
+      errors.push(...pdResult.errors);
+    } catch(e) {
+      errors.push('generatePdPackage: ' + e.message);
+    }
+  }
+
+  // ── Документы ПДн (если модуль подключён) ──────────────
+  if ((client.modules || '').includes('PD')) {
+    try {
+      const { generatePdPackage } = require('./gen_pd');
+      const pdResult = await generatePdPackage(client, s, outputDir, tmpRoot);
+      generated.push(...pdResult.generated);
+      errors.push(...pdResult.errors);
+      if (pdResult.report?.userModified) report.userModified.push(...pdResult.report.userModified);
+    } catch(e) {
+      errors.push('generatePdPackage: ' + e.message);
+    }
+  }
+
+  // ── Документы ВУ (если модуль подключён) ───────────────
+  if ((client.modules || '').includes('VU')) {
+    try {
+      const { generateVuPackage } = require('./gen_vu');
+      const vuResult = await generateVuPackage(client, s, outputDir, tmpRoot);
+      generated.push(...vuResult.generated);
+      errors.push(...vuResult.errors);
+    } catch(e) {
+      errors.push('generateVuPackage: ' + e.message);
+    }
+  }
+
+  // Очищаем временную папку
+  try { fs.rmSync(tmpRoot, {recursive:true, force:true}); } catch(e) {}
+
+  return{generated, errors, report};
 }
 
 module.exports={generatePackage};

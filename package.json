@@ -3,14 +3,69 @@
   "version": "1.0.0",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
+  "author": {
+    "name": "ИП Свинцова Д.И.",
+    "email": "DIANASVINTSOVA@MAIL.RU"
+  },
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
   },
   "dependencies": {
     "docx": "^9.7.1",
-    "lowdb": "1.0.0"
+    "lowdb": "1.0.0",
+    "electron-updater": "^6.1.7"
   },
   "devDependencies": {
-    "electron": "^29.0.0"
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "ru.kompliance.pro",
+    "productName": "КомплаенсПро",
+    "copyright": "© 2026 ИП Свинцова Д.И.",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "ИП Свинцова Д.И."
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "language": "1049",
+      "artifactName": "КомплаенсПро-Setup-${version}.exe",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "КомплаенсПро",
+      "runAfterFinish": true
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "generator.js",
+      "gen_p1.js",
+      "gen_p2.js",
+      "gen_pd.js",
+      "gen_vu.js",
+      "utils.js",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Aleksandr1786",
+      "repo": "kompliance-pro"
+    }
   }
 }

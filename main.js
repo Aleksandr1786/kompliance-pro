@@ -10,6 +10,7 @@ const FileSync = require('lowdb/adapters/FileSync');
 
 let db;
 let mainWindow = null;
+let pendingUpdate = null;
 
 // ─── ВЕРСИОНИРОВАНИЕ СХЕМЫ ДАННЫХ ────────────────────────
 //
@@ -1104,10 +1105,13 @@ function setupAutoUpdater() {
     console.log(`[Updater] Доступна версия ${info.version}`);
     if (!mainWindow) return;
 
-    mainWindow.webContents.send('update:available', {
-      version: info.version,
-      releaseDate: info.releaseDate,
-    });
+    pendingUpdate = { version: info.version, releaseDate: info.releaseDate };
+
+    // Если страница уже загружена — отправляем сразу
+    if (!mainWindow.webContents.isLoading()) {
+      mainWindow.webContents.send('update:available', pendingUpdate);
+      pendingUpdate = null;
+    }
   });
 
   // Новой версии нет
@@ -1137,12 +1141,12 @@ function setupAutoUpdater() {
     console.error('[Updater] Ошибка:', err.message);
   });
 
-  // Проверяем обновления через 3 секунды после запуска
+  // Проверяем обновления через 10 секунд после запуска
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(err => {
       console.error('[Updater] Не удалось проверить обновления:', err.message);
     });
-  }, 3000);
+  }, 10000);
 }
 
 // IPC — пользователь согласился скачать обновление
@@ -1190,6 +1194,19 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // Отправляем отложенное уведомление об обновлении после загрузки страницы
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (pendingUpdate) {
+      // Задержка 3 сек — даём время на инициализацию PIN/триал экранов
+      setTimeout(() => {
+        if (pendingUpdate && mainWindow) {
+          mainWindow.webContents.send('update:available', pendingUpdate);
+          pendingUpdate = null;
+        }
+      }, 3000);
+    }
+  });
   // Сохраняем размер окна при изменении
   const saveBounds = () => {
     if (!mainWindow) return;

@@ -134,13 +134,19 @@ function logoutAdmin() {
 // ─── АВТООБНОВЛЕНИЕ — UI ─────────────────────────────────
 
 function initAutoUpdater() {
-  if (!window.api.onUpdateAvailable) return;
+  if (!window.api.onUpdateAvailable) {
+    console.log('[Updater] onUpdateAvailable недоступен');
+    return;
+  }
+  console.log('[Updater] Слушатели зарегистрированы');
 
   window.api.onUpdateAvailable((info) => {
+    console.log('[Updater] Получено update:available', info);
     showUpdateBanner(info.version);
   });
 
   window.api.onUpdateProgress((data) => {
+    console.log('[Updater] Прогресс:', data.percent);
     const bar = document.getElementById('update-progress-bar');
     const txt = document.getElementById('update-progress-text');
     if (bar) bar.style.width = data.percent + '%';
@@ -148,11 +154,11 @@ function initAutoUpdater() {
   });
 
   window.api.onUpdateDownloaded(() => {
+    console.log('[Updater] Скачано, показываем баннер готовности');
     document.getElementById('update-banner')?.remove();
     showUpdateReadyBanner();
   });
 }
-
 function showUpdateBanner(version) {
   document.getElementById('update-banner')?.remove();
   const banner = document.createElement('div');
@@ -168,7 +174,7 @@ function showUpdateBanner(version) {
       <div style="font-size:24px;flex-shrink:0">🆕</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:4px">
-          Доступна версия \${version}
+          Доступна версия ${version}
         </div>
         <div style="font-size:12px;color:#64748b;margin-bottom:12px">
           Обновление улучшает стабильность и добавляет новые функции

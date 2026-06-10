@@ -1,8 +1,15 @@
 // ============================================================
 // КОМПЛАЕНСПРО — navigation.js
-// Навигация и обновление счётчиков
-// Выделен из app.js, версия 08.06.2026
+// Навигация по разделам, бейджи сайдбара
+// Декомпозиция app.js — батч 2, 10.06.2026
 // ============================================================
+
+// ── НАВИГАЦИЯ ────────────────────────────────────────────
+function setupNav() {
+  document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+    item.addEventListener('click', () => navigate(item.dataset.page));
+  });
+}
 
 async function navigate(page, clientId = null) {
   currentPage = page;
@@ -12,6 +19,7 @@ async function navigate(page, clientId = null) {
   if (navItem) navItem.classList.add('active');
   const btn = document.getElementById('topbarAction');
   btn.style.display = 'none';
+  // Скрываем кнопку редактирования клиента на всех страницах кроме карточки
   if (page !== 'client') {
     const editBtn = document.getElementById('topbarEdit');
     if (editBtn) editBtn.style.display = 'none';

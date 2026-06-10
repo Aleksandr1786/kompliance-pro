@@ -28,7 +28,7 @@ async function getClients(includeArchived = false) {
 // ── СИСТЕМА ЛИЦЕНЗИЙ И ДОСТУПА ───────────────────────────
 
 // Текущая лицензия (загружается из настроек при старте)
-let LICENSE = {
+var LICENSE = {
   type:        'OUTSOURCE',        // SOLO | OUTSOURCE
   modules:     ['OT','PD','VU'],   // доступные модули
   max_clients: 999,                // лимит клиентов (999 = без лимита для разработки)
@@ -39,7 +39,7 @@ let LICENSE = {
 };
 
 // Режим администратора (виден внутренний механизм)
-let IS_ADMIN = false;
+var IS_ADMIN = false;
 
 // Проверить доступ к модулю
 function checkAccess(module) {
@@ -128,6 +128,12 @@ function logoutAdmin() {
   applySettings();
   showToast('Режим пользователя', 'var(--muted)');
   navigate('settings');
+}
+
+function setDashboardMode(mode) {
+  LICENSE.type = mode === 'outsourcer' ? 'OUTSOURCE' : 'SOLO';
+  showToast(mode === 'outsourcer' ? 'Режим: Аутсорсер' : 'Режим: Штатный специалист', 'var(--green)');
+  navigate('dashboard');
 }
 
 // ── ИНИЦИАЛИЗАЦИЯ ────────────────────────────────────────
@@ -1453,418 +1459,418 @@ async function updateBadges() {
 }
 
 // ── ДАШБОРД ──────────────────────────────────────────────
-async function renderDashboard() {
-  const stats   = await window.api.dashboardStats();
-  const clients = await getClients();
-  const tasks   = await window.api.tasksList();
-  const events  = await window.api.eventsList(null);
-  const alerts  = await window.api.trainingAlerts();
-
-  const btn = document.getElementById('topbarAction');
-  btn.textContent = '+ Добавить клиента';
-  btn.style.display = 'flex';
-  btn.onclick = () => openModal('modalAddClient');
-  const editBtn = document.getElementById('topbarEdit');
-  if (editBtn) editBtn.style.display = 'none';
-
-  // Сохраняем для календаря
-  window._dashEvents = events;
-  window._dashTasks = tasks;
-
-  // ── РЕКОМЕНДАЦИИ АССИСТЕНТА ───────────────────────────
-  const recs = [];
-  const now = new Date();
-
-  // Реальный счётчик просрочек: обучение + просроченные события
-  const overdueTraining = alerts.filter(a => a.overdue).length;
-  const overdueEvents = events.filter(e => new Date(e.due_date) < now).length;
-  const totalOverdue = overdueTraining + overdueEvents;
-
-  // 1. Просроченное обучение
-  const overdueAlerts = alerts.filter(a => a.overdue);
-  if (overdueAlerts.length) {
-    const byClient = {};
-    overdueAlerts.forEach(a => {
-      if (!byClient[a.client_name]) byClient[a.client_name] = 0;
-      byClient[a.client_name]++;
-    });
-    Object.entries(byClient).slice(0,2).forEach(([name, count]) => {
-      recs.push({
-        svg: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
-        color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
-        text: `Провести обучение — ${name}`,
-        sub: `${count} сотр. с просроченным обучением`,
-        action: null,
-      });
-    });
-  }
-
-  // 2. Обучение истекает скоро (≤14 дней)
-  const soonAlerts = alerts.filter(a => !a.overdue && a.days_left <= 14);
-  if (soonAlerts.length && recs.length < 4) {
-    const byClient = {};
-    soonAlerts.forEach(a => {
-      if (!byClient[a.client_id]) byClient[a.client_id] = { name: a.client_name, count: 0, days: a.days_left };
-      byClient[a.client_id].count++;
-      if (a.days_left < byClient[a.client_id].days) byClient[a.client_id].days = a.days_left;
-    });
-    Object.entries(byClient).slice(0,2).forEach(([id, info]) => {
-      recs.push({
-        svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
-        color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)',
-        text: `Запланировать обучение — ${info.name}`,
-        sub: `${info.count} сотр., срок через ${info.days} дн.`,
-        action: `navigate('client',${id})`,
-      });
-    });
-  }
-
-  // 3. Клиенты без документов
-  const noDocs = clients.filter(c => (c.score||0) === 0);
-  if (noDocs.length && recs.length < 4) {
-    recs.push({
-      svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',
-      color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)',
-      text: `Сгенерировать документы — ${noDocs[0].name}`,
-      sub: `Документы ещё не созданы`,
-      action: `navigate('client',${noDocs[0].id})`,
-    });
-  }
-
-  // 4. Клиенты с низким score
-  const lowScore = clients.filter(c => (c.score||0) > 0 && (c.score||0) < 40);
-  if (lowScore.length && recs.length < 4) {
-    recs.push({
-      svg: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-      color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
-      text: `Заполнить данные — ${lowScore[0].name}`,
-      sub: `Готовность ${lowScore[0].score||0}% — требует внимания`,
-      action: `navigate('client',${lowScore[0].id})`,
-    });
-  }
-
-  // 5. Клиенты без сотрудников
-  const noStaff = clients.filter(c => !c.staff || c.staff === 0);
-  if (noStaff.length && recs.length < 4) {
-    recs.push({
-      svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
-      color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)',
-      text: `Добавить сотрудников — ${noStaff[0].name}`,
-      sub: `Сотрудники не внесены`,
-      action: `navigate('client',${noStaff[0].id})`,
-    });
-  }
-
-  // 6. Открытые задачи с дедлайном
-  const dueTasks = tasks.filter(t => !t.done && t.due_date);
-  dueTasks.filter(t => Math.ceil((new Date(t.due_date)-now)/86400000) <= 7)
-    .slice(0,1).forEach(t => {
-      if (recs.length >= 5) return;
-      const d = Math.ceil((new Date(t.due_date)-now)/86400000);
-      recs.push({
-        svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
-        color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)',
-        text: t.title,
-        sub: `Срок${d<=0?' истёк':' через '+d+' дн.'}${t.client_name?' · '+t.client_name:''}`,
-        action: `navigate('tasks')`,
-      });
-    });
-
-  // 7. Приближающийся плановый обход / проверка ГИТ
-  clients.forEach(c => {
-    if (recs.length >= 5) return;
-    if (c.next_visit_date) {
-      const d = Math.ceil((new Date(c.next_visit_date) - now) / 86400000);
-      if (d >= 0 && d <= 14) {
-        recs.push({
-          svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-          color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)',
-          text: `Плановый обход — ${c.name}`,
-          sub: `Через ${d} дн. · ${new Date(c.next_visit_date).toLocaleDateString('ru-RU')}`,
-          action: `navigate('client',${c.id})`,
-        });
-      }
-    }
-    if (recs.length >= 5) return;
-    if (c.git_next_date) {
-      const d = Math.ceil((new Date(c.git_next_date) - now) / 86400000);
-      if (d >= 0 && d <= 30) {
-        recs.push({
-          svg: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
-          color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
-          text: `Плановая проверка ГИТ — ${c.name}`,
-          sub: `Через ${d} дн. · Подготовьтесь заранее`,
-          action: `navigate('client',${c.id})`,
-        });
-      }
-    }
-  });
-
-  // 8. Отчётность — ближайший несданный отчёт
-  try {
-    const sett = await window.api.settingsGet();
-    let submitted = {};
-    try { submitted = JSON.parse(sett.reports_submitted || '{}'); } catch(_) {}
-    const regions2 = [...new Set(clients.map(c => c.region).filter(Boolean))];
-    const hasKrasnodar2 = regions2.some(r => r && r.includes('Краснодар'));
-    let repList = getFederalReports(now.getFullYear()).map(r => ({ ...r, scope:'federal' }));
-    if (hasKrasnodar2) repList = repList.concat(getKrasnodarReports(now.getFullYear()).map(r => ({ ...r, scope:'krasnodar' })));
-    repList.forEach(r => { r.dueDate = shiftToWorkday(r.due); r.id = `${r.scope}_${r.due}_${r.name.slice(0,20).replace(/\s/g,'_')}`; });
-    repList.sort((a,b) => a.dueDate - b.dueDate);
-    // Отчёт считается несданным, если хотя бы у одного клиента нет галочки
-    const nextRep = repList.find(r => {
-      if (r.dueDate < now) return false;
-      return clients.some(c => !submitted[`${c.id}__${r.id}`]);
-    });
-    if (nextRep && recs.length < 5) {
-      const d = Math.ceil((nextRep.dueDate - now) / 86400000);
-      if (d <= 14) {
-        recs.push({
-          svg: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-          color: d <= 3 ? '#f87171' : '#fbbf24',
-          bg: d <= 3 ? 'rgba(248,113,113,0.08)' : 'rgba(251,191,36,0.08)',
-          border: d <= 3 ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
-          text: `Сдать отчёт: ${nextRep.name}`,
-          sub: `${nextRep.period} · до ${nextRep.dueDate.toLocaleDateString('ru-RU')} · через ${d} дн.`,
-          action: `navigate('reporting')`,
-        });
-      }
-    }
-  } catch(_) {}
-
-  const recIcon = (icon, bg, border) => `<div style="width:30px;height:30px;border-radius:8px;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon}</div>`;
-
-  // 9. Ближайшие события клиентов (в течение 14 дней)
-  events.filter(e => {
-    const d = Math.ceil((new Date(e.due_date) - now) / 86400000);
-    return d >= 0 && d <= 14;
-  }).slice(0, 2).forEach(e => {
-    if (recs.length >= 5) return;
-    const d = Math.ceil((new Date(e.due_date) - now) / 86400000);
-    recs.push({
-      svg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
-      color: d <= 3 ? '#f87171' : '#94a3b8',
-      bg: d <= 3 ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.03)',
-      border: d <= 3 ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.06)',
-      text: e.title,
-      sub: `${e.client_name || ''} · ${d === 0 ? 'сегодня' : 'через ' + d + ' дн.'}`,
-      action: `navigate('client',${e.client_id})`,
-    });
-  });
-
-  const recsHtml = recs.length ? recs.slice(0,4).map((r,i) => `
-    <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;
-      border-bottom:1px solid rgba(255,255,255,0.05);cursor:${r.action?'pointer':'default'};
-      border-radius:6px;transition:background .15s"
-      ${r.action?`onclick="${r.action}"`:''}
-      onmouseover="this.style.background='rgba(255,255,255,0.02)'"
-      onmouseout="this.style.background='transparent'">
-      <div style="width:30px;height:30px;border-radius:8px;background:${r.bg};border:1px solid ${r.border};
-        display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${r.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${r.svg}</svg>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12.5px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.text}</div>
-        <div style="font-size:11px;color:#475569;margin-top:2px">${r.sub}</div>
-      </div>
-      ${r.action?`<div style="color:#334155;font-size:12px;align-self:center;flex-shrink:0">→</div>`:''}
-    </div>`).join('')
-  : `<div style="padding:12px 0;text-align:center;color:#334155;font-size:12px">Нет рекомендаций — всё в порядке 👍</div>`;
-
-  // Формируем блок алертов обучения
-  const alertsHtml = alerts.length ? alerts.slice(0,5).map(a => {
-    const color = a.overdue ? 'var(--red)' : a.days_left <= 14 ? 'var(--amber)' : '#fbbf24';
-    const icon  = a.overdue ? '🔴' : a.days_left <= 14 ? '🟠' : '🟡';
-    const label = a.overdue ? `Просрочено ${Math.abs(a.days_left)} дн.` : `${a.days_left} дн.`;
-    return `<div class="event-row" style="cursor:pointer" onclick="navigate('client',${a.client_id})">
-      <div class="ev-dot" style="background:${color}"></div>
-      <div class="ev-body">
-        <div class="ev-title">${a.employee_name} — ${a.training_type}</div>
-        <div class="ev-sub">${a.client_name}</div>
-      </div>
-      <div class="ev-when" style="color:${color}">${icon} ${label}</div>
-    </div>`;
-  }).join('') : '';
-
-  document.getElementById('content').innerHTML = `
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">${ic('building', 14)} Клиенты</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">на сопровождении</div></div>
-      <div class="stat-card"><div class="stat-label">${ic('clipboard-list', 14)} Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent > 0 ? stats.urgent + ' срочных' : 'нет срочных'}</div></div>
-      <div class="stat-card"><div class="stat-label">${ic('graduation-cap', 14)} Обучение</div><div class="stat-value" style="color:${alerts.length?'var(--amber)':'var(--green)'}">${alerts.length}</div><div class="stat-sub">истекает в течение 30 дн.</div></div>
-      <div class="stat-card"><div class="stat-label">${ic('alert-triangle', 14)} Просрочено</div><div class="stat-value" style="color:${totalOverdue?'var(--red)':'var(--green)'}">${totalOverdue}</div><div class="stat-sub">требуют действий</div></div>
-    </div>
-    <div class="grid2">
-      <div>
-        <div class="panel">
-          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Клиенты</div><div class="panel-count">${clients.length} орг.</div><div class="panel-action" onclick="navigate('clients')">Все →</div></div>
-          <div class="client-search"><input class="search-input" placeholder="🔍 Поиск клиента..." oninput="filterDashClients(this.value)"></div>
-          <div id="dashClientList">${renderClientRows(clients)}</div>
-        </div>
-        ${clients.length >= 2 ? `
-        <div class="panel">
-          <div class="panel-head">
-            <span style="font-size:15px">🏆</span>
-            <div class="panel-title">Рейтинг готовности</div>
-            <div class="panel-count">${clients.length} клиентов</div>
-          </div>
-          <div style="padding:4px 0">
-            ${[...clients].sort((a,b) => (b.score||0)-(a.score||0)).map((c, i) => {
-              const score = c.score || 0;
-              const color = score >= 80 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
-              const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="font-size:11px;color:#475569;width:18px;text-align:center;display:inline-block">${i+1}</span>`;
-              const initials = getInitials(c.name);
-              return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="navigate('client',${c.id})">
-                <div style="width:22px;text-align:center;flex-shrink:0;font-size:15px">${medal}</div>
-                <div style="width:28px;height:28px;border-radius:8px;background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
-                  <div style="margin-top:4px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
-                    <div style="width:${score}%;height:100%;background:${color};border-radius:2px;transition:width .6s ease"></div>
-                  </div>
-                </div>
-                <div style="font-size:12px;font-weight:700;color:${color};flex-shrink:0;min-width:36px;text-align:right">${score}%</div>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>` : ''}
-        ${tasks.length ? `
-        <div class="panel">
-          <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
-          <div>${tasks.slice(0,5).map(t => renderTaskRow(t)).join('')}</div>
-        </div>` : ''}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <div class="panel">
-          <div class="panel-head">
-            <span style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;background:rgba(251,191,36,0.2);border-radius:50%"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="#1a1f2e" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></span>
-            <div class="panel-title">Ассистент рекомендует</div>
-            <div class="panel-count">${recs.length} ${recs.length===1?'задача':recs.length>=2&&recs.length<=4?'задачи':'задач'}</div>
-          </div>
-          <div style="padding:4px 0">${recsHtml}</div>
-        </div>
-        ${renderProductionCalendar(events, tasks)}
-      </div>
-    </div>
-  `;
-}
-
-let allDashClients = [];
-async function filterDashClients(q) {
-  if (!allDashClients.length) allDashClients = await getClients();
-  const filtered = allDashClients.filter(c =>
-    c.name.toLowerCase().includes(q.toLowerCase()) ||
-    (c.inn||'').includes(q) || (c.okved||'').includes(q)
-  );
-  document.getElementById('dashClientList').innerHTML = renderClientRows(filtered);
-}
-
-function renderClientRows(clients) {
-  if (!clients.length) return emptyState("building","Клиентов пока нет","Нажмите «+ Добавить клиента»");
-  return clients.map(c => {
-    const mods = (c.modules||'OT').split(',');
-    const dots = mods.map(m => `<div class="mod-dot" style="background:${m==='OT'?'var(--green)':m==='PD'?'var(--amber)':'var(--red)'}" title="${m}"></div>`).join('');
-    const initials = getInitials(c.name);
-    const scoreColor = (c.score||0) >= 80 ? 'var(--green)' : (c.score||0) >= 40 ? 'var(--amber)' : 'var(--red)';
-    return `<div class="client-row" onclick="navigate('client',${c.id})">
-      <div class="client-avatar-sm" style="background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'}">${initials}</div>
-      <div class="client-info"><div class="client-name">${c.name}</div><div class="client-meta">ОКВЭД ${c.okved||'—'} · ${c.staff||0} чел. · ${c.region||''}</div></div>
-      <div class="mod-dots">${dots}</div>
-      <div class="client-score" style="color:${scoreColor}">${c.score||0}%</div>
-    </div>`;
-  }).join('');
-}
-
-function renderEventRow(e) {
-  const due = new Date(e.due_date);
-  const now = new Date();
-  const diff = Math.round((due - now) / 86400000);
-  let color = 'var(--muted2)', label = formatDate(e.due_date);
-  if (diff < 0) { color = 'var(--red)'; label = 'Просрочено'; }
-  else if (diff <= 3) color = 'var(--red)';
-  else if (diff <= 14) color = 'var(--amber)';
-  else if (diff <= 30) color = 'var(--blue2)';
-  const modColor = e.module==='OT'?'var(--green)':e.module==='PD'?'var(--amber)':'var(--red)';
-  return `<div class="event-row">
-    <div class="ev-dot" style="background:${color}"></div>
-    <div class="ev-body"><div class="ev-title">${e.title}</div><div class="ev-sub">${e.client_name||''}</div></div>
-    <div class="ev-when" style="color:${color}">${label}</div>
-  </div>`;
-}
-
-function renderTaskRow(t) {
-  const tagClass = t.module==='OT'?'tag-ot':t.module==='PD'?'tag-pd':'tag-vu';
-  const tagLabel = t.module==='OT'?'ОТ':t.module==='PD'?'ПД':'ВУ';
-  const isDone = !!t.done;
-  const checkInner = isDone
-    ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#00c853,#69f0ae);box-shadow:0 0 8px rgba(0,200,83,0.5);flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6.5 5,9.5 10,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
-    : `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
-  return `<div class="task-row" id="task-row-${t.id}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;transition:background .15s" onmouseover="this.querySelector('.task-del-btn').style.opacity='1'" onmouseout="this.querySelector('.task-del-btn').style.opacity='0'">
-    <div class="task-check ${isDone?'done':''}" onclick="toggleTask(${t.id},this)" id="task-check-${t.id}" style="flex-shrink:0;cursor:pointer">${checkInner}</div>
-    <div class="task-text ${isDone?'done':''}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}${t.client_name?' <span style="color:var(--muted);font-size:11px">· '+t.client_name+'</span>':''}</div>
-    ${t.module?`<div class="task-tag ${tagClass}" style="flex-shrink:0">${tagLabel}</div>`:''}
-    <button class="task-del-btn" onclick="deleteTask(${t.id})" title="Удалить задачу"
-      style="flex-shrink:0;opacity:0;background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;color:#475569;transition:all .15s;display:flex;align-items:center"
-      onmouseover="this.style.color='#f87171';this.style.background='rgba(248,113,113,0.1)'"
-      onmouseout="this.style.color='#475569';this.style.background='none'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-    </button>
-  </div>`;
-}
-
-async function deleteTask(id) {
-  const row = document.getElementById('task-row-' + id);
-
-  // Анимация исчезновения
-  if (row) {
-    row.style.transition = 'all .25s ease';
-    row.style.opacity = '0';
-    row.style.transform = 'translateX(20px)';
-    row.style.maxHeight = row.offsetHeight + 'px';
-    await new Promise(r => setTimeout(r, 250));
-    row.style.maxHeight = '0';
-    row.style.padding = '0';
-    row.style.margin = '0';
-    row.style.overflow = 'hidden';
-    await new Promise(r => setTimeout(r, 200));
-    row.remove();
-  }
-
-  await window.api.taskDelete(id);
-  showToast('Задача удалена');
-}
-
-async function toggleTask(id, checkEl) {
-  if (!document.getElementById('task-check-styles')) {
-    const s = document.createElement('style');
-    s.id = 'task-check-styles';
-    s.textContent = `
-      @keyframes tc-pop { 0%{transform:scale(0) rotate(-45deg);opacity:0} 55%{transform:scale(1.3) rotate(8deg)} 75%{transform:scale(0.88) rotate(-3deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
-      @keyframes tc-glow { 0%{box-shadow:0 0 0 0 rgba(0,200,83,0.8)} 50%{box-shadow:0 0 0 7px rgba(0,200,83,0.25)} 100%{box-shadow:0 0 0 13px rgba(0,200,83,0)} }
-      @keyframes tc-stroke { to{stroke-dashoffset:0} }
-      @keyframes tc-row-flash { 0%{background:rgba(0,200,83,0.1)} 100%{background:transparent} }
-    `;
-    document.head.appendChild(s);
-  }
-
-  await window.api.taskToggle(id);
-  const row    = document.getElementById('task-row-' + id);
-  const isDone = checkEl.classList.contains('done');
-  const textEl = checkEl.nextElementSibling;
-
-  if (!isDone) {
-    checkEl.classList.add('done');
-    if (textEl) textEl.classList.add('done');
-    if (row) { row.style.animation = ''; void row.offsetWidth; row.style.animation = 'tc-row-flash .7s ease forwards'; }
-    checkEl.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#00c853,#69f0ae);animation:tc-pop .45s cubic-bezier(.22,.68,0,1.4) both,tc-glow 1.4s ease .1s both;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6.5 5,9.5 10,3" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="14" stroke-dashoffset="14" style="animation:tc-stroke .3s ease .12s forwards"/></svg></span>`;
-  } else {
-    checkEl.classList.remove('done');
-    if (textEl) textEl.classList.remove('done');
-    if (row) row.style.animation = '';
-    checkEl.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
-  }
-}
-
-
+// async function renderDashboard() {
+//   const stats   = await window.api.dashboardStats();
+//   const clients = await getClients();
+//   const tasks   = await window.api.tasksList();
+//   const events  = await window.api.eventsList(null);
+//   const alerts  = await window.api.trainingAlerts();
+// 
+//   const btn = document.getElementById('topbarAction');
+//   btn.textContent = '+ Добавить клиента';
+//   btn.style.display = 'flex';
+//   btn.onclick = () => openModal('modalAddClient');
+//   const editBtn = document.getElementById('topbarEdit');
+//   if (editBtn) editBtn.style.display = 'none';
+// 
+//   // Сохраняем для календаря
+//   window._dashEvents = events;
+//   window._dashTasks = tasks;
+// 
+//   // ── РЕКОМЕНДАЦИИ АССИСТЕНТА ───────────────────────────
+//   const recs = [];
+//   const now = new Date();
+// 
+//   // Реальный счётчик просрочек: обучение + просроченные события
+//   const overdueTraining = alerts.filter(a => a.overdue).length;
+//   const overdueEvents = events.filter(e => new Date(e.due_date) < now).length;
+//   const totalOverdue = overdueTraining + overdueEvents;
+// 
+//   // 1. Просроченное обучение
+//   const overdueAlerts = alerts.filter(a => a.overdue);
+//   if (overdueAlerts.length) {
+//     const byClient = {};
+//     overdueAlerts.forEach(a => {
+//       if (!byClient[a.client_name]) byClient[a.client_name] = 0;
+//       byClient[a.client_name]++;
+//     });
+//     Object.entries(byClient).slice(0,2).forEach(([name, count]) => {
+//       recs.push({
+//         svg: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+//         color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
+//         text: `Провести обучение — ${name}`,
+//         sub: `${count} сотр. с просроченным обучением`,
+//         action: null,
+//       });
+//     });
+//   }
+// 
+//   // 2. Обучение истекает скоро (≤14 дней)
+//   const soonAlerts = alerts.filter(a => !a.overdue && a.days_left <= 14);
+//   if (soonAlerts.length && recs.length < 4) {
+//     const byClient = {};
+//     soonAlerts.forEach(a => {
+//       if (!byClient[a.client_id]) byClient[a.client_id] = { name: a.client_name, count: 0, days: a.days_left };
+//       byClient[a.client_id].count++;
+//       if (a.days_left < byClient[a.client_id].days) byClient[a.client_id].days = a.days_left;
+//     });
+//     Object.entries(byClient).slice(0,2).forEach(([id, info]) => {
+//       recs.push({
+//         svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+//         color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)',
+//         text: `Запланировать обучение — ${info.name}`,
+//         sub: `${info.count} сотр., срок через ${info.days} дн.`,
+//         action: `navigate('client',${id})`,
+//       });
+//     });
+//   }
+// 
+//   // 3. Клиенты без документов
+//   const noDocs = clients.filter(c => (c.score||0) === 0);
+//   if (noDocs.length && recs.length < 4) {
+//     recs.push({
+//       svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',
+//       color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)',
+//       text: `Сгенерировать документы — ${noDocs[0].name}`,
+//       sub: `Документы ещё не созданы`,
+//       action: `navigate('client',${noDocs[0].id})`,
+//     });
+//   }
+// 
+//   // 4. Клиенты с низким score
+//   const lowScore = clients.filter(c => (c.score||0) > 0 && (c.score||0) < 40);
+//   if (lowScore.length && recs.length < 4) {
+//     recs.push({
+//       svg: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+//       color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
+//       text: `Заполнить данные — ${lowScore[0].name}`,
+//       sub: `Готовность ${lowScore[0].score||0}% — требует внимания`,
+//       action: `navigate('client',${lowScore[0].id})`,
+//     });
+//   }
+// 
+//   // 5. Клиенты без сотрудников
+//   const noStaff = clients.filter(c => !c.staff || c.staff === 0);
+//   if (noStaff.length && recs.length < 4) {
+//     recs.push({
+//       svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
+//       color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)',
+//       text: `Добавить сотрудников — ${noStaff[0].name}`,
+//       sub: `Сотрудники не внесены`,
+//       action: `navigate('client',${noStaff[0].id})`,
+//     });
+//   }
+// 
+//   // 6. Открытые задачи с дедлайном
+//   const dueTasks = tasks.filter(t => !t.done && t.due_date);
+//   dueTasks.filter(t => Math.ceil((new Date(t.due_date)-now)/86400000) <= 7)
+//     .slice(0,1).forEach(t => {
+//       if (recs.length >= 5) return;
+//       const d = Math.ceil((new Date(t.due_date)-now)/86400000);
+//       recs.push({
+//         svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+//         color: '#fbbf24', bg: 'rgba(251,191,36,0.08)', border: 'rgba(251,191,36,0.2)',
+//         text: t.title,
+//         sub: `Срок${d<=0?' истёк':' через '+d+' дн.'}${t.client_name?' · '+t.client_name:''}`,
+//         action: `navigate('tasks')`,
+//       });
+//     });
+// 
+//   // 7. Приближающийся плановый обход / проверка ГИТ
+//   clients.forEach(c => {
+//     if (recs.length >= 5) return;
+//     if (c.next_visit_date) {
+//       const d = Math.ceil((new Date(c.next_visit_date) - now) / 86400000);
+//       if (d >= 0 && d <= 14) {
+//         recs.push({
+//           svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+//           color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)',
+//           text: `Плановый обход — ${c.name}`,
+//           sub: `Через ${d} дн. · ${new Date(c.next_visit_date).toLocaleDateString('ru-RU')}`,
+//           action: `navigate('client',${c.id})`,
+//         });
+//       }
+//     }
+//     if (recs.length >= 5) return;
+//     if (c.git_next_date) {
+//       const d = Math.ceil((new Date(c.git_next_date) - now) / 86400000);
+//       if (d >= 0 && d <= 30) {
+//         recs.push({
+//           svg: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+//           color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
+//           text: `Плановая проверка ГИТ — ${c.name}`,
+//           sub: `Через ${d} дн. · Подготовьтесь заранее`,
+//           action: `navigate('client',${c.id})`,
+//         });
+//       }
+//     }
+//   });
+// 
+//   // 8. Отчётность — ближайший несданный отчёт
+//   try {
+//     const sett = await window.api.settingsGet();
+//     let submitted = {};
+//     try { submitted = JSON.parse(sett.reports_submitted || '{}'); } catch(_) {}
+//     const regions2 = [...new Set(clients.map(c => c.region).filter(Boolean))];
+//     const hasKrasnodar2 = regions2.some(r => r && r.includes('Краснодар'));
+//     let repList = getFederalReports(now.getFullYear()).map(r => ({ ...r, scope:'federal' }));
+//     if (hasKrasnodar2) repList = repList.concat(getKrasnodarReports(now.getFullYear()).map(r => ({ ...r, scope:'krasnodar' })));
+//     repList.forEach(r => { r.dueDate = shiftToWorkday(r.due); r.id = `${r.scope}_${r.due}_${r.name.slice(0,20).replace(/\s/g,'_')}`; });
+//     repList.sort((a,b) => a.dueDate - b.dueDate);
+//     // Отчёт считается несданным, если хотя бы у одного клиента нет галочки
+//     const nextRep = repList.find(r => {
+//       if (r.dueDate < now) return false;
+//       return clients.some(c => !submitted[`${c.id}__${r.id}`]);
+//     });
+//     if (nextRep && recs.length < 5) {
+//       const d = Math.ceil((nextRep.dueDate - now) / 86400000);
+//       if (d <= 14) {
+//         recs.push({
+//           svg: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+//           color: d <= 3 ? '#f87171' : '#fbbf24',
+//           bg: d <= 3 ? 'rgba(248,113,113,0.08)' : 'rgba(251,191,36,0.08)',
+//           border: d <= 3 ? 'rgba(248,113,113,0.2)' : 'rgba(251,191,36,0.2)',
+//           text: `Сдать отчёт: ${nextRep.name}`,
+//           sub: `${nextRep.period} · до ${nextRep.dueDate.toLocaleDateString('ru-RU')} · через ${d} дн.`,
+//           action: `navigate('reporting')`,
+//         });
+//       }
+//     }
+//   } catch(_) {}
+// 
+//   const recIcon = (icon, bg, border) => `<div style="width:30px;height:30px;border-radius:8px;background:${bg};border:1px solid ${border};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${icon}</div>`;
+// 
+//   // 9. Ближайшие события клиентов (в течение 14 дней)
+//   events.filter(e => {
+//     const d = Math.ceil((new Date(e.due_date) - now) / 86400000);
+//     return d >= 0 && d <= 14;
+//   }).slice(0, 2).forEach(e => {
+//     if (recs.length >= 5) return;
+//     const d = Math.ceil((new Date(e.due_date) - now) / 86400000);
+//     recs.push({
+//       svg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+//       color: d <= 3 ? '#f87171' : '#94a3b8',
+//       bg: d <= 3 ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.03)',
+//       border: d <= 3 ? 'rgba(248,113,113,0.2)' : 'rgba(255,255,255,0.06)',
+//       text: e.title,
+//       sub: `${e.client_name || ''} · ${d === 0 ? 'сегодня' : 'через ' + d + ' дн.'}`,
+//       action: `navigate('client',${e.client_id})`,
+//     });
+//   });
+// 
+//   const recsHtml = recs.length ? recs.slice(0,4).map((r,i) => `
+//     <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;
+//       border-bottom:1px solid rgba(255,255,255,0.05);cursor:${r.action?'pointer':'default'};
+//       border-radius:6px;transition:background .15s"
+//       ${r.action?`onclick="${r.action}"`:''}
+//       onmouseover="this.style.background='rgba(255,255,255,0.02)'"
+//       onmouseout="this.style.background='transparent'">
+//       <div style="width:30px;height:30px;border-radius:8px;background:${r.bg};border:1px solid ${r.border};
+//         display:flex;align-items:center;justify-content:center;flex-shrink:0">
+//         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${r.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${r.svg}</svg>
+//       </div>
+//       <div style="flex:1;min-width:0">
+//         <div style="font-size:12.5px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.text}</div>
+//         <div style="font-size:11px;color:#475569;margin-top:2px">${r.sub}</div>
+//       </div>
+//       ${r.action?`<div style="color:#334155;font-size:12px;align-self:center;flex-shrink:0">→</div>`:''}
+//     </div>`).join('')
+//   : `<div style="padding:12px 0;text-align:center;color:#334155;font-size:12px">Нет рекомендаций — всё в порядке 👍</div>`;
+// 
+//   // Формируем блок алертов обучения
+//   const alertsHtml = alerts.length ? alerts.slice(0,5).map(a => {
+//     const color = a.overdue ? 'var(--red)' : a.days_left <= 14 ? 'var(--amber)' : '#fbbf24';
+//     const icon  = a.overdue ? '🔴' : a.days_left <= 14 ? '🟠' : '🟡';
+//     const label = a.overdue ? `Просрочено ${Math.abs(a.days_left)} дн.` : `${a.days_left} дн.`;
+//     return `<div class="event-row" style="cursor:pointer" onclick="navigate('client',${a.client_id})">
+//       <div class="ev-dot" style="background:${color}"></div>
+//       <div class="ev-body">
+//         <div class="ev-title">${a.employee_name} — ${a.training_type}</div>
+//         <div class="ev-sub">${a.client_name}</div>
+//       </div>
+//       <div class="ev-when" style="color:${color}">${icon} ${label}</div>
+//     </div>`;
+//   }).join('') : '';
+// 
+//   document.getElementById('content').innerHTML = `
+//     <div class="stats-grid">
+//       <div class="stat-card"><div class="stat-label">${ic('building', 14)} Клиенты</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">на сопровождении</div></div>
+//       <div class="stat-card"><div class="stat-label">${ic('clipboard-list', 14)} Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent > 0 ? stats.urgent + ' срочных' : 'нет срочных'}</div></div>
+//       <div class="stat-card"><div class="stat-label">${ic('graduation-cap', 14)} Обучение</div><div class="stat-value" style="color:${alerts.length?'var(--amber)':'var(--green)'}">${alerts.length}</div><div class="stat-sub">истекает в течение 30 дн.</div></div>
+//       <div class="stat-card"><div class="stat-label">${ic('alert-triangle', 14)} Просрочено</div><div class="stat-value" style="color:${totalOverdue?'var(--red)':'var(--green)'}">${totalOverdue}</div><div class="stat-sub">требуют действий</div></div>
+//     </div>
+//     <div class="grid2">
+//       <div>
+//         <div class="panel">
+//           <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Клиенты</div><div class="panel-count">${clients.length} орг.</div><div class="panel-action" onclick="navigate('clients')">Все →</div></div>
+//           <div class="client-search"><input class="search-input" placeholder="🔍 Поиск клиента..." oninput="filterDashClients(this.value)"></div>
+//           <div id="dashClientList">${renderClientRows(clients)}</div>
+//         </div>
+//         ${clients.length >= 2 ? `
+//         <div class="panel">
+//           <div class="panel-head">
+//             <span style="font-size:15px">🏆</span>
+//             <div class="panel-title">Рейтинг готовности</div>
+//             <div class="panel-count">${clients.length} клиентов</div>
+//           </div>
+//           <div style="padding:4px 0">
+//             ${[...clients].sort((a,b) => (b.score||0)-(a.score||0)).map((c, i) => {
+//               const score = c.score || 0;
+//               const color = score >= 80 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171';
+//               const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span style="font-size:11px;color:#475569;width:18px;text-align:center;display:inline-block">${i+1}</span>`;
+//               const initials = getInitials(c.name);
+//               return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer" onclick="navigate('client',${c.id})">
+//                 <div style="width:22px;text-align:center;flex-shrink:0;font-size:15px">${medal}</div>
+//                 <div style="width:28px;height:28px;border-radius:8px;background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
+//                 <div style="flex:1;min-width:0">
+//                   <div style="font-size:12px;font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+//                   <div style="margin-top:4px;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
+//                     <div style="width:${score}%;height:100%;background:${color};border-radius:2px;transition:width .6s ease"></div>
+//                   </div>
+//                 </div>
+//                 <div style="font-size:12px;font-weight:700;color:${color};flex-shrink:0;min-width:36px;text-align:right">${score}%</div>
+//               </div>`;
+//             }).join('')}
+//           </div>
+//         </div>` : ''}
+//         ${tasks.length ? `
+//         <div class="panel">
+//           <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="navigate('tasks')">Все →</div></div>
+//           <div>${tasks.slice(0,5).map(t => renderTaskRow(t)).join('')}</div>
+//         </div>` : ''}
+//       </div>
+//       <div style="display:flex;flex-direction:column;gap:14px">
+//         <div class="panel">
+//           <div class="panel-head">
+//             <span style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;background:rgba(251,191,36,0.2);border-radius:50%"><svg width="10" height="10" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="#1a1f2e" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg></span>
+//             <div class="panel-title">Ассистент рекомендует</div>
+//             <div class="panel-count">${recs.length} ${recs.length===1?'задача':recs.length>=2&&recs.length<=4?'задачи':'задач'}</div>
+//           </div>
+//           <div style="padding:4px 0">${recsHtml}</div>
+//         </div>
+//         ${renderProductionCalendar(events, tasks)}
+//       </div>
+//     </div>
+//   `;
+// }
+// 
+// var allDashClients = [];
+// async function filterDashClients(q) {
+//   if (!allDashClients.length) allDashClients = await getClients();
+//   const filtered = allDashClients.filter(c =>
+//     c.name.toLowerCase().includes(q.toLowerCase()) ||
+//     (c.inn||'').includes(q) || (c.okved||'').includes(q)
+//   );
+//   document.getElementById('dashClientList').innerHTML = renderClientRows(filtered);
+// }
+// 
+// function renderClientRows(clients) {
+//   if (!clients.length) return emptyState("building","Клиентов пока нет","Нажмите «+ Добавить клиента»");
+//   return clients.map(c => {
+//     const mods = (c.modules||'OT').split(',');
+//     const dots = mods.map(m => `<div class="mod-dot" style="background:${m==='OT'?'var(--green)':m==='PD'?'var(--amber)':'var(--red)'}" title="${m}"></div>`).join('');
+//     const initials = getInitials(c.name);
+//     const scoreColor = (c.score||0) >= 80 ? 'var(--green)' : (c.score||0) >= 40 ? 'var(--amber)' : 'var(--red)';
+//     return `<div class="client-row" onclick="navigate('client',${c.id})">
+//       <div class="client-avatar-sm" style="background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'}">${initials}</div>
+//       <div class="client-info"><div class="client-name">${c.name}</div><div class="client-meta">ОКВЭД ${c.okved||'—'} · ${c.staff||0} чел. · ${c.region||''}</div></div>
+//       <div class="mod-dots">${dots}</div>
+//       <div class="client-score" style="color:${scoreColor}">${c.score||0}%</div>
+//     </div>`;
+//   }).join('');
+// }
+// 
+// function renderEventRow(e) {
+//   const due = new Date(e.due_date);
+//   const now = new Date();
+//   const diff = Math.round((due - now) / 86400000);
+//   let color = 'var(--muted2)', label = formatDate(e.due_date);
+//   if (diff < 0) { color = 'var(--red)'; label = 'Просрочено'; }
+//   else if (diff <= 3) color = 'var(--red)';
+//   else if (diff <= 14) color = 'var(--amber)';
+//   else if (diff <= 30) color = 'var(--blue2)';
+//   const modColor = e.module==='OT'?'var(--green)':e.module==='PD'?'var(--amber)':'var(--red)';
+//   return `<div class="event-row">
+//     <div class="ev-dot" style="background:${color}"></div>
+//     <div class="ev-body"><div class="ev-title">${e.title}</div><div class="ev-sub">${e.client_name||''}</div></div>
+//     <div class="ev-when" style="color:${color}">${label}</div>
+//   </div>`;
+// }
+// 
+// function renderTaskRow(t) {
+//   const tagClass = t.module==='OT'?'tag-ot':t.module==='PD'?'tag-pd':'tag-vu';
+//   const tagLabel = t.module==='OT'?'ОТ':t.module==='PD'?'ПД':'ВУ';
+//   const isDone = !!t.done;
+//   const checkInner = isDone
+//     ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#00c853,#69f0ae);box-shadow:0 0 8px rgba(0,200,83,0.5);flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6.5 5,9.5 10,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
+//     : `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
+//   return `<div class="task-row" id="task-row-${t.id}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;transition:background .15s" onmouseover="this.querySelector('.task-del-btn').style.opacity='1'" onmouseout="this.querySelector('.task-del-btn').style.opacity='0'">
+//     <div class="task-check ${isDone?'done':''}" onclick="toggleTask(${t.id},this)" id="task-check-${t.id}" style="flex-shrink:0;cursor:pointer">${checkInner}</div>
+//     <div class="task-text ${isDone?'done':''}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}${t.client_name?' <span style="color:var(--muted);font-size:11px">· '+t.client_name+'</span>':''}</div>
+//     ${t.module?`<div class="task-tag ${tagClass}" style="flex-shrink:0">${tagLabel}</div>`:''}
+//     <button class="task-del-btn" onclick="deleteTask(${t.id})" title="Удалить задачу"
+//       style="flex-shrink:0;opacity:0;background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;color:#475569;transition:all .15s;display:flex;align-items:center"
+//       onmouseover="this.style.color='#f87171';this.style.background='rgba(248,113,113,0.1)'"
+//       onmouseout="this.style.color='#475569';this.style.background='none'">
+//       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+//     </button>
+//   </div>`;
+// }
+// 
+// async function deleteTask(id) {
+//   const row = document.getElementById('task-row-' + id);
+// 
+//   // Анимация исчезновения
+//   if (row) {
+//     row.style.transition = 'all .25s ease';
+//     row.style.opacity = '0';
+//     row.style.transform = 'translateX(20px)';
+//     row.style.maxHeight = row.offsetHeight + 'px';
+//     await new Promise(r => setTimeout(r, 250));
+//     row.style.maxHeight = '0';
+//     row.style.padding = '0';
+//     row.style.margin = '0';
+//     row.style.overflow = 'hidden';
+//     await new Promise(r => setTimeout(r, 200));
+//     row.remove();
+//   }
+// 
+//   await window.api.taskDelete(id);
+//   showToast('Задача удалена');
+// }
+// 
+// async function toggleTask(id, checkEl) {
+//   if (!document.getElementById('task-check-styles')) {
+//     const s = document.createElement('style');
+//     s.id = 'task-check-styles';
+//     s.textContent = `
+//       @keyframes tc-pop { 0%{transform:scale(0) rotate(-45deg);opacity:0} 55%{transform:scale(1.3) rotate(8deg)} 75%{transform:scale(0.88) rotate(-3deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+//       @keyframes tc-glow { 0%{box-shadow:0 0 0 0 rgba(0,200,83,0.8)} 50%{box-shadow:0 0 0 7px rgba(0,200,83,0.25)} 100%{box-shadow:0 0 0 13px rgba(0,200,83,0)} }
+//       @keyframes tc-stroke { to{stroke-dashoffset:0} }
+//       @keyframes tc-row-flash { 0%{background:rgba(0,200,83,0.1)} 100%{background:transparent} }
+//     `;
+//     document.head.appendChild(s);
+//   }
+// 
+//   await window.api.taskToggle(id);
+//   const row    = document.getElementById('task-row-' + id);
+//   const isDone = checkEl.classList.contains('done');
+//   const textEl = checkEl.nextElementSibling;
+// 
+//   if (!isDone) {
+//     checkEl.classList.add('done');
+//     if (textEl) textEl.classList.add('done');
+//     if (row) { row.style.animation = ''; void row.offsetWidth; row.style.animation = 'tc-row-flash .7s ease forwards'; }
+//     checkEl.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#00c853,#69f0ae);animation:tc-pop .45s cubic-bezier(.22,.68,0,1.4) both,tc-glow 1.4s ease .1s both;flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6.5 5,9.5 10,3" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="14" stroke-dashoffset="14" style="animation:tc-stroke .3s ease .12s forwards"/></svg></span>`;
+//   } else {
+//     checkEl.classList.remove('done');
+//     if (textEl) textEl.classList.remove('done');
+//     if (row) row.style.animation = '';
+//     checkEl.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
+//   }
+// }
+// 
+// 
 // ── КЛИЕНТЫ ──────────────────────────────────────────────
 async function renderClients() {
   const clients = await getClients();
@@ -4730,6 +4736,7 @@ async function renderSettings() {
         </div>
 
         ${IS_ADMIN ? `
+          <div class="section" id="s-ai">
           <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></span><div class="section-title">AI-провайдер</div></div>
           <div class="section-body">
             <div style="display:flex;flex-direction:column;gap:8px">
@@ -4741,7 +4748,7 @@ async function renderSettings() {
               <div style="font-size:11px;color:var(--muted);margin-top:4px">Без ключа приложение работает в базовом режиме</div>
             </div>
           </div>
-        </div>
+          </div><!-- /s-ai -->
 
         <!-- ЛИЦЕНЗИЯ (только admin) -->
         <div class="section">
@@ -4791,6 +4798,23 @@ async function renderSettings() {
                   Активировать
                 </button>
               </div>
+            </div>
+            <!-- Переключатель режима дашборда -->
+            <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Режим дашборда</div>
+              <div style="display:flex;gap:8px;">
+                <button onclick="setDashboardMode('outsourcer')"
+                  id="dash-mode-outsourcer"
+                  style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${LICENSE.type==='OUTSOURCE'?'rgba(96,165,250,0.5)':'rgba(255,255,255,0.08)'};background:${LICENSE.type==='OUTSOURCE'?'rgba(96,165,250,0.12)':'transparent'};color:${LICENSE.type==='OUTSOURCE'?'#60a5fa':'var(--muted)'}">
+                  Аутсорсер
+                </button>
+                <button onclick="setDashboardMode('specialist')"
+                  id="dash-mode-specialist"
+                  style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${LICENSE.type!=='OUTSOURCE'?'rgba(96,165,250,0.5)':'rgba(255,255,255,0.08)'};background:${LICENSE.type!=='OUTSOURCE'?'rgba(96,165,250,0.12)':'transparent'};color:${LICENSE.type!=='OUTSOURCE'?'#60a5fa':'var(--muted)'}">
+                  Штатный специалист
+                </button>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:8px">Переключает вид главного экрана</div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.15);border-radius:8px;margin-bottom:8px">
               <div style="font-size:12px;color:#f87171">Режим администратора активен</div>
@@ -7474,13 +7498,36 @@ async function savePdData(clientId) {
 
 // ── ПДн: добавить ИСПДн ──────────────────────────────────
 async function addIspdnItem(clientId) {
-  const name = prompt('Название информационной системы ПД:\n\nПримеры: 1С:Бухгалтерия, Кадровая система, CRM, Почта, Облачное хранилище');
-  if (!name || !name.trim()) return;
+  // Создаём модальное окно вместо prompt
+  let modal = document.getElementById('ispdn-modal');
+  if (modal) modal.remove();
+  modal = document.createElement('div');
+  modal.id = 'ispdn-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:99999';
+  modal.innerHTML = `
+    <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:400px">
+      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:6px">Добавить ИСПДн</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:14px">Примеры: 1С:Бухгалтерия, Кадровая система, CRM, Почта</div>
+      <input id="ispdn-name-input" type="text" placeholder="Название информационной системы" style="width:100%;padding:10px 14px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:16px" onkeydown="if(event.key==='Enter')document.getElementById('ispdn-submit').click()">
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="document.getElementById('ispdn-modal').remove()">Отмена</button>
+        <button id="ispdn-submit" class="btn btn-primary" onclick="submitIspdn(${clientId})">Добавить</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('ispdn-name-input')?.focus(), 100);
+}
+
+async function submitIspdn(clientId) {
+  const input = document.getElementById('ispdn-name-input');
+  const name = input?.value?.trim();
+  if (!name) return;
   const client = await window.api.clientGet(clientId);
   const list = client.pd_ispdn_list || [];
   const today = new Date().toLocaleDateString('ru-RU');
-  list.push({ name: name.trim(), added: today });
+  list.push({ name, added: today });
   await window.api.clientUpdate(clientId, { pd_ispdn_list: list });
+  document.getElementById('ispdn-modal')?.remove();
   showToast('ИСПДн добавлена ✓', 'var(--green)');
   await navigate('client', clientId);
 }

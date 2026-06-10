@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<title>КомплаенсПро</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">Комплаенс<span>Про</span></div>
+    <div class="logo-sub">Аутсорс-платформа</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Главное</div>
+    <div class="nav-item active" data-page="dashboard"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span> Дашборд</div>
+    <div class="nav-item" data-page="clients"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span> Клиенты <span class="nav-badge green" id="badge-clients">0</span></div>
+    <div class="nav-item" data-page="tasks"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span> Задачи <span class="nav-badge amber" id="badge-tasks">0</span></div>
+    <div class="nav-item" data-page="reporting"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span> Отчётность</div>
+    <div class="nav-section">Модули</div>
+    <div class="nav-item" data-page="ot"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span> Охрана труда</div>
+    <div class="nav-item" data-page="pd"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span> ПДн</div>
+    <div class="nav-item" data-page="vu"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span> Воинский учёт</div>
+    <div class="nav-section">Система</div>
+    <div class="nav-item" data-page="settings"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Настройки</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-block">
+      <div class="user-avatar" id="userAvatar">АС</div>
+      <div><div class="user-name" id="userName">А. Свинцов</div><div class="user-role" id="userRole">Специалист по ОТ</div></div>
+    </div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbarTitle">Дашборд</div>
+    <div class="topbar-right">
+      <div class="ai-status"><div class="ai-dot"></div><span id="aiStatusText">Базовый режим</span></div>
+      <button class="btn btn-primary" id="topbarAction" style="display:none"></button>
+    </div>
+  </div>
+  <div class="content" id="content"></div>
+</div>
+
+<!-- МОДАЛ: ДОБАВИТЬ КЛИЕНТА -->
+<div class="modal-overlay" id="modalAddClient">
+  <div class="modal" style="max-height:88vh;overflow-y:auto;padding-bottom:8px">
+    <div class="modal-title">🏢 Добавить клиента</div>
+    <div class="modal-sub">Система определит пакет документов по ОКВЭД автоматически</div>
+    <div class="form-row">
+      <div class="form-group full">
+        <div class="form-label">Название <span class="req">*</span></div>
+        <input class="form-input" id="c-name" placeholder="ООО Название / ИП Фамилия И.О.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">ИНН</div>
+        <input class="form-input" id="c-inn" placeholder="7700000000">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Форма</div>
+        <select class="form-select" id="c-form">
+          <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">ОКВЭД <span class="req">*</span></div>
+        <input class="form-input" id="c-okved" placeholder="26.20">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Сотрудников</div>
+        <input class="form-input" id="c-staff" type="number" placeholder="25" min="1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Регион</div>
+        <select class="form-select" id="c-region">
+          <option>Краснодарский край</option>
+          <option>Москва</option><option>Санкт-Петербург</option>
+          <option>Московская область</option><option>Ростовская область</option>
+          <option>Ставропольский край</option><option>Другой регион</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Город</div>
+        <input class="form-input" id="c-city" placeholder="Новороссийск">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group full">
+        <div class="form-label">Юридический адрес</div>
+        <input class="form-input" id="c-address" placeholder="г. Новороссийск, ул. Примерная, д. 1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Телефон</div>
+        <input class="form-input" id="c-phone" placeholder="+7 000 000-00-00">
+      </div>
+      <div class="form-group">
+        <div class="form-label">Начальный № приказа</div>
+        <input class="form-input" id="c-order-prefix" type="number" placeholder="1" min="1" value="1">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Должность руководителя</div>
+        <select class="form-select" id="c-manager-position">
+          <option>Индивидуальный предприниматель</option>
+          <option>Генеральный директор</option>
+          <option>Директор</option>
+          <option>Исполнительный директор</option>
+          <option>Руководитель</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">ФИО руководителя</div>
+        <input class="form-input" id="c-manager-name" placeholder="Иванов Иван Иванович">
+      </div>
+    </div>
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">УСЛОВИЯ ТРУДА</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Класс условий труда (СОУТ)</div>
+        <select class="form-select" id="c-soat-class">
+          <option value="2">Класс 2 — Допустимые (офис, ПЭВМ)</option>
+          <option value="31">Класс 3.1 — Вредные (1 степень)</option>
+          <option value="32">Класс 3.2 — Вредные (2 степень)</option>
+          <option value="33">Класс 3.3 — Вредные (3 степень)</option>
+          <option value="34">Класс 3.4 — Вредные (4 степень)</option>
+          <option value="4">Класс 4 — Опасные</option>
+          <option value="0">СОУТ не проводилась</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Особые условия</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+            <input type="checkbox" id="c-hazard-works" style="width:15px;height:15px">
+            ⚠️ Работы повышенной опасности
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+            <input type="checkbox" id="c-medcheck-required" style="width:15px;height:15px">
+            🏥 Медосмотры обязательны
+          </label>
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ОХРАНУ ТРУДА</div>
+    <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Если отличается от руководителя — заполните. Иначе оставьте пустым.</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Должность отв. за ОТ</div>
+        <input class="form-input" id="c-ot-position" placeholder="Специалист по ОТ">
+      </div>
+      <div class="form-group">
+        <div class="form-label">ФИО отв. за ОТ</div>
+        <input class="form-input" id="c-ot-name" placeholder="Петров Пётр Петрович">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:4px">
+      <div class="form-label">Модули</div>
+      <div class="modules-check">
+        <div class="module-pill checked" data-module="OT" onclick="togglePill(this)">Охрана труда</div>
+        <div class="module-pill checked" data-module="PD" onclick="togglePill(this)">ПДн</div>
+        <div class="module-pill" data-module="VU" onclick="togglePill(this)">Воинский учёт</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalAddClient')">Отмена</button>
+      <button class="btn btn-primary" onclick="submitAddClient()">Добавить →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ТОСТ -->
+<div class="toast" id="toast"></div>
+
+<script src="icons.js"></script>
+<script src="modules/demo-data.js"></script>
+<script src="modules/demo.js"></script>
+<script src="modules/auth.js"></script>
+<script src="modules/dashboard.js"></script>
+<script src="modules/clients.js"></script>
+<script src="modules/archive.js"></script>
+<script src="modules/pd-simulator.js"></script>
+<script src="modules/readiness.js"></script>
+<script src="modules/onboarding.js"></script>
+<script src="modules/navigation.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -21,6 +21,68 @@ function updateLog(msg) {
   console.log(`[Updater] ${msg}`);
 }
 
+// ─── ХРАНИТЕЛЬ: журнал тихой работы ──────────────────────
+// Всё, что Хранитель делает незаметно, записывается сюда:
+// %APPDATA%/kompliance-pro/guardian.log
+function guardianLog(msg) {
+  try {
+    const logPath = path.join(app.getPath('userData'), 'guardian.log');
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch(_) {}
+  console.log(`[Хранитель] ${msg}`);
+}
+
+// Снимок базы в особую папку (не подпадает под ротацию дневных копий)
+function guardianSnapshot(reason) {
+  try {
+    const src = path.join(app.getPath('userData'), 'kompliance.json');
+    if (!fs.existsSync(src)) return null;
+    const dir = path.join(app.getPath('userData'), 'autobackup');
+    fs.mkdirSync(dir, { recursive: true });
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const dest = path.join(dir, `snapshot_${reason}_${ts}.json`);
+    fs.copyFileSync(src, dest);
+    // Снимков каждого типа храним не больше 5
+    const snaps = fs.readdirSync(dir)
+      .filter(f => f.startsWith(`snapshot_${reason}_`)).sort();
+    while (snaps.length > 5) {
+      try { fs.unlinkSync(path.join(dir, snaps.shift())); } catch(_) {}
+    }
+    guardianLog(`Снимок создан (${reason}): ${path.basename(dest)}`);
+    return dest;
+  } catch (e) {
+    guardianLog(`ОШИБКА снимка (${reason}): ${e.message}`);
+    return null;
+  }
+}
+
+// Глубокая проверка целостности: не только валидный JSON,
+// но и правильная структура коллекций
+function guardianIntegrityCheck() {
+  const collections = ['clients','employees','documents','events','tasks','divisions'];
+  try {
+    const counts = [];
+    for (const name of collections) {
+      const val = db.get(name).value();
+      if (!Array.isArray(val)) {
+        guardianLog(`ЦЕЛОСТНОСТЬ: коллекция «${name}» повреждена (не массив)`);
+        return { ok: false, broken: name };
+      }
+      counts.push(`${name}:${val.length}`);
+    }
+    const settings = db.get('settings').value();
+    if (!settings || typeof settings !== 'object') {
+      guardianLog('ЦЕЛОСТНОСТЬ: settings повреждены');
+      return { ok: false, broken: 'settings' };
+    }
+    guardianLog(`Целостность подтверждена (${counts.join(', ')}, схема v${settings.db_version || 0})`);
+    return { ok: true };
+  } catch (e) {
+    guardianLog(`ЦЕЛОСТНОСТЬ: ошибка проверки — ${e.message}`);
+    return { ok: false, broken: 'unknown' };
+  }
+}
+
 // ─── ВЕРСИОНИРОВАНИЕ СХЕМЫ ДАННЫХ ────────────────────────
 //
 // Как добавить новую миграцию:
@@ -103,6 +165,11 @@ function runMigrations(db) {
   if (!pending.length) return;
 
   console.log(`[Migration] База версии ${currentVersion}, нужна ${DB_VERSION}. Запускаем ${pending.length} миграций...`);
+  guardianLog(`Миграция схемы: v${currentVersion} → v${DB_VERSION} (${pending.length} шаг.)`);
+
+  // ХРАНИТЕЛЬ: неприкосновенный снимок ПЕРЕД изменением схемы.
+  // Если миграция пойдёт не так — данные пользователя в безопасности.
+  guardianSnapshot(`pre_migration_v${currentVersion}`);
 
   for (const migration of pending) {
     try {
@@ -111,8 +178,10 @@ function runMigrations(db) {
       // Обновляем версию после каждой успешной миграции
       db.set('settings.db_version', migration.version).write();
       console.log(`[Migration] v${migration.version}: ✅ выполнена`);
+      guardianLog(`Миграция v${migration.version} выполнена: ${migration.description}`);
     } catch (e) {
       console.error(`[Migration] v${migration.version}: ❌ ошибка — ${e.message}`);
+      guardianLog(`ОШИБКА миграции v${migration.version}: ${e.message}. Снимок pre_migration сохранён в autobackup.`);
       // Останавливаемся — не накатываем следующие
       break;
     }
@@ -127,19 +196,22 @@ function initDB() {
     try {
       JSON.parse(fs.readFileSync(dbPath, 'utf8'));
     } catch (e) {
-      // База повреждена — пытаемся восстановить
+      // База повреждена — Хранитель восстанавливает из последней копии
       const corruptPath = dbPath + '.corrupt_' + Date.now();
       try { fs.renameSync(dbPath, corruptPath); } catch(_) {}
-      // Ищем последний авто-бэкап
+      guardianLog(`ТРЕВОГА: база повреждена (JSON не читается). Повреждённый файл сохранён: ${path.basename(corruptPath)}`);
       try {
         const autoDir = path.join(app.getPath('userData'), 'autobackup');
         if (fs.existsSync(autoDir)) {
           const backups = fs.readdirSync(autoDir).filter(f => f.endsWith('.json')).sort().reverse();
           if (backups.length) {
             fs.copyFileSync(path.join(autoDir, backups[0]), dbPath);
+            guardianLog(`Восстановление выполнено из копии: ${backups[0]}`);
+          } else {
+            guardianLog('Восстановление невозможно: копий нет. Будет создана чистая база.');
           }
         }
-      } catch(_) {}
+      } catch(e2) { guardianLog(`ОШИБКА восстановления: ${e2.message}`); }
     }
   }
 
@@ -191,6 +263,40 @@ function initDB() {
 
   // Накатываем миграции схемы
   runMigrations(db);
+
+  // ХРАНИТЕЛЬ: глубокая проверка структуры после инициализации.
+  // Если коллекция разрушена (не массив) — восстанавливаемся из снимка.
+  const integrity = guardianIntegrityCheck();
+  if (!integrity.ok) {
+    const restored = guardianRestoreLatest();
+    if (restored) {
+      const adapter2 = new FileSync(dbPath);
+      db = low(adapter2);
+      guardianLog('База перечитана после восстановления.');
+      guardianIntegrityCheck();
+    }
+  }
+}
+
+// Восстановление из самой свежей копии (любого типа)
+function guardianRestoreLatest() {
+  try {
+    const dbPath = path.join(app.getPath('userData'), 'kompliance.json');
+    const dir = path.join(app.getPath('userData'), 'autobackup');
+    if (!fs.existsSync(dir)) return false;
+    const all = fs.readdirSync(dir).filter(f => f.endsWith('.json'))
+      .map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+    if (!all.length) { guardianLog('Восстановление: копий не найдено.'); return false; }
+    // Текущий (повреждённый) файл тоже сохраняем — ничего не теряем
+    try { fs.copyFileSync(dbPath, dbPath + '.broken_' + Date.now()); } catch(_) {}
+    fs.copyFileSync(path.join(dir, all[0].f), dbPath);
+    guardianLog(`Восстановление выполнено из копии: ${all[0].f}`);
+    return true;
+  } catch (e) {
+    guardianLog(`ОШИБКА восстановления: ${e.message}`);
+    return false;
+  }
 }
 
 function nextId(collection) {
@@ -403,6 +509,67 @@ ipcMain.handle('backup:choose-folder', async () => {
   const res = await dialog.showOpenDialog({ properties: ['openDirectory'] });
   if (res.canceled) return null;
   return res.filePaths[0];
+});
+
+// ─── ХРАНИТЕЛЬ: IPC для будущего экрана «Восстановление» ──
+// Статус: версия схемы, число копий, последние записи журнала
+ipcMain.handle('guardian:status', async () => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'autobackup');
+    const backups = fs.existsSync(dir)
+      ? fs.readdirSync(dir).filter(f => f.endsWith('.json')) : [];
+    const logPath = path.join(app.getPath('userData'), 'guardian.log');
+    let tail = [];
+    if (fs.existsSync(logPath)) {
+      const lines = fs.readFileSync(logPath, 'utf8').trim().split('\n');
+      tail = lines.slice(-20);
+    }
+    return {
+      ok: true,
+      schemaVersion: db.get('settings.db_version').value() || 0,
+      backupsCount: backups.length,
+      log: tail
+    };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Список копий с датами и размерами
+ipcMain.handle('guardian:list-backups', async () => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'autobackup');
+    if (!fs.existsSync(dir)) return { ok: true, backups: [] };
+    const backups = fs.readdirSync(dir).filter(f => f.endsWith('.json'))
+      .map(f => {
+        const st = fs.statSync(path.join(dir, f));
+        return { name: f, date: st.mtime.toISOString(), size: st.size };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return { ok: true, backups };
+  } catch (e) { return { ok: false, error: e.message }; }
+});
+
+// Восстановление из выбранной копии (с защитным снимком текущего состояния)
+ipcMain.handle('guardian:restore', async (_, backupName) => {
+  try {
+    const dir = path.join(app.getPath('userData'), 'autobackup');
+    const srcFile = path.join(dir, path.basename(backupName || ''));
+    if (!fs.existsSync(srcFile)) return { ok: false, error: 'Копия не найдена' };
+    // Копия должна быть валидным JSON — иначе не восстанавливаем
+    JSON.parse(fs.readFileSync(srcFile, 'utf8'));
+    // Текущее состояние — в снимок (восстановление обратимо!)
+    guardianSnapshot('pre_restore');
+    const dbPath = path.join(app.getPath('userData'), 'kompliance.json');
+    fs.copyFileSync(srcFile, dbPath);
+    guardianLog(`Восстановление по запросу пользователя из: ${path.basename(srcFile)}`);
+    // Перечитываем базу и перезагружаем окно
+    const adapter = new FileSync(dbPath);
+    db = low(adapter);
+    if (mainWindow) mainWindow.reload();
+    return { ok: true };
+  } catch (e) {
+    guardianLog(`ОШИБКА восстановления по запросу: ${e.message}`);
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('open-external', async (_, url) => {
@@ -897,6 +1064,7 @@ function autoBackup() {
     // Бэкап раз в день
     if (!fs.existsSync(dest)) {
       fs.copyFileSync(src, dest);
+      guardianLog(`Дневная копия создана: auto_${today}.json`);
     }
 
     // Чистим старые: оставляем последние 30

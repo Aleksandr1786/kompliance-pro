@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -45,7 +45,7 @@
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "language": "1049",
-      "artifactName": "KomplainsPro-Setup-${version}.exe",
+      "artifactName": "KomplainsPro-Setup.exe",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "КомплаенсПро",

@@ -227,6 +227,16 @@ async function renderClientVu(clientId) {
   const emps = await window.api.employeesList(clientId);
   const vuEmps = emps.filter(e => e.vu_category);
 
+  // Документы ВУ из реестра приложения (база documents, module='VU')
+  const allDocs = await window.api.documentsList(clientId);
+  const vuDocs = allDocs.filter(d => d.module === 'VU');
+  let vuFolder = '';
+  if (vuDocs.length && vuDocs[0].filepath) {
+    const fp0 = vuDocs[0].filepath;
+    const m = fp0.match(/^(.*[\\/]Воинский учёт)[\\/]/);
+    vuFolder = (m ? m[1] : fp0.replace(/[\\/][^\\/]+$/, '')).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
   const totalEmps   = emps.length;
   const vuCount     = vuEmps.length;
   const призывники  = vuEmps.filter(e => e.vu_category === 'призывник').length;
@@ -408,6 +418,30 @@ async function renderClientVu(clientId) {
 
       </div>
 
+      <!-- Документы — Воинский учёт (из реестра) -->
+      <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Документы — Воинский учёт
+            <span style="font-size:11px;color:var(--muted2);font-weight:500">${vuDocs.length} шт.</span>
+          </span>
+          ${vuFolder ? `<button onclick="window.api.docsOpenFolder('${vuFolder}')" style="padding:6px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer">📁 Открыть папку</button>` : ''}
+        </div>
+        ${vuDocs.length ? `
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${vuDocs.map(d => {
+            const nm = (d.name || '').replace(/\.docx$/i, '');
+            const fp = (d.filepath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<div onclick="openDocFile('${fp}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.06);border-radius:8px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='rgba(255,255,255,0.015)'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <div style="flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}</div>
+              <span style="font-size:10px;color:var(--muted2);flex-shrink:0">${d.updated_at ? formatDate(d.updated_at) : ''}</span>
+            </div>`;
+          }).join('')}
+        </div>` : `<div style="font-size:12px;color:var(--muted2);padding:8px 0">Пока не сгенерированы — нажмите «Сгенерировать пакет» выше.</div>`}
+      </div>
+
       <!-- Список военнообязанных сотрудников -->
       <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
@@ -499,7 +533,7 @@ async function generateVuDocs(clientId) {
   await saveVuData(clientId);
   showToast('⏳ Генерация документов ВУ...');
   try {
-    const result = await window.api.docsGenerate(clientId);
+    const result = await window.api.docsGenerate(clientId, 'VU');
     if (result.errors?.length) {
       showToast('⚠ Сгенерировано с ошибками: ' + result.errors[0], 'var(--amber)');
     } else {

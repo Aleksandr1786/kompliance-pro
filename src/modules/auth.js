@@ -7,12 +7,39 @@
 var LICENSE = {
   type:        'OUTSOURCE',        // SOLO | OUTSOURCE
   modules:     ['OT','PD','VU'],   // доступные модули
-  max_clients: 999,                // лимит клиентов (999 = без лимита для разработки)
+  max_clients: 2,                  // лимит триала (обновится из checkTrial)
   size:        null,               // MICRO|SMALL|MEDIUM|LARGE (для SOLO)
-  expires_at:  '2030-01-01',       // дата окончания
-  active:      true,               // активна ли лицензия
-  key:         'DEV-MODE',         // лицензионный ключ
+  expires_at:  '',                 // дата окончания (заполнится из триала/лицензии)
+  active:      true,               // активна (триал считается активным доступом)
+  key:         '',                 // лицензионный ключ
+  status:      'trial',            // trial | licensed | expired | subscription_expired
+  daysLeft:    null,               // сколько дней осталось
 };
+
+// Подтягивает реальный статус триала/лицензии из main.js при старте.
+// Заменяет прежний хардкод "до 2030" честными данными.
+async function syncLicenseFromBackend() {
+  try {
+    const t = await window.api.trialStatus();
+    if (!t) return;
+    LICENSE.status   = t.status;
+    LICENSE.daysLeft = (typeof t.daysLeft === 'number') ? t.daysLeft : null;
+    if (t.status === 'licensed') {
+      LICENSE.active     = true;
+      LICENSE.expires_at = t.expires || '';
+      LICENSE.max_clients = 999;
+    } else if (t.status === 'trial') {
+      LICENSE.active     = true;
+      LICENSE.expires_at = '';
+      LICENSE.max_clients = t.maxClients || 2;
+    } else { // expired | subscription_expired | wrong_machine
+      LICENSE.active     = false;
+      LICENSE.expires_at = '';
+    }
+  } catch (e) {
+    console.warn('[License] Не удалось получить статус:', e);
+  }
+}
 
 // Режим администратора (виден внутренний механизм)
 var IS_ADMIN = false;
@@ -108,7 +135,9 @@ function logoutAdmin() {
 
 function setDashboardMode(mode) {
   LICENSE.type = mode === 'outsourcer' ? 'OUTSOURCE' : 'SOLO';
+  window.api.settingsSave({ license_type: LICENSE.type }); // запоминаем режим между запусками
   showToast(mode === 'outsourcer' ? 'Режим: Аутсорсер' : 'Режим: Штатный специалист', 'var(--green)');
+  if (typeof applyNavTerms === 'function') applyNavTerms(); // обновляем метки сайдбара/модалов
   navigate('dashboard');
 }
 

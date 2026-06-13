@@ -5,9 +5,11 @@
 // ============================================================
 
 // ── ГЕНЕРАЦИЯ ДОКУМЕНТОВ ─────────────────────────────────
-async function generateDocs(clientId) {
-  showToast('⚙️ Генерирую документы...');
-  const result = await window.api.docsGenerate(clientId);
+async function generateDocs(clientId, scope = 'OT') {
+  const MODULE_NAMES = { OT:'Охрана труда', PD:'Персональные данные', VU:'Воинский учёт', ALL:'все модули' };
+  const moduleName = MODULE_NAMES[scope] || '';
+  showToast('⚙️ Генерирую: ' + moduleName + '...');
+  const result = await window.api.docsGenerate(clientId, scope);
   if (!result.ok) {
     showToast('Ошибка: ' + result.error, 'var(--red)');
     return;
@@ -40,7 +42,7 @@ async function generateDocs(clientId) {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <div style="font-size:28px">${hasChanges ? '🔄' : '✅'}</div>
         <div>
-          <div style="font-size:16px;font-weight:700;color:#f1f5f9">Генерация завершена</div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">Генерация завершена${moduleName ? ' — ' + moduleName : ''}</div>
           <div style="font-size:12px;color:#64748b;margin-top:2px">
             ${hasChanges
               ? `Обновлено ${updated.length + added.length} из ${result.generated.length} документов`

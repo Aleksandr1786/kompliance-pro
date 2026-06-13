@@ -25,9 +25,9 @@ async function navigate(page, clientId = null) {
     if (editBtn) editBtn.style.display = 'none';
   }
   const titles = {
-    dashboard:'Дашборд', clients:'Клиенты', tasks:'Задачи',
+    dashboard:'Дашборд', clients:term('clients'), tasks:'Задачи',
     ot:'Охрана труда', pd:'Персональные данные', vu:'Воинский учёт',
-    reporting:'Отчётность', settings:'Настройки', client:'Карточка клиента'
+    reporting:'Отчётность', settings:'Настройки', client:'Карточка ' + term('clientGen')
   };
   document.getElementById('topbarTitle').textContent = titles[page] || page;
   await updateBadges();

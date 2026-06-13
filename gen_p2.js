@@ -241,10 +241,16 @@ async function gen_05_employees(c,s,dir){
     'Юрист':'работа с правовой документацией',
     'Кадровик':'ведение кадровой документации',
   };
+  const seen=new Set();
+  let n=2;
   for(let i=0;i<c.employees.length;i++){
     const emp=c.employees[i];
-    const pos=emp.position;
-    const num=String(i+2).padStart(2,'0');
+    const pos=(emp.position||'').trim();
+    if(!pos) continue;                       // нет должности — пропускаем
+    const key=pos.toLowerCase();
+    if(seen.has(key)) continue;              // одна инструкция на должность
+    seen.add(key);
+    const num=String(n++).padStart(2,'0');
     const activity=positions[pos]||'выполнение должностных обязанностей в офисе';
     const fname=await buildIOT(c,'№ '+num+'-ИОТ','для '+pos,[
       SH('1. Общие требования охраны труда'),

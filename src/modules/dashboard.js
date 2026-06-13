@@ -11,7 +11,7 @@ async function renderDashboard() {
   const alerts  = await window.api.trainingAlerts();
 
   const btn = document.getElementById('topbarAction');
-  btn.textContent = '+ Добавить клиента';
+  btn.textContent = '+ ' + term('addClient');
   btn.style.display = 'flex';
   btn.onclick = () => openModal('modalAddClient');
   const editBtn = document.getElementById('topbarEdit');
@@ -223,7 +223,7 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks) {
 function renderOutsourcerRows(clientStats) {
   if (!clientStats.length) {
     return `<tr><td colspan="4" style="padding: 24px; text-align: center; color: var(--muted); font-size: 13px;">
-      Клиентов пока нет — нажмите «+ Добавить клиента»
+      ${term('clientsGenPl')} пока нет — нажмите «+ ${term('addClient')}»
     </td></tr>`;
   }
 
@@ -506,7 +506,7 @@ async function renderDashboardSpecialist(clients, events, alerts, tasks) {
             <span style="display:flex;align-items:center;justify-content:center;width:18px;height:18px;background:rgba(251,191,36,0.2);border-radius:50%">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="#fbbf24" stroke="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2" stroke="#1a1f2e" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>
             </span>
-            <div class="panel-title">Ассистент рекомендует</div>
+            <div class="panel-title">КомплаенсПро рекомендует</div>
             <div class="panel-count">${recs.length} ${recs.length === 1 ? 'задача' : recs.length >= 2 && recs.length <= 4 ? 'задачи' : 'задач'}</div>
           </div>
           <div style="padding:4px 0">${recsHtml}</div>
@@ -531,7 +531,7 @@ async function filterDashClients(q) {
 }
 
 function renderClientRows(clients) {
-  if (!clients.length) return emptyState("building","Клиентов пока нет","Нажмите «+ Добавить клиента»");
+  if (!clients.length) return emptyState("building", term('clientsGenPl') + " пока нет", "Нажмите «+ " + term('addClient') + "»");
   return clients.map(c => {
     const mods = (c.modules||'OT').split(',');
     const dots = mods.map(m => `<div class="mod-dot" style="background:${m==='OT'?'var(--green)':m==='PD'?'var(--amber)':'var(--red)'}" title="${m}"></div>`).join('');

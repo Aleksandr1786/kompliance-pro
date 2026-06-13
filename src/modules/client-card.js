@@ -113,11 +113,14 @@ async function renderClientCard(id) {
   const otDocs = docs.filter(d => d.module === 'OT');
   const pdDocs = docs.filter(d => d.module === 'PD');
   const vuDocs = docs.filter(d => d.module === 'VU');
-  // Папка клиента на рабочем столе (для кнопки "Открыть папку")
+  // Папка модуля ОТ (для кнопки "Открыть папку") — корень «Охрана труда», а не первый раздел
   const safeName = (c.name || '').replace(/[\/\\:*?"<>|]/g, '_').slice(0, 60);
-  const clientDocDir = otDocs.length && otDocs[0].filepath
-    ? otDocs[0].filepath.replace(/[\\/][^\\/]+$/, '') // папка из пути первого файла
-    : null;
+  let clientDocDir = null;
+  if (otDocs.length && otDocs[0].filepath) {
+    const fp = otDocs[0].filepath;
+    const m = fp.match(/^(.*[\\/]Охрана труда)[\\/]/);
+    clientDocDir = m ? m[1] : fp.replace(/[\\/][^\\/]+$/, '');
+  }
   _currentClientDocDir = clientDocDir;
 
   document.getElementById('content').innerHTML = `
@@ -239,10 +242,10 @@ async function renderClientCard(id) {
           <div class="panel-count">${otDocs.length} шт.</div>
           <div style="margin-left:auto;display:flex;gap:8px">
             ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="openClientFolder()">📁 Открыть папку</button>` : ''}
-            <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id})">${ic("zap",14)} Сгенерировать</button>
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id},'OT')">${ic("zap",14)} Сгенерировать</button>
           </div>
         </div>
-        <div>${otDocs.length ? renderDocsBySection(otDocs) : renderEmptyDocs('ОТ', id)}</div>
+        <div>${otDocs.length ? renderDocsBySection(otDocs) : renderEmptyDocs('OT', id)}</div>
       </div>
 
       <!-- СПРАВКА ДЛЯ БУХГАЛТЕРА (ЕФС-1) -->
@@ -382,7 +385,7 @@ async function renderClientCard(id) {
           ${ic("file-text", 18)}
           <div class="panel-title">Документы — ПДн</div>
           <div class="panel-count">${pdDocs.length} шт.</div>
-          <button class="btn btn-primary" style="margin-left:auto;font-size:12px" onclick="generatePdDocs(${id})">${ic("zap",14)} Сгенерировать</button>
+          <button class="btn btn-primary" style="margin-left:auto;font-size:12px" onclick="generateDocs(${id},'PD')">${ic("zap",14)} Сгенерировать</button>
         </div>
         <div style="margin-top:8px">
           ${pdDocs.length
@@ -529,12 +532,14 @@ function renderDocRow(d) {
   </div>`;
 }
 
-function renderEmptyDocs(mod, clientId) {
+function renderEmptyDocs(scope, clientId) {
+  const names = { OT:'Охрана труда', PD:'Персональные данные', VU:'Воинский учёт' };
+  const name = names[scope] || scope;
   return `<div class="empty-state">
     <div class="empty-icon">${ic("file-text",40)}</div>
     <div class="empty-title">Документов нет</div>
-    <div class="empty-sub">Документы по модулю ${mod} появятся здесь после генерации</div>
-    <button class="btn btn-primary" style="margin-top:8px" onclick="showToast('Генерация документов будет доступна после подключения AI')">${ic("zap",14)} Сгенерировать</button>
+    <div class="empty-sub">Документы по модулю «${name}» появятся здесь после генерации</div>
+    <button class="btn btn-primary" style="margin-top:8px" onclick="generateDocs(${clientId},'${scope}')">${ic("zap",14)} Сгенерировать</button>
   </div>`;
 }
 

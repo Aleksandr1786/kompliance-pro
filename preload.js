@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('api', {
   backupChooseFolder: ()      => ipcRenderer.invoke('backup:choose-folder'),
 
   // Генерация документов
-  docsGenerate:   (clientId)  => ipcRenderer.invoke('docs:generate', clientId),
+  docsGenerate:   (clientId, scope) => ipcRenderer.invoke('docs:generate', clientId, scope),
   docsOpenFolder: (dir)       => ipcRenderer.invoke('docs:open-folder', dir),
   docsOpenFile:   (filepath)  => ipcRenderer.invoke('docs:open-file', filepath),
   vuGenerateReports: (clientId, docs) => ipcRenderer.invoke('vu:generate-reports', clientId, docs),

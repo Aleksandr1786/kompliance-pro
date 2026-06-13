@@ -54,9 +54,17 @@ function signLine(pos, fio) {
 
 // Год из doc_date
 function docYear(c) {
-  if (safe(c.doc_year)) return c.doc_year;
-  if (safe(c.doc_date)) return c.doc_date.split('.').pop() || new Date().getFullYear().toString();
-  return new Date().getFullYear().toString();
+  const y = safe(c.doc_year, '');
+  if (y) return y;
+  const d = safe(c.doc_date, '');
+  if (d) return d.split('.').pop() || String(new Date().getFullYear());
+  return String(new Date().getFullYear());
+}
+
+// Год как число (с защитой от NaN)
+function docYearNum(c) {
+  const n = parseInt(docYear(c), 10);
+  return Number.isFinite(n) ? n : new Date().getFullYear();
 }
 
 // Военкомат
@@ -127,13 +135,13 @@ async function gen_vu_01(c, s, dir) {
   const sameDir = !vu.responsible_name || vu.responsible_name === dirFio;
 
   const ch = [
-    ...orderHead(c, `№ ${orderN}`, `об организации воинского учёта\nв ${norm(safe(c.name))}`),
+    ...orderHead(c, `№ ${orderN}`, `об организации воинского учёта\nв ${safe(c.name)}`),
     ...eL(1),
     p('На основании Федерального закона от 28.03.1998 № 53-ФЗ «О воинской обязанности и военной службе», Постановления Правительства РФ от 27.11.2006 № 719 «Об утверждении Положения о воинском учёте» и Методических рекомендаций по ведению воинского учёта в организациях (утв. Генштабом ВС РФ 11.07.2017),'),
     ...eL(1),
     H('ПРИКАЗЫВАЮ:'),
     ...eL(1),
-    bul(`Организовать воинский учёт граждан, пребывающих в запасе, и граждан, подлежащих призыву на военную службу, в ${norm(safe(c.name))}.`),
+    bul(`Организовать воинский учёт граждан, пребывающих в запасе, и граждан, подлежащих призыву на военную службу, в ${safe(c.name)}.`),
     bul(`Назначить ответственным за ведение воинского учёта ${respFio}, ${respPos}.`),
     ...(sameDir ? [] : [
       bul(`На период отпуска, командировки или временной нетрудоспособности ответственного за воинский учёт его обязанности исполняет ${dirPos} ${dirFio}.`),
@@ -163,13 +171,13 @@ async function gen_vu_02(c, s, dir) {
 
   const ch = [
     pC('УТВЕРЖДАЮ'),
-    pC(`${dirPos} ${norm(safe(c.name))}`),
+    pC(`${dirPos} ${safe(c.name)}`),
     ...eL(1),
     pC('______________  ' + initials(dirFio)),
     pC(`«____» ______________ ${docYear(c)} г.`),
     ...eL(1),
     H('ФУНКЦИОНАЛЬНЫЕ ОБЯЗАННОСТИ'),
-    SH(`ответственного за воинский учёт\n${norm(safe(c.name))}`),
+    SH(`ответственного за воинский учёт\n${safe(c.name)}`),
     ...eL(1),
     p(`Ответственный за воинский учёт — ${respPos} ${respFio} — обязан:`),
     ...eL(1),
@@ -217,7 +225,7 @@ async function gen_vu_02(c, s, dir) {
 async function gen_vu_03(c, s, dir) {
   const vu = getVuData(c);
   const year = docYear(c);
-  const nextYear = String(parseInt(year) + 1);
+  const nextYear = String(docYearNum(c) + 1);
   const dirFio  = directorFio(c);
   const dirPos  = directorPos(c);
   const respFio = vuRespFio(c, vu);
@@ -272,7 +280,7 @@ async function gen_vu_03(c, s, dir) {
           children: [
             pL('УТВЕРЖДАЮ'),
             pL(`${dirPos}`),
-            pL(`${norm(safe(c.name))}`),
+            pL(`${safe(c.name)}`),
             ...eL(1),
             pL(`______________  ${initials(dirFio)}`),
             pL(`«____» ______________ ${nextYear} г.`),
@@ -283,7 +291,7 @@ async function gen_vu_03(c, s, dir) {
     ...eL(1),
     H('ПЛАН'),
     SH(`работы по осуществлению воинского учёта\nграждан, пребывающих в запасе, в ${nextYear} году`),
-    SH(`${norm(safe(c.name))}`),
+    SH(`${safe(c.name)}`),
     ...eL(1),
 
     tbl(colW, [
@@ -350,7 +358,7 @@ async function gen_vu_04(c, s, dir) {
   const respPos = vuRespPos(c, vu);
   const respPhone = vuRespPhone(c, vu);
   const year = docYear(c);
-  const reportDate = `01.01.${String(parseInt(year) + 1)}`;
+  const reportDate = `01.01.${String(docYearNum(c) + 1)}`;
 
   const CW_FORM = 9026; // A4 портрет
   const col2 = [4500, 4526];
@@ -638,7 +646,7 @@ async function gen_vu_05(c, s, dir) {
   const ch = [
     H('ЖУРНАЛ'),
     SH('проверок осуществления воинского учёта'),
-    SH(norm(safe(c.name))),
+    SH(safe(c.name)),
     ...eL(1),
     tbl(colW, [hdr, ...emptyRows]),
   ];
@@ -670,7 +678,7 @@ async function gen_vu_06(c, s, dir) {
     ...eL(1),
     p([
       new TextRun({ text: 'принял(-а) от ответственного за воинский учёт ', font: FONT, size: SZ }),
-      new TextRun({ text: `${norm(safe(c.name))}`, font: FONT, size: SZ }),
+      new TextRun({ text: `${safe(c.name)}`, font: FONT, size: SZ }),
     ]),
     p([
       new TextRun({ text: `${respPos} ${respFio}`, font: FONT, size: SZ }),
@@ -713,14 +721,14 @@ async function gen_vu_07(c, s, dir) {
 
   const ch = [
     pR(`${vk}`),
-    pR('от ' + norm(safe(c.name))),
+    pR('от ' + safe(c.name)),
     pR(c.address || ''),
     ...eL(2),
     H('УВЕДОМЛЕНИЕ'),
     SH('о принятии на работу гражданина,\nсостоящего на воинском учёте'),
     ...eL(1),
     p([
-      new TextRun({ text: `${norm(safe(c.name))} в соответствии с п. 32 Положения о воинском учёте (Постановление Правительства РФ от 27.11.2006 № 719) уведомляет о принятии на работу гражданина, состоящего на воинском учёте:`, font: FONT, size: SZ }),
+      new TextRun({ text: `${safe(c.name)} в соответствии с п. 32 Положения о воинском учёте (Постановление Правительства РФ от 27.11.2006 № 719) уведомляет о принятии на работу гражданина, состоящего на воинском учёте:`, font: FONT, size: SZ }),
     ]),
     ...eL(1),
     new Table({
@@ -770,13 +778,13 @@ async function gen_vu_08(c, s, dir) {
 
   const ch = [
     pR(`${vk}`),
-    pR('от ' + norm(safe(c.name))),
+    pR('от ' + safe(c.name)),
     pR(c.address || ''),
     ...eL(2),
     H('УВЕДОМЛЕНИЕ'),
     SH('об увольнении гражданина,\nсостоящего на воинском учёте'),
     ...eL(1),
-    p(`${norm(safe(c.name))} в соответствии с п. 32 Положения о воинском учёте (Постановление Правительства РФ от 27.11.2006 № 719) уведомляет об увольнении с работы гражданина, состоящего на воинском учёте:`),
+    p(`${safe(c.name)} в соответствии с п. 32 Положения о воинском учёте (Постановление Правительства РФ от 27.11.2006 № 719) уведомляет об увольнении с работы гражданина, состоящего на воинском учёте:`),
     ...eL(1),
     new Table({
       width: { size: 9026, type: WidthType.DXA },
@@ -818,11 +826,11 @@ async function gen_vu_09(c, s, dir) {
 
   const ch = [
     H('АКТ'),
-    SH(`сверки учётных данных граждан, пребывающих в запасе,\nсостоящих на воинском учёте в ${norm(safe(c.name))},\nс учётными данными ${vk}`),
+    SH(`сверки учётных данных граждан, пребывающих в запасе,\nсостоящих на воинском учёте в ${safe(c.name)},\nс учётными данными ${vk}`),
     ...eL(1),
     p(`«____» ______________ ${docYear(c)} г.`),
     ...eL(1),
-    p(`Мы, нижеподписавшиеся, представитель ${vk} _____________________________ и ответственный за воинский учёт ${norm(safe(c.name))} ${respFio}, составили настоящий акт о том, что произведена сверка учётных данных граждан, пребывающих в запасе, работающих в ${norm(safe(c.name))}.`),
+    p(`Мы, нижеподписавшиеся, представитель ${vk} _____________________________ и ответственный за воинский учёт ${safe(c.name)} ${respFio}, составили настоящий акт о том, что произведена сверка учётных данных граждан, пребывающих в запасе, работающих в ${safe(c.name)}.`),
     ...eL(1),
     p('По состоянию на дату сверки:'),
     ...eL(1),
@@ -877,7 +885,7 @@ async function gen_vu_09(c, s, dir) {
           width:{size:4526,type:WidthType.DXA},
           borders:{top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE}},
           children: [
-            pL(`От ${norm(safe(c.name))}:`),
+            pL(`От ${safe(c.name)}:`),
             pL(`______________  ${initials(respFio)}`),
             pL(`${respPos}`),
           ],
@@ -909,7 +917,7 @@ async function gen_vu_10(c, s, dir) {
 
   const ch = [
     H('СПРАВКА'),
-    SH(`о численности военнообязанных работников\n${norm(safe(c.name))}\nпо состоянию на «____» ______________ ${year} г.`),
+    SH(`о численности военнообязанных работников\n${safe(c.name)}\nпо состоянию на «____» ______________ ${year} г.`),
     ...eL(1),
     new Table({
       width: { size: 9026, type: WidthType.DXA },

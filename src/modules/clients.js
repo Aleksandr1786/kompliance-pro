@@ -7,13 +7,13 @@
 async function renderClients() {
   const clients = await getClients();
   const btn = document.getElementById('topbarAction');
-  btn.textContent = '+ Добавить клиента';
+  btn.textContent = '+ ' + term('addClient');
   btn.style.display = 'flex';
   btn.onclick = () => openModal('modalAddClient');
 
   document.getElementById('content').innerHTML = `
     <div class="panel">
-      <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Все клиенты</div><div class="panel-count">${clients.length} организаций</div></div>
+      <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Все ${term('clients')}</div><div class="panel-count">${clients.length} организаций</div></div>
       <div class="client-search"><input class="search-input" placeholder="🔍 Поиск по названию, ИНН, ОКВЭД..." oninput="filterClients(this.value)" id="clientSearch"></div>
       <div id="fullClientList">${renderClientRows(clients)}</div>
     </div>
@@ -120,7 +120,7 @@ async function openEditModal(clientId) {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal" style="max-height:90vh;overflow-y:auto">
-        <div class="modal-title">✏️ Редактировать клиента</div>
+        <div class="modal-title">✏️ Редактировать ${term('clientAcc')}</div>
         <div class="modal-sub">Измените данные организации</div>
         <div class="form-row">
           <div class="form-group full"><div class="form-label">Название <span class="req">*</span></div><input class="form-input" id="e-name"></div>
@@ -364,7 +364,7 @@ async function submitEditClient(clientId) {
 
   await window.api.clientUpdate(clientId, data);
   closeModal('modalEditClient');
-  showToast('Данные клиента сохранены ✓');
+  showToast('Данные ' + term('clientGen') + ' сохранены ✓');
   await navigate('client', clientId);
 }
 
@@ -386,15 +386,15 @@ async function deleteClient(clientId) {
           ${ic('trash',22)}
         </div>
         <div>
-          <div style="font-size:16px;font-weight:700;color:var(--text)">Архивировать клиента?</div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">Архивировать ${term('clientAcc')}?</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">${c.name}</div>
         </div>
       </div>
 
       <div style="padding:12px;background:rgba(248,113,113,0.06);border:1px solid rgba(248,113,113,0.15);border-radius:10px;margin-bottom:16px">
         <div style="font-size:12px;color:#f87171;line-height:1.6">
-          Клиент будет перемещён в архив. Все данные, сотрудники и документы сохранятся.<br>
-          Восстановить можно в разделе <strong>Настройки → Архив клиентов</strong>.
+          ${term('client')} будет перемещён в архив. Все данные, сотрудники и документы сохранятся.<br>
+          Восстановить можно в разделе <strong>Настройки → Архив ${term('clientsGenPl').toLowerCase()}</strong>.
         </div>
       </div>
 

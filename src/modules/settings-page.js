@@ -8,6 +8,23 @@
 async function renderSettings() {
   const s = await window.api.settingsGet();
 
+  // Подтягиваем честный статус триала/лицензии (заменяет хардкод "до 2030")
+  if (typeof syncLicenseFromBackend === 'function') {
+    await syncLicenseFromBackend();
+  }
+  // Человекочитаемые строки статуса и срока
+  const licStatusText =
+    LICENSE.status === 'licensed'            ? 'Активна' :
+    LICENSE.status === 'trial'               ? 'Пробный период' :
+    LICENSE.status === 'subscription_expired'? 'Подписка истекла' :
+    LICENSE.status === 'expired'             ? 'Пробный период истёк' :
+                                               (LICENSE.active ? 'Активна' : 'Не активна');
+  const licStatusColor = (LICENSE.status === 'licensed' || LICENSE.status === 'trial') ? '#34d399' : '#f87171';
+  const licUntilText =
+    LICENSE.status === 'licensed' && LICENSE.expires_at ? LICENSE.expires_at :
+    LICENSE.status === 'trial' && LICENSE.daysLeft != null ? `осталось ${LICENSE.daysLeft} дн.` :
+    '—';
+
   // Загружаем Machine ID асинхронно после рендера
   setTimeout(async () => {
     const el = document.getElementById('machine-id-display');
@@ -130,13 +147,13 @@ async function renderSettings() {
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
                 <div style="padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
                   <div style="font-size:10px;color:var(--muted);margin-bottom:4px">СТАТУС</div>
-                  <div style="font-size:13px;font-weight:600;color:${LICENSE.active ? '#34d399' : '#f87171'}">
-                    ${LICENSE.active ? 'Активна' : 'Не активна'}
+                  <div style="font-size:13px;font-weight:600;color:${licStatusColor}">
+                    ${licStatusText}
                   </div>
                 </div>
                 <div style="padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
                   <div style="font-size:10px;color:var(--muted);margin-bottom:4px">ДЕЙСТВУЕТ ДО</div>
-                  <div style="font-size:13px;font-weight:600;color:var(--text)">${LICENSE.expires_at}</div>
+                  <div style="font-size:13px;font-weight:600;color:var(--text)">${licUntilText}</div>
                 </div>
               </div>
               <!-- ID устройства -->
@@ -193,7 +210,7 @@ async function renderSettings() {
             <div class="section-title">Лицензия</div>
             <div style="margin-left:auto">
               <span style="font-size:11px;padding:3px 10px;border-radius:6px;background:rgba(52,211,153,0.15);color:#34d399;font-weight:600">
-                ${LICENSE.active ? 'Активна' : 'Неактивна'}
+                ${licStatusText}
               </span>
             </div>
           </div>
@@ -205,7 +222,7 @@ async function renderSettings() {
               </div>
               <div style="padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:4px">ДЕЙСТВУЕТ ДО</div>
-                <div style="font-size:13px;font-weight:600;color:var(--text)">${LICENSE.expires_at}</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text)">${licUntilText}</div>
               </div>
               <div style="padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:4px">МОДУЛИ</div>

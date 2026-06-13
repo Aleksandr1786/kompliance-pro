@@ -90,6 +90,7 @@ function applySettings() {
   document.getElementById('userName').textContent = name;
   document.getElementById('userAvatar').textContent = initials;
   document.getElementById('userRole').textContent = settings.user_position || 'Специалист по ОТ';
+  applyNavTerms();
 
   const hasKey = settings.ai_key && settings.ai_key.length > 10;
   const dot = document.querySelector('.ai-dot');
@@ -102,7 +103,7 @@ function applySettings() {
       const providerNames = { deepseek:'DeepSeek', claude:'Claude', yandex:'YandexGPT', giga:'GigaChat', ollama:'Ollama' };
       txt.textContent = (providerNames[settings.ai_provider] || 'AI') + ' активен';
     } else {
-      txt.textContent = '✨ Ассистент активен';
+      txt.textContent = '✨ Контроль активен';
     }
     txt.style.color = 'var(--green)';
   } else {
@@ -155,6 +156,28 @@ function formatDate(str) {
   if (!str) return '—';
   const d = new Date(str);
   return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short', year:'numeric' });
+}
+
+// ── Терминология по режиму (Аутсорсер / Штатный) ─────────
+// Единый источник правды. Меняем формулировки ЗДЕСЬ, а не по всему UI.
+// LICENSE.type: 'SOLO' = Штатный специалист → «Компания», иначе → «Клиент».
+function term(key) {
+  const staff = (typeof LICENSE !== 'undefined' && LICENSE.type === 'SOLO');
+  const DICT = {
+    outsourcer: { clients:'Клиенты', client:'Клиент', clientAcc:'клиента', clientGen:'клиента', addClient:'Добавить клиента', clientsGenPl:'Клиентов' },
+    staff:      { clients:'Компании', client:'Компания', clientAcc:'компанию', clientGen:'компании', addClient:'Добавить компанию', clientsGenPl:'Компаний' },
+  };
+  return (staff ? DICT.staff : DICT.outsourcer)[key] || key;
+}
+
+// Проставляет термины в статичный HTML (сайдбар, заголовки модалов).
+// Вызывать при старте и сразу после смены режима.
+function applyNavTerms() {
+  document.querySelectorAll('[data-term]').forEach(el => {
+    el.textContent = term(el.dataset.term);
+  });
+  const addTitle = document.getElementById('addClientTitle');
+  if (addTitle) addTitle.textContent = '🏢 ' + term('addClient');
 }
 
 // Хелпер: пустое состояние с SVG иконкой

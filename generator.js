@@ -350,24 +350,28 @@ function shouldOverwrite(basename, diskHashMap, currentClientHash) {
   return false; // файл изменён пользователем, данные те же → НЕ трогать
 }
 
-async function generatePackage(client,settings,outputDir){
+async function generatePackage(client,settings,outputDir,scope='ALL'){
   const c=norm(client);
   const s=settings||{};
   const path=require('path');
   const fs=require('fs');
 
-  const dirs={
-    root:outputDir,
-    d1:path.join(outputDir,'Раздел 1. Организационно-распорядительная документация'),
-    d2:path.join(outputDir,'Раздел 2. Локальные нормативные акты'),
-    d3:path.join(outputDir,'Раздел 3. Электробезопасность'),
-    d5:path.join(outputDir,'Раздел 5. Инструкции по охране труда'),
-    d6:path.join(outputDir,'Раздел 6. Журналы учёта'),
-    d7:path.join(outputDir,'Раздел 7. Программы обучения'),
-  };
+  // Какие модули генерировать в этот заход (scope: 'ALL' | 'OT' | 'PD' | 'VU')
+  const genOT = scope === 'ALL' || scope === 'OT';
+  const genPD = (scope === 'ALL' || scope === 'PD') && (client.modules || '').includes('PD');
+  const genVU = (scope === 'ALL' || scope === 'VU') && (client.modules || '').includes('VU');
 
-  // Создаём папки — НЕ удаляем файлы заранее
-  for(const d of Object.values(dirs)) fs.mkdirSync(d,{recursive:true});
+  // Весь ОТ кладём в подпапку «Охрана труда» — единообразно с ПДн и ВУ
+  const otDir = path.join(outputDir, 'Охрана труда');
+  const dirs={
+    root:otDir,
+    d1:path.join(otDir,'Раздел 1. Организационно-распорядительная документация'),
+    d2:path.join(otDir,'Раздел 2. Локальные нормативные акты'),
+    d3:path.join(otDir,'Раздел 3. Электробезопасность'),
+    d5:path.join(otDir,'Раздел 5. Инструкции по охране труда'),
+    d6:path.join(otDir,'Раздел 6. Журналы учёта'),
+    d7:path.join(otDir,'Раздел 7. Программы обучения'),
+  };
 
   // Временная папка для генерации
   const tmpRoot = path.join(outputDir, '__tmp_gen');
@@ -388,7 +392,13 @@ async function generatePackage(client,settings,outputDir){
       const result = await fn(c, s, tmpDir);
       const files = Array.isArray(result) ? result : [result];
 
+      const seenInRun = new Set();
       for (const tmpFile of files) {
+        if (!tmpFile) continue;
+        if (seenInRun.has(tmpFile)) continue;   // один и тот же файл не обрабатываем дважды
+        seenInRun.add(tmpFile);
+        if (!fs.existsSync(tmpFile)) continue;   // источник не создан — пропускаем без падения
+
         const basename = path.basename(tmpFile);
         const finalFile = path.join(finalDir, basename);
 
@@ -396,8 +406,11 @@ async function generatePackage(client,settings,outputDir){
           fs.copyFileSync(tmpFile, finalFile);
           generated.push(finalFile);
         } else {
-          // Пользователь изменил файл, данные клиента те же — не трогаем
-          generated.push(finalFile); // уже существует с правками пользователя
+          // Данные те же — сохраняем правки пользователя. НО если файла нет
+          // в целевой папке (например, после переноса структуры папок) —
+          // всё равно создаём, иначе папка/документ просто не появятся.
+          if (!fs.existsSync(finalFile)) fs.copyFileSync(tmpFile, finalFile);
+          generated.push(finalFile);
           report.userModified.push(basename);
         }
         try { fs.unlinkSync(tmpFile); } catch(e) {}
@@ -406,6 +419,10 @@ async function generatePackage(client,settings,outputDir){
       errors.push(fn.name+': '+e.message);
     }
   };
+
+  if(genOT){
+  // Создаём папки ОТ — НЕ удаляем файлы заранее
+  for(const d of Object.values(dirs)) fs.mkdirSync(d,{recursive:true});
 
   await run(p1.gen_01_01,dirs.d1);await run(p1.gen_01_02,dirs.d1);await run(p1.gen_01_03,dirs.d1);
   await run(p1.gen_01_04,dirs.d1);await run(p1.gen_01_05,dirs.d1);await run(p1.gen_01_06,dirs.d1);
@@ -449,30 +466,19 @@ async function generatePackage(client,settings,outputDir){
 
   await run(gen_07_01,dirs.d7);await run(gen_07_02,dirs.d7);await run(gen_07_03,dirs.d7);
 
-  await run(gen_checklist,outputDir);
+  await run(gen_checklist,otDir);
 
   // ── Документы для клиента (всегда) ─────────────────────
-  // Папка "Прочее" для доп. документов
-  const dExtra = require('path').join(outputDir,'Прочее');
+  // Папка "Прочее" внутри «Охрана труда»
+  const dExtra = path.join(otDir,'Прочее');
   require('fs').mkdirSync(dExtra,{recursive:true});
   await run(p2.gen_git_memo,    dExtra); // Памятка ГИТ
   await run(p2.gen_elec_contract,dExtra); // Договор на электробезопасность
   await run(p2.gen_act,         dExtra); // Акт выполненных работ
+  } // genOT
 
   // ── Документы ПДн (если модуль подключён) ──────────────
-  if ((client.modules || '').includes('PD')) {
-    try {
-      const { generatePdPackage } = require('./gen_pd');
-      const pdResult = await generatePdPackage(client, settings, outputDir);
-      generated.push(...pdResult.generated);
-      errors.push(...pdResult.errors);
-    } catch(e) {
-      errors.push('generatePdPackage: ' + e.message);
-    }
-  }
-
-  // ── Документы ПДн (если модуль подключён) ──────────────
-  if ((client.modules || '').includes('PD')) {
+  if (genPD) {
     try {
       const { generatePdPackage } = require('./gen_pd');
       const pdResult = await generatePdPackage(client, s, outputDir, tmpRoot);
@@ -485,7 +491,7 @@ async function generatePackage(client,settings,outputDir){
   }
 
   // ── Документы ВУ (если модуль подключён) ───────────────
-  if ((client.modules || '').includes('VU')) {
+  if (genVU) {
     try {
       const { generateVuPackage } = require('./gen_vu');
       const vuResult = await generateVuPackage(client, s, outputDir, tmpRoot);

@@ -668,7 +668,14 @@ async function submitVuReport(clientId) {
     }
     if (updated.length) {
       changesHtml += `<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;color:#60a5fa;letter-spacing:.4px">🔄 ОБНОВЛЕНЫ (${updated.length})</div>` +
-        updated.map(n => `<div style="font-size:11px;color:#93c5fd;padding:2px 0">${cleanVuName(n)}</div>`).join('') + `</div>`;
+        updated.map(it => {
+          const uName   = (typeof it === 'string') ? it : it.name;
+          const uReason = (typeof it === 'string') ? null : it.reason;
+          return `<div style="padding:2px 0">
+            <div style="font-size:11px;color:#93c5fd">${cleanVuName(uName)}</div>
+            <div style="font-size:10px;color:#475569;margin-left:2px">${uReason || 'причина уточнится при следующем формировании'}</div>
+          </div>`;
+        }).join('') + `</div>`;
     }
     if (unchanged.length) {
       changesHtml += `<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.4px">✓ БЕЗ ИЗМЕНЕНИЙ (${unchanged.length})</div>` +

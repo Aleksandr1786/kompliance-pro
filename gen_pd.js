@@ -1,7 +1,7 @@
 'use strict';
 // КомплаенсПро gen_pd.js v1.0 — Генератор документов по ПДн (152-ФЗ)
 
-const { safe } = require('./utils');
+const { safe, makeRunner } = require('./utils');
 const base = require('./gen_p1');
 const {
   norm, save, oNum, approvalBlock, approvalOrder, orderHead, orderSign,
@@ -627,7 +627,11 @@ async function pd_05_03(c, s, dir) {
     ...eL(2),
     pL(safe(c.pd_resp_pos) + ':  ___________________  ' + safe(c.pd_resp_name)),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('ПД-05.03')},children:ch}], dir, 'Акт об уничтожении персональных данных.docx');
+  // 🟢➕ Копим ВСЕ акты об уничтожении ПДн — каждый со своей датой в имени,
+  // никогда не перезаписываем (см. КомплаенсПро_Анализ_версионирования_документов.md).
+  // Дата — c.doc_date (как во всех документах пакета); если не задана — сегодня.
+  const actDate = (safe(c.doc_date, '').replace(/[\\/:*?"<>|]/g, '-')) || new Date().toLocaleDateString('ru-RU');
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('ПД-05.03')},children:ch}], dir, `Акт об уничтожении персональных данных от ${actDate}.docx`);
 }
 
 // ── РАЗДЕЛ 6: ПЛАНЫ ─────────────────────────────────────
@@ -1114,45 +1118,7 @@ async function generatePdPackage(client, settings, outputDir, tmpRoot) {
   const generated = [], errors = [];
   const report = { userModified: [] };
 
-  const { shouldOverwrite: _so } = (() => {
-    try { return require('./generator'); } catch(e) { return {}; }
-  })();
-
-  // Локальная копия функции если generator не экспортирует её
-  function _shouldOverwrite(basename, diskHashMap, currentClientHash) {
-    const info = diskHashMap && diskHashMap[basename];
-    if (!info) return true;
-    if (info.diskHash === info.storedFileHash) return true;
-    if (info.storedClientHash !== currentClientHash) return true;
-    return false;
-  }
-
-  const run = async (fn, finalDir) => {
-    const relPath = path.relative(outputDir, finalDir);
-    const tmpDir = relPath ? path.join(myTmpRoot, relPath) : myTmpRoot;
-    fs.mkdirSync(tmpDir, {recursive:true});
-
-    try {
-      const result = await fn(c, s, tmpDir);
-      const files = Array.isArray(result) ? result : [result];
-
-      for (const tmpFile of files) {
-        const basename = path.basename(tmpFile);
-        const finalFile = path.join(finalDir, basename);
-
-        if (_shouldOverwrite(basename, s.diskHashMap, s.currentClientHash)) {
-          fs.copyFileSync(tmpFile, finalFile);
-          generated.push(finalFile);
-        } else {
-          generated.push(finalFile);
-          report.userModified.push(basename);
-        }
-        try { fs.unlinkSync(tmpFile); } catch(e) {}
-      }
-    } catch(e) {
-      errors.push(fn.name + ': ' + e.message);
-    }
-  };
+  const run = makeRunner(c, s, outputDir, myTmpRoot, generated, errors, report);
 
   const hasEmployees = (c.employees || []).length > 0;
   const isOOO_or_AO  = c.isOOO || c.isAO;

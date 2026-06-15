@@ -400,8 +400,8 @@ const TOUR_OUTSOURCER = [
     nav: () => { navigate('client', 1); setTimeout(() => typeof switchTab !== 'undefined' && switchTab('ot'), 600); },
     target: () => document.querySelector('button[onclick*="docsGenerate"], .btn-generate'),
     title: '34 документа — одной кнопкой',
-    text: 'Приказы, программы инструктажей, журналы — по актуальным НПА. Генерируются за 30 секунд, готовы к подписи.',
-    hint: 'Нажми «Сгенерировать» чтобы проверить',
+    text: 'Приказы, программы инструктажей, журналы — по актуальным НПА. Формируются за 30 секунд, готовы к подписи.',
+    hint: 'Нажми «Сформировать пакет» чтобы проверить',
   },
   {
     nav: () => navigate('dashboard'),
@@ -440,7 +440,7 @@ const TOUR_SPECIALIST = [
     target: () => document.querySelector('button[onclick*="docsGenerate"], .btn-generate'),
     title: 'Документы за 30 секунд',
     text: 'Нажмёшь одну кнопку — получишь полный пакет документов по ОТ. Приказы, инструкции, журналы — по закону, с реквизитами твоей организации.',
-    hint: 'Нажми «Сгенерировать» чтобы проверить',
+    hint: 'Нажми «Сформировать пакет» чтобы проверить',
   },
   {
     nav: () => { navigate('client', 1); setTimeout(() => typeof switchTab !== 'undefined' && switchTab('staff'), 600); },

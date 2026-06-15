@@ -8,7 +8,7 @@
 async function generateDocs(clientId, scope = 'OT') {
   const MODULE_NAMES = { OT:'Охрана труда', PD:'Персональные данные', VU:'Воинский учёт', ALL:'все модули' };
   const moduleName = MODULE_NAMES[scope] || '';
-  showToast('⚙️ Генерирую: ' + moduleName + '...');
+  showToast('⚙️ Формирую: ' + moduleName + '...');
   const result = await window.api.docsGenerate(clientId, scope);
   if (!result.ok) {
     showToast('Ошибка: ' + result.error, 'var(--red)');
@@ -20,6 +20,7 @@ async function generateDocs(clientId, scope = 'OT') {
   const updated   = r.updated   || [];
   const added     = r.added     || [];
   const unchanged = r.unchanged || [];
+  const archived  = r.archived  || [];
   const errors    = result.errors || [];
 
   // Формируем модальное окно с отчётом
@@ -42,7 +43,7 @@ async function generateDocs(clientId, scope = 'OT') {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <div style="font-size:28px">${hasChanges ? '🔄' : '✅'}</div>
         <div>
-          <div style="font-size:16px;font-weight:700;color:#f1f5f9">Генерация завершена${moduleName ? ' — ' + moduleName : ''}</div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">Отчёт сформирован${moduleName ? ' — ' + moduleName : ''}</div>
           <div style="font-size:12px;color:#64748b;margin-top:2px">
             ${hasChanges
               ? `Обновлено ${updated.length + added.length} из ${result.generated.length} документов`
@@ -72,6 +73,17 @@ async function generateDocs(clientId, scope = 'OT') {
         <div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:.5px;margin-bottom:6px">✓ БЕЗ ИЗМЕНЕНИЙ (${unchanged.length})</div>
         <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px 12px">
           ${makeList(unchanged, '#64748b', '✓')}
+        </div>
+      </div>` : ''}
+
+      ${archived.length ? `
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#a78bfa;letter-spacing:.5px;margin-bottom:6px">🗄 ПРЕДЫДУЩИЕ ВЕРСИИ В АРХИВ (${archived.length})</div>
+        <div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.15);border-radius:8px;padding:8px 12px">
+          ${archived.map(a => `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="font-size:12px">🗄</span>
+            <span style="font-size:12px;color:#c4b5fd">${cleanName(a.basename)} → Архив/${a.year}</span>
+          </div>`).join('')}
         </div>
       </div>` : ''}
 

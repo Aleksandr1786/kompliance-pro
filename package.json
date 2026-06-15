@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -60,6 +60,7 @@
       "gen_pd.js",
       "gen_vu.js",
       "utils.js",
+      "sections.js",
       "src/**/*",
       "assets/**/*",
       "node_modules/**/*"

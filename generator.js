@@ -2,7 +2,7 @@
 // КомплаенсПро generator.js v2.0 — PART 3: Разделы 6, 7, чек-лист, главная функция
 
 const base=require('./gen_p1');
-const { safe } = require('./utils');
+const { safe, makeRunner } = require('./utils');
 const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW}=base;
 const {PageOrientation}=require('docx');
 
@@ -339,17 +339,6 @@ async function gen_checklist(c,s,dir){
 
 // ── ГЛАВНАЯ ФУНКЦИЯ ─────────────────────────────────────
 
-// Определяем — нужно ли перезаписывать файл
-// true  = перезаписать (файла нет / не изменялся / данные клиента изменились)
-// false = НЕ трогать  (пользователь изменил И данные клиента те же)
-function shouldOverwrite(basename, diskHashMap, currentClientHash) {
-  const info = diskHashMap && diskHashMap[basename];
-  if (!info) return true;                              // файла нет на диске → создать
-  if (info.diskHash === info.storedFileHash) return true; // не изменялся пользователем → перезаписать
-  if (info.storedClientHash !== currentClientHash) return true; // данные клиента изменились → перезаписать
-  return false; // файл изменён пользователем, данные те же → НЕ трогать
-}
-
 async function generatePackage(client,settings,outputDir,scope='ALL'){
   const c=norm(client);
   const s=settings||{};
@@ -382,43 +371,7 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   const generated=[],errors=[];
   const report={ updated:[], added:[], unchanged:[], userModified:[] };
 
-  const run=async(fn, finalDir)=>{
-    // Генерируем во временную папку с такой же структурой
-    const relPath = path.relative(outputDir, finalDir);
-    const tmpDir = relPath ? path.join(tmpRoot, relPath) : tmpRoot;
-    fs.mkdirSync(tmpDir, {recursive:true});
-
-    try {
-      const result = await fn(c, s, tmpDir);
-      const files = Array.isArray(result) ? result : [result];
-
-      const seenInRun = new Set();
-      for (const tmpFile of files) {
-        if (!tmpFile) continue;
-        if (seenInRun.has(tmpFile)) continue;   // один и тот же файл не обрабатываем дважды
-        seenInRun.add(tmpFile);
-        if (!fs.existsSync(tmpFile)) continue;   // источник не создан — пропускаем без падения
-
-        const basename = path.basename(tmpFile);
-        const finalFile = path.join(finalDir, basename);
-
-        if (shouldOverwrite(basename, s.diskHashMap, s.currentClientHash)) {
-          fs.copyFileSync(tmpFile, finalFile);
-          generated.push(finalFile);
-        } else {
-          // Данные те же — сохраняем правки пользователя. НО если файла нет
-          // в целевой папке (например, после переноса структуры папок) —
-          // всё равно создаём, иначе папка/документ просто не появятся.
-          if (!fs.existsSync(finalFile)) fs.copyFileSync(tmpFile, finalFile);
-          generated.push(finalFile);
-          report.userModified.push(basename);
-        }
-        try { fs.unlinkSync(tmpFile); } catch(e) {}
-      }
-    } catch(e) {
-      errors.push(fn.name+': '+e.message);
-    }
-  };
+  const run = makeRunner(c, s, outputDir, tmpRoot, generated, errors, report);
 
   if(genOT){
   // Создаём папки ОТ — НЕ удаляем файлы заранее
@@ -485,6 +438,10 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
       generated.push(...pdResult.generated);
       errors.push(...pdResult.errors);
       if (pdResult.report?.userModified) report.userModified.push(...pdResult.report.userModified);
+      if (pdResult.report?.archived) {
+        if (!report.archived) report.archived = [];
+        report.archived.push(...pdResult.report.archived);
+      }
     } catch(e) {
       errors.push('generatePdPackage: ' + e.message);
     }
@@ -497,6 +454,11 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
       const vuResult = await generateVuPackage(client, s, outputDir, tmpRoot);
       generated.push(...vuResult.generated);
       errors.push(...vuResult.errors);
+      if (vuResult.report?.userModified) report.userModified.push(...vuResult.report.userModified);
+      if (vuResult.report?.archived) {
+        if (!report.archived) report.archived = [];
+        report.archived.push(...vuResult.report.archived);
+      }
     } catch(e) {
       errors.push('generateVuPackage: ' + e.message);
     }

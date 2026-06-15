@@ -420,6 +420,86 @@ function getDocYear(client) {
   return String(new Date().getFullYear());
 }
 
+// ---------------------------------------------------------------------
+// «Почему изменился документ» (доказательная база, Фаза 1)
+// ---------------------------------------------------------------------
+
+/**
+ * Человекочитаемые названия полей клиента — для отчёта «почему изменился
+ * документ» (причина «изменились данные клиента»).
+ *
+ * Ключ — имя поля в объекте клиента (как в main.js / БД db.clients).
+ * Значение — подпись, которую увидит пользователь в отчёте.
+ *
+ * Добавление нового поля = одна строка здесь, архитектура не меняется.
+ * Если в карточке появятся отдельные ответственные за ПД/ВУ — добавь их
+ * сюда тем же способом (например, pd_responsible_name: 'Ответственный за ПД').
+ */
+const FIELD_LABELS = {
+  name:              'Наименование организации',
+  inn:               'ИНН',
+  okved:             'ОКВЭД',
+  region:            'Регион',
+  city:              'Город',
+  address:           'Юридический адрес',
+  phone:             'Телефон',
+  manager_position:  'Должность руководителя',
+  manager_name:      'ФИО руководителя',
+  soat_class:        'Класс условий труда (СОУТ)',
+  hazard_works:      'Работы повышенной опасности',
+  medcheck_required: 'Медосмотры обязательны',
+  ot_position:       'Должность отв. за ОТ',
+  ot_name:           'ФИО отв. за ОТ',
+};
+
+/**
+ * Снимок полей клиента для client.last_gen_snapshot — только те поля,
+ * что входят в FIELD_LABELS (диф остальных полей не нужен для отчёта).
+ *
+ * Сохраняется в БД после каждого «Сформировать пакет», чтобы при следующем
+ * формировании можно было показать, ЧТО именно изменилось у клиента.
+ *
+ * @param {object} client — клиент (нормализованный, как clientWithEmployees)
+ * @returns {object}
+ */
+function snapshotClientFields(client) {
+  const snap = {};
+  for (const key of Object.keys(FIELD_LABELS)) {
+    snap[key] = (client && client[key] !== undefined) ? client[key] : '';
+  }
+  return snap;
+}
+
+/**
+ * Сравнивает снимок прошлого формирования с текущими данными клиента.
+ * Возвращает список изменённых полей с подписями и значениями «было/стало».
+ *
+ * Если снимка нет (client.last_gen_snapshot отсутствует — первое
+ * формирование после внедрения фичи), возвращает [] — причина в этом
+ * случае не подбирается, чтобы не показать ложное «не изменилось».
+ *
+ * @param {object|undefined} oldSnapshot — client.last_gen_snapshot
+ * @param {object} client — текущий клиент (нормализованный)
+ * @returns {Array<{field:string, label:string, from:string, to:string}>}
+ */
+function diffClientFields(oldSnapshot, client) {
+  if (!oldSnapshot) return [];
+  const changes = [];
+  for (const key of Object.keys(FIELD_LABELS)) {
+    const oldVal = String(oldSnapshot[key] ?? '');
+    const newVal = String((client && client[key]) ?? '');
+    if (oldVal !== newVal) {
+      changes.push({
+        field: key,
+        label: FIELD_LABELS[key],
+        from:  oldVal || '—',
+        to:    newVal || '—',
+      });
+    }
+  }
+  return changes;
+}
+
 module.exports = {
   shouldOverwrite,
   makeRunner,
@@ -432,4 +512,7 @@ module.exports = {
   isVersioned,
   VERSIONED_DOCUMENTS,
   VERSIONED_PREFIXES,
+  FIELD_LABELS,
+  snapshotClientFields,
+  diffClientFields,
 };

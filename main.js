@@ -480,9 +480,13 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
 
   // Карта хэшей файлов на диске — защита правок пользователя + doc_year
   // для архивации (см. utils.makeRunner/archivePreviousVersion).
-  const { buildDiskHashMap, getDocYear, docContentHash } = require('./utils');
+  const { buildDiskHashMap, getDocYear, docContentHash, diffClientFields, snapshotClientFields } = require('./utils');
   const oldDocs = db.get('documents').filter({ client_id: clientId }).value();
   const diskHashMap = buildDiskHashMap(oldDocs);
+
+  // Реестр версий шаблонов документов — для причины «обновлены требования
+  // законодательства» (см. doc-meta.js). Общий с docs:generate.
+  const DOC_META = require('./doc-meta');
 
   const clientWithEmployees = {
     ...client,
@@ -526,12 +530,39 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
         const old = db.get('documents').find({ client_id: clientId, name: baseName }).value();
 
         // Тип изменения по содержимому
-        if (!old) changeReport.added.push(baseName);
-        else if (old.doc_content_hash) {
-          (old.doc_content_hash === contentHash ? changeReport.unchanged : changeReport.updated).push(baseName);
-        } else {
-          (old.file_hash && old.file_hash === fileHash ? changeReport.unchanged : changeReport.updated).push(baseName);
+        let changeType = 'added';
+        if (old) {
+          if (old.doc_content_hash) {
+            changeType = (old.doc_content_hash === contentHash) ? 'unchanged' : 'updated';
+          } else {
+            changeType = (old.file_hash && old.file_hash === fileHash) ? 'unchanged' : 'updated';
+          }
         }
+
+        // «Почему изменился документ» (Фаза 1, хвост для пути «Сдать отчёт» —
+        // та же логика, что в docs:generate; см. utils.diffClientFields).
+        const docMeta = DOC_META[baseName] || {};
+        const newTemplateVersion = docMeta.version || 1;
+        let changeReason = null;
+
+        if (changeType === 'updated') {
+          const oldTemplateVersion = (old && old.template_version) || 1;
+          if (newTemplateVersion > oldTemplateVersion) {
+            changeReason = 'Обновлены требования законодательства'
+              + (docMeta.npa ? ': ' + docMeta.npa : '')
+              + ` (версия документа ${oldTemplateVersion} → ${newTemplateVersion})`;
+          } else {
+            const changedFields = diffClientFields(client.last_gen_snapshot, clientWithEmployees);
+            if (changedFields.length) {
+              changeReason = 'Изменились данные клиента: '
+                + changedFields.map(c => `${c.label} (${c.from} → ${c.to})`).join(', ');
+            }
+          }
+        }
+
+        if (changeType === 'added') changeReport.added.push(baseName);
+        else if (changeType === 'updated') changeReport.updated.push({ name: baseName, reason: changeReason });
+        else changeReport.unchanged.push(baseName);
 
         db.get('documents').remove({ client_id: clientId, name: baseName }).write();
         maxId++;
@@ -546,6 +577,7 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
           doc_content_hash: contentHash,
           client_hash: clientHash,
           doc_year:    getDocYear(client),
+          template_version: newTemplateVersion,
           status:      'ok',
           created_at:  old?.created_at || new Date().toISOString(),
           updated_at:  new Date().toISOString(),
@@ -553,6 +585,12 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
           notes:       '',
         }).write();
       }
+
+      // Снимок отслеживаемых полей клиента — общий с docs:generate
+      // (см. utils.diffClientFields / snapshotClientFields).
+      db.get('clients').find({ id: clientId }).assign({
+        last_gen_snapshot: snapshotClientFields(clientWithEmployees),
+      }).write();
     } catch(e) { /* запись в реестр не критична для самой генерации файлов */ }
 
     return {
@@ -628,8 +666,12 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
   oldDocs.forEach(d => { oldDocMap[d.name] = d; });
 
   // Собираем карту хэшей файлов на диске (для умной генерации)
-  const { buildDiskHashMap, getDocYear, docContentHash } = require('./utils');
+  const { buildDiskHashMap, getDocYear, docContentHash, diffClientFields, snapshotClientFields } = require('./utils');
   const diskHashMap = buildDiskHashMap(oldDocs);
+
+  // Реестр версий шаблонов документов — для причины «обновлены требования
+  // законодательства» (см. doc-meta.js).
+  const DOC_META = require('./doc-meta');
 
   try {
     const result = await generatePackage(clientWithEmployees, {
@@ -710,8 +752,35 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         }
       }
 
+      // «Почему изменился документ» (Фаза 1, только основной путь
+      // generatePackage). Разделитель причин:
+      //   - версия шаблона выросла (doc-meta.js) → обновлены требования НПА;
+      //   - версия та же, но изменились отслеживаемые поля клиента
+      //     (FIELD_LABELS) → изменились данные клиента;
+      //   - ни то ни другое (например, первое формирование после внедрения
+      //     фичи, нет снимка) → причина не подбирается, чтобы не показать
+      //     ложную информацию в доказательной базе.
+      const docMeta = DOC_META[baseName] || {};
+      const newTemplateVersion = docMeta.version || 1;
+      let changeReason = null;
+
+      if (changeType === 'updated') {
+        const oldTemplateVersion = (oldDoc && oldDoc.template_version) || 1;
+        if (newTemplateVersion > oldTemplateVersion) {
+          changeReason = 'Обновлены требования законодательства'
+            + (docMeta.npa ? ': ' + docMeta.npa : '')
+            + ` (версия документа ${oldTemplateVersion} → ${newTemplateVersion})`;
+        } else {
+          const changedFields = diffClientFields(client.last_gen_snapshot, clientWithEmployees);
+          if (changedFields.length) {
+            changeReason = 'Изменились данные клиента: '
+              + changedFields.map(c => `${c.label} (${c.from} → ${c.to})`).join(', ');
+          }
+        }
+      }
+
       if (changeType === 'unchanged') report.unchanged.push(baseName);
-      else if (changeType === 'updated') report.updated.push(baseName);
+      else if (changeType === 'updated') report.updated.push({ name: baseName, reason: changeReason });
       else report.added.push(baseName);
 
       // Определяем модуль по папке файла
@@ -742,6 +811,7 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         doc_content_hash: contentHash,
         client_hash: clientHash,
         doc_year:    getDocYear(client),
+        template_version: newTemplateVersion,
         status:      'ok',
         created_at:  oldDoc?.created_at || new Date().toISOString(),
         updated_at:  new Date().toISOString(),
@@ -749,6 +819,12 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         notes:       '',
       }).write();
     }
+
+    // Снимок отслеживаемых полей клиента — основа для причины «изменились
+    // данные клиента» при следующем формировании (см. utils.diffClientFields).
+    db.get('clients').find({ id: clientId }).assign({
+      last_gen_snapshot: snapshotClientFields(clientWithEmployees),
+    }).write();
 
     return {
       ok:           true,

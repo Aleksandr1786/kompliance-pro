@@ -221,6 +221,24 @@ function nextId(collection) {
 
 function now() { return new Date().toISOString(); }
 
+/**
+ * Корневая папка для документов клиентов.
+ * Намеренно вне Desktop/Documents — в %LOCALAPPDATA%, которая НЕ
+ * синхронизируется облачными клиентами (OneDrive и т.п.). Это убирает
+ * целый класс проблем: блокировки файлов при перезаписи/архивации,
+ * конфликтные дубли папок, ложное «файл отсутствует» при отложенной
+ * синхронизации. Пользователь открывает папку кнопками «Открыть папку».
+ */
+function getOutputRoot() {
+  // app.getPath('appData') = %APPDATA% (Roaming, может синхронизироваться
+  // доменными политиками); 'userData' указывает внутрь appData.
+  // Для документов берём LOCALAPPDATA — он не роумится и не синхронизируется.
+  const base = process.env.LOCALAPPDATA
+            || app.getPath('userData')   // запасной вариант, если переменной нет
+            || app.getPath('desktop');
+  return path.join(base, 'КомплаенсПро', 'Документы');
+}
+
 // ─── КЛИЕНТЫ ─────────────────────────────────────────────
 ipcMain.handle('clients:list', () => {
   return db.get('clients').sortBy('name').value();
@@ -445,12 +463,27 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
   if (!client) return { ok: false, error: 'Клиент не найден' };
   const settings = db.get('settings').value();
 
-  const rootDir  = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
+  const rootDir  = getOutputRoot();
   const safeName = (client.name || 'Клиент').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 60).replace(/[ .]+$/, '') || 'Клиент';
   const outputDir = path.join(rootDir, safeName);
   fs.mkdirSync(outputDir, { recursive: true });
 
   const employees = db.get('employees').filter({ client_id: clientId }).value();
+
+  // Хэш данных клиента — та же база, что и в docs:generate, чтобы
+  // shouldOverwrite корректно распознавал «данные не менялись» независимо
+  // от того, каким путём документ генерировался в прошлый раз.
+  const crypto = require('crypto');
+  const clientHash = crypto.createHash('md5')
+    .update(JSON.stringify({ ...client, employees }))
+    .digest('hex');
+
+  // Карта хэшей файлов на диске — защита правок пользователя + doc_year
+  // для архивации (см. utils.makeRunner/archivePreviousVersion).
+  const { buildDiskHashMap, getDocYear, docContentHash } = require('./utils');
+  const oldDocs = db.get('documents').filter({ client_id: clientId }).value();
+  const diskHashMap = buildDiskHashMap(oldDocs);
+
   const clientWithEmployees = {
     ...client,
     city: (client.city || client.region || '').replace(/^г\.?\s*/i,'').trim() || '',
@@ -471,9 +504,70 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
 
   try {
     const { generateVuReports } = require('./gen_vu');
-    const result = await generateVuReports(clientWithEmployees, settings, outputDir, docs);
-    const vuDir = require('path').join(outputDir, 'Воинский учёт');
-    return { ok: true, generated: result.generated, errors: result.errors, folder: vuDir };
+    const result = await generateVuReports(clientWithEmployees, {
+      ...settings,
+      diskHashMap,
+      currentClientHash: clientHash,
+    }, outputDir, docs);
+    const vuDir = path.join(outputDir, 'Воинский учёт');
+
+    // Регистрируем сгенерированные документы в реестре приложения.
+    // Upsert по имени файла: обновляем только эти документы, остальные ВУ не трогаем.
+    // Попутно строим отчёт об изменениях (added/updated/unchanged) — по содержимому
+    // document.xml, чтобы окно результата показывало правду, а не «обновлено всё».
+    const changeReport = { added: [], updated: [], unchanged: [] };
+    try {
+      let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id), 0);
+      for (const filename of (result.generated || [])) {
+        const baseName = path.basename(filename);
+        let fileHash = '';
+        try { fileHash = crypto.createHash('md5').update(fs.readFileSync(filename)).digest('hex'); } catch(_) {}
+        const contentHash = docContentHash(filename);
+        const old = db.get('documents').find({ client_id: clientId, name: baseName }).value();
+
+        // Тип изменения по содержимому
+        if (!old) changeReport.added.push(baseName);
+        else if (old.doc_content_hash) {
+          (old.doc_content_hash === contentHash ? changeReport.unchanged : changeReport.updated).push(baseName);
+        } else {
+          (old.file_hash && old.file_hash === fileHash ? changeReport.unchanged : changeReport.updated).push(baseName);
+        }
+
+        db.get('documents').remove({ client_id: clientId, name: baseName }).write();
+        maxId++;
+        db.get('documents').push({
+          id:          maxId,
+          client_id:   clientId,
+          module:      'VU',
+          name:        baseName,
+          filename:    baseName,
+          filepath:    filename,
+          file_hash:   fileHash,
+          doc_content_hash: contentHash,
+          client_hash: clientHash,
+          doc_year:    getDocYear(client),
+          status:      'ok',
+          created_at:  old?.created_at || new Date().toISOString(),
+          updated_at:  new Date().toISOString(),
+          npa_basis:   'ФЗ-53 от 28.03.1998, ПП РФ №719 от 27.11.2006',
+          notes:       '',
+        }).write();
+      }
+    } catch(e) { /* запись в реестр не критична для самой генерации файлов */ }
+
+    return {
+      ok: true,
+      generated: result.generated,
+      errors: result.errors,
+      folder: vuDir,
+      report: {
+        added:        changeReport.added,
+        updated:      changeReport.updated,
+        unchanged:    changeReport.unchanged,
+        userModified: result.report?.userModified || [],
+        archived:     result.report?.archived || [],
+      },
+    };
   } catch(e) {
     return { ok: false, error: e.message };
   }
@@ -484,8 +578,8 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
   if (!client) return { ok: false, error: 'Клиент не найден' };
   const settings = db.get('settings').value();
 
-  // Папка клиента: КомплаенсПро_Документы / Название организации
-  const rootDir  = path.join(app.getPath('desktop'), 'КомплаенсПро_Документы');
+  // Папка клиента: <корень документов> / Название организации
+  const rootDir  = getOutputRoot();
   const safeName = (client.name || 'Клиент').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 60).replace(/[ .]+$/, '') || 'Клиент';
   const outputDir = path.join(rootDir, safeName);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -534,7 +628,7 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
   oldDocs.forEach(d => { oldDocMap[d.name] = d; });
 
   // Собираем карту хэшей файлов на диске (для умной генерации)
-  const { buildDiskHashMap } = require('./utils');
+  const { buildDiskHashMap, getDocYear, docContentHash } = require('./utils');
   const diskHashMap = buildDiskHashMap(oldDocs);
 
   try {
@@ -547,12 +641,38 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
     // Обновляем документы в БД — upsert по имени файла (без дублей)
     // При scoped-генерации удаляем из реестра ТОЛЬКО записи этого модуля,
     // чтобы не затереть документы других модулей.
+    // Исключение — «накопительные» документы (Акт об уничтожении ПД с датой
+    // в имени, 🟢➕): они не пересоздаются каждый запуск, поэтому их записи
+    // из реестра не удаляем, иначе файл останется на диске, а из реестра пропадёт.
+    const isAccumulatingDoc = (name) => /^Акт об уничтожении персональных данных от .+\.docx$/.test(name);
+
     if (scope === 'ALL') {
-      db.get('documents').remove({ client_id: clientId }).write();
+      db.get('documents').remove(d => d.client_id === clientId && !isAccumulatingDoc(d.name)).write();
     } else {
-      db.get('documents').remove({ client_id: clientId, module: scope }).write();
+      db.get('documents').remove(d => d.client_id === clientId && d.module === scope && !isAccumulatingDoc(d.name)).write();
     }
     let maxId = Math.max(0, ...db.get('documents').value().map(d => d.id), 0);
+
+    // Дедупликация реестра по (client_id, name): дубли одного документа —
+    // всегда ошибка (один файл = одна запись). Накопительные акты с РАЗНЫМИ
+    // датами имеют разные имена, поэтому не схлопываются между собой, а вот
+    // повторные записи одного и того же акта (одна дата) — убираем.
+    // Это чистит и «вечные» записи-сироты, которые исключены из массового
+    // remove выше как накопительные, но физически уже не пересоздаются.
+    {
+      const seen = new Set();
+      const toRemoveIds = [];
+      for (const d of db.get('documents').value()
+                        .filter(x => x.client_id === clientId)
+                        .sort((a,b) => b.id - a.id)) {           // свежие (больший id) — первыми
+        const key = d.name;
+        if (seen.has(key)) toRemoveIds.push(d.id);
+        else seen.add(key);
+      }
+      if (toRemoveIds.length) {
+        db.get('documents').remove(d => toRemoveIds.includes(d.id)).write();
+      }
+    }
 
     const report = { updated: [], added: [], unchanged: [] };
     const seenNames = new Set(); // защита от дублей внутри одной генерации
@@ -564,19 +684,26 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
       // Пропускаем дубли (один и тот же файл не может быть два раза)
       if (seenNames.has(baseName)) continue;
       seenNames.add(baseName);
-      // Хеш содержимого файла для сравнения
+      // Хеш байтов файла (для обратной совместимости) + хеш СОДЕРЖИМОГО.
+      // Решение «изменился/не изменился» принимаем по содержимому (document.xml),
+      // т.к. байты .docx меняются всегда из-за таймстампов — иначе отчёт всегда
+      // показывал бы «обновлено всё», даже когда реально ничего не менялось.
       let fileHash = '';
       try {
         const buf = fs.readFileSync(filename);
         fileHash = crypto.createHash('md5').update(buf).digest('hex');
       } catch(e) {}
+      const contentHash = docContentHash(filename);
 
       const oldDoc = oldDocMap[baseName];
       let status = 'ok';
       let changeType = 'added';
 
       if (oldDoc) {
-        if (oldDoc.file_hash && oldDoc.file_hash === fileHash) {
+        // Сравниваем по содержимому, если оно сохранено; иначе фоллбэк на байты.
+        if (oldDoc.doc_content_hash) {
+          changeType = (oldDoc.doc_content_hash === contentHash) ? 'unchanged' : 'updated';
+        } else if (oldDoc.file_hash && oldDoc.file_hash === fileHash) {
           changeType = 'unchanged';
         } else {
           changeType = 'updated';
@@ -597,6 +724,13 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         : docModule === 'VU' ? 'ФЗ-53 от 28.03.1998, ПП РФ №719 от 27.11.2006'
         :                      'ТК РФ, Постановление Правительства №2464';
 
+      // Upsert по имени: убираем возможную существующую запись этого документа,
+      // чтобы не плодить дубли. Важно для накопительных актов (Акт об уничтожении
+      // ПД с датой): они исключены из массового remove выше, поэтому без этого
+      // точечного удаления повторные генерации добавляли бы новую запись каждый
+      // раз (один файл на диске → много записей в реестре).
+      db.get('documents').remove(d => d.client_id === clientId && d.name === baseName).write();
+
       db.get('documents').push({
         id:          maxId,
         client_id:   clientId,
@@ -605,7 +739,9 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         filename:    baseName,
         filepath:    filename,
         file_hash:   fileHash,
+        doc_content_hash: contentHash,
         client_hash: clientHash,
+        doc_year:    getDocYear(client),
         status:      'ok',
         created_at:  oldDoc?.created_at || new Date().toISOString(),
         updated_at:  new Date().toISOString(),
@@ -622,6 +758,7 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
       report: {
         ...report,
         userModified: result.report?.userModified || [],
+        archived:     result.report?.archived || [],
       },
     };
   } catch(e) {

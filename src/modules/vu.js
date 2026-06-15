@@ -393,7 +393,7 @@ async function renderClientVu(clientId) {
             display:flex;align-items:center;justify-content:center;gap:8px"
             onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform=''">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Сгенерировать пакет
+            Сформировать пакет
           </button>
         </div>
 
@@ -429,17 +429,7 @@ async function renderClientVu(clientId) {
           ${vuFolder ? `<button onclick="window.api.docsOpenFolder('${vuFolder}')" style="padding:6px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer">📁 Открыть папку</button>` : ''}
         </div>
         ${vuDocs.length ? `
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${vuDocs.map(d => {
-            const nm = (d.name || '').replace(/\.docx$/i, '');
-            const fp = (d.filepath || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            return `<div onclick="openDocFile('${fp}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.06);border-radius:8px;cursor:pointer" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='rgba(255,255,255,0.015)'">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <div style="flex:1;min-width:0;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}</div>
-              <span style="font-size:10px;color:var(--muted2);flex-shrink:0">${d.updated_at ? formatDate(d.updated_at) : ''}</span>
-            </div>`;
-          }).join('')}
-        </div>` : `<div style="font-size:12px;color:var(--muted2);padding:8px 0">Пока не сгенерированы — нажмите «Сгенерировать пакет» выше.</div>`}
+        <div>${renderDocsBySection(vuDocs, 'VU')}</div>` : `<div style="font-size:12px;color:var(--muted2);padding:8px 0">Пока не сформированы — нажмите «Сформировать пакет» выше.</div>`}
       </div>
 
       <!-- Список военнообязанных сотрудников -->
@@ -531,18 +521,10 @@ async function saveVuData(clientId) {
 
 async function generateVuDocs(clientId) {
   await saveVuData(clientId);
-  showToast('⏳ Генерация документов ВУ...');
-  try {
-    const result = await window.api.docsGenerate(clientId, 'VU');
-    if (result.errors?.length) {
-      showToast('⚠ Сгенерировано с ошибками: ' + result.errors[0], 'var(--amber)');
-    } else {
-      showToast('✅ Документы ВУ сгенерированы!');
-    }
-    await navigate('client', clientId);
-  } catch(e) {
-    showToast('Ошибка генерации: ' + e.message, 'var(--red)');
-  }
+  // Используем общий путь generateDocs() из docs-generation.js — он показывает
+  // то же окно «Отчёт сформирован» со списком изменений (новые/обновлены/
+  // без изменений/архив), что и ОТ/ПДн. Раньше здесь был только тост.
+  await generateDocs(clientId, 'VU');
 }
 
 function showVuReportModal(clientId) {
@@ -671,6 +653,34 @@ async function submitVuReport(clientId) {
 
     if (!result.ok) throw new Error(result.error || 'Ошибка генерации');
 
+    // Краткая сводка изменений (added/updated/unchanged) + архивация
+    const rep = result.report || {};
+    const added     = rep.added     || [];
+    const updated    = rep.updated    || [];
+    const unchanged = rep.unchanged || [];
+    const archived  = rep.archived  || [];
+    const cleanVuName = n => String(n).replace(/\.docx$/i,'').replace(/^ВУ-\d+\s*/,'').trim();
+
+    let changesHtml = '';
+    if (added.length) {
+      changesHtml += `<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;color:#34d399;letter-spacing:.4px">➕ НОВЫЕ (${added.length})</div>` +
+        added.map(n => `<div style="font-size:11px;color:#86efac;padding:2px 0">${cleanVuName(n)}</div>`).join('') + `</div>`;
+    }
+    if (updated.length) {
+      changesHtml += `<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;color:#60a5fa;letter-spacing:.4px">🔄 ОБНОВЛЕНЫ (${updated.length})</div>` +
+        updated.map(n => `<div style="font-size:11px;color:#93c5fd;padding:2px 0">${cleanVuName(n)}</div>`).join('') + `</div>`;
+    }
+    if (unchanged.length) {
+      changesHtml += `<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.4px">✓ БЕЗ ИЗМЕНЕНИЙ (${unchanged.length})</div>` +
+        unchanged.map(n => `<div style="font-size:11px;color:#64748b;padding:2px 0">${cleanVuName(n)}</div>`).join('') + `</div>`;
+    }
+    if (archived.length) {
+      changesHtml += `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)"><div style="font-size:10px;font-weight:700;color:#a78bfa;letter-spacing:.4px">🗄 ПРЕДЫДУЩИЕ ВЕРСИИ В АРХИВ (${archived.length})</div>` +
+        archived.map(a => `<div style="font-size:11px;color:#c4b5fd;padding:2px 0">${cleanVuName(a.basename)} → Архив/${a.year}</div>`).join('') + `</div>`;
+    }
+
+    const totalChanged = added.length + updated.length;
+
     // Успех
     if (statusEl) {
       statusEl.style.display = 'block';
@@ -680,11 +690,14 @@ async function submitVuReport(clientId) {
       statusEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          Документы сформированы (${result.generated?.length || docs.length} шт.)
+          Отчёт сформирован — ${totalChanged > 0
+            ? `обновлено ${totalChanged} из ${result.generated?.length || docs.length}`
+            : `все ${result.generated?.length || docs.length} актуальны`}
         </div>
-        ${result.errors?.length ? `<div style="color:#fbbf24;font-size:11px">Предупреждения: ${result.errors[0]}</div>` : ''}
+        <div style="max-height:200px;overflow-y:auto">${changesHtml}</div>
+        ${result.errors?.length ? `<div style="color:#fbbf24;font-size:11px;margin-top:6px">Предупреждения: ${result.errors[0]}</div>` : ''}
         <button onclick="window.api.docsOpenFolder('${(result.folder||'').replace(/\\/g,'\\\\')}')"
-          style="margin-top:8px;padding:6px 14px;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);border-radius:8px;color:#34d399;font-size:11px;font-weight:600;cursor:pointer">
+          style="margin-top:10px;padding:6px 14px;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);border-radius:8px;color:#34d399;font-size:11px;font-weight:600;cursor:pointer">
           📂 Открыть папку
         </button>`;
     }
@@ -708,9 +721,11 @@ async function submitVuReport(clientId) {
     }, 300);
 
     if (btn) {
+      btn.disabled = false;          // ← БЫЛО true (стр. блокировки выше); без снятия onclick «Готово» не срабатывал
       btn.innerHTML = '✅ Готово';
       btn.style.background = 'linear-gradient(135deg,#059669,#10b981)';
       btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
       btn.onclick = () => document.getElementById('modal-vu-report')?.remove();
     }
 
@@ -822,7 +837,7 @@ async function renderVuReadiness(clientId) {
   if (!checks.journal) risks.push({
     level: 'medium', title: 'Не заведён журнал проверок воинского учёта',
     law: 'п.40 Методических рекомендаций ГШ ВС РФ', fine: 'до 100 000 ₽',
-    fix: 'Завести журнал (шаблон — кнопка «Сгенерировать пакет»)',
+    fix: 'Завести журнал (шаблон — кнопка «Сформировать пакет»)',
   });
   if (emps.length > 0 && vuCount === 0) risks.push({
     level: 'medium', title: 'Данные о военнообязанных сотрудниках не заполнены',

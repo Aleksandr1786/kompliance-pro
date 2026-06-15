@@ -3,7 +3,8 @@
 // Зависит от gen_p1.js (base helpers)
 
 const base = require('./gen_p1');
-const { safe } = require('./utils');
+const { safe, makeRunner } = require('./utils');
+const { sectionOf, sectionFolder, SECTIONS } = require('./sections');
 const {
   norm, save, oNum,
   p, pC, pR, pL, H, SH, bul, eL,
@@ -960,65 +961,142 @@ async function generateVuPackage(client, settings, outputDir, tmpRoot) {
   const fs   = require('fs');
   const path = require('path');
 
-  // Папка для документов ВУ
+  const s = settings || {};
+
+  // Папка модуля ВУ
   const vuDir = path.join(outputDir, 'Воинский учёт');
   fs.mkdirSync(vuDir, { recursive: true });
 
+  // Миграция: переносим документы из старой плоской структуры
+  // (когда все файлы лежали прямо в «Воинский учёт») в подпапки разделов.
+  migrateVuFolders(vuDir);
+
+  // Временная папка (берём из generator.js или создаём свою)
+  const myTmpRoot = tmpRoot || path.join(outputDir, '__tmp_vu');
+  fs.mkdirSync(myTmpRoot, { recursive: true });
+
   const generated = [];
   const errors    = [];
+  const report    = { userModified: [] };
 
+  const run = makeRunner(client, s, outputDir, myTmpRoot, generated, errors, report);
+
+  // Полные имена файлов нужны, чтобы определить раздел через sections.js.
   const docs = [
-    { fn: gen_vu_01, name: 'ВУ-01 Приказ о назначении ответственного' },
-    { fn: gen_vu_02, name: 'ВУ-02 Функциональные обязанности' },
-    { fn: gen_vu_03, name: 'ВУ-03 План работы по воинскому учёту' },
-    { fn: gen_vu_04, name: 'ВУ-04 Карточка учёта организации (Форма №18)' },
-    { fn: gen_vu_05, name: 'ВУ-05 Журнал проверок воинского учёта' },
-    { fn: gen_vu_06, name: 'ВУ-06 Расписка в получении документов' },
-    { fn: gen_vu_07, name: 'ВУ-07 Уведомление о приёме военнообязанного' },
-    { fn: gen_vu_08, name: 'ВУ-08 Уведомление об увольнении военнообязанного' },
-    { fn: gen_vu_09, name: 'ВУ-09 Акт сверки с военным комиссариатом' },
-    { fn: gen_vu_10, name: 'ВУ-10 Справка о численности военнообязанных' },
+    { fn: gen_vu_01, file: 'ВУ-01 Приказ о назначении ответственного за воинский учёт.docx' },
+    { fn: gen_vu_02, file: 'ВУ-02 Функциональные обязанности ответственного за воинский учёт.docx' },
+    { fn: gen_vu_03, file: 'ВУ-03 План работы по осуществлению воинского учёта.docx' },
+    { fn: gen_vu_04, file: 'ВУ-04 Карточка учёта организации (Форма №18).docx' },
+    { fn: gen_vu_05, file: 'ВУ-05 Журнал проверок осуществления воинского учёта.docx' },
+    { fn: gen_vu_06, file: 'ВУ-06 Расписка в получении документов воинского учёта.docx' },
+    { fn: gen_vu_07, file: 'ВУ-07 Уведомление в военкомат о приёме военнообязанного.docx' },
+    { fn: gen_vu_08, file: 'ВУ-08 Уведомление в военкомат об увольнении военнообязанного.docx' },
+    { fn: gen_vu_09, file: 'ВУ-09 Акт сверки с военным комиссариатом.docx' },
+    { fn: gen_vu_10, file: 'ВУ-10 Справка о численности военнообязанных работников.docx' },
   ];
 
+  // Заранее создаём папки нужных разделов
   for (const doc of docs) {
-    try {
-      const result = await doc.fn(client, settings, vuDir);
-      if (result) generated.push(result);
-    } catch(e) {
-      errors.push(`${doc.name}: ${e.message}`);
-    }
+    const folder = sectionFolder('VU', sectionOf('VU', doc.file));
+    fs.mkdirSync(path.join(vuDir, folder), { recursive: true });
   }
 
-  return { generated, errors };
+  for (const doc of docs) {
+    const folder   = sectionFolder('VU', sectionOf('VU', doc.file));
+    const finalDir = path.join(vuDir, folder);
+    await run(doc.fn, finalDir);
+  }
+
+  // Очищаем свою tmpRoot если создавали сами
+  if (!tmpRoot) {
+    try { fs.rmSync(myTmpRoot, {recursive:true, force:true}); } catch(e) {}
+  }
+
+  return { generated, errors, report };
 }
 
-async function generateVuReports(client, settings, outputDir, docs) {
+/**
+ * Миграция старой структуры ВУ: если документы лежат прямо в папке
+ * «Воинский учёт» (плоско), переносит их в подпапки разделов согласно
+ * sections.js. Безопасна для повторного вызова: если файл уже в подпапке
+ * или его нет — ничего не делает. Существующие файлы в подпапке не трогаем
+ * (чтобы не затереть правки пользователя — там разберётся обычная генерация).
+ */
+function migrateVuFolders(vuDir) {
+  const fs   = require('fs');
+  const path = require('path');
+  if (!fs.existsSync(vuDir)) return;
+
+  let entries;
+  try { entries = fs.readdirSync(vuDir, { withFileTypes: true }); }
+  catch(e) { return; }
+
+  for (const ent of entries) {
+    if (!ent.isFile()) continue;                 // только файлы верхнего уровня
+    if (!ent.name.toLowerCase().endsWith('.docx')) continue;
+    if (ent.name.startsWith('~$')) continue;     // временные файлы Word
+
+    const sid = sectionOf('VU', ent.name);
+    const folder = sectionFolder('VU', sid);
+    const srcPath = path.join(vuDir, ent.name);
+    const dstDir  = path.join(vuDir, folder);
+    const dstPath = path.join(dstDir, ent.name);
+
+    if (srcPath === dstPath) continue;           // уже на месте (не должно быть, но на всякий)
+    try {
+      fs.mkdirSync(dstDir, { recursive: true });
+      if (fs.existsSync(dstPath)) {
+        // В подпапке уже есть актуальная версия — старый плоский файл удаляем
+        fs.unlinkSync(srcPath);
+      } else {
+        fs.renameSync(srcPath, dstPath);
+      }
+    } catch(e) {
+      // Файл занят (открыт в Word) или иная ошибка — пропускаем, не валимся
+    }
+  }
+}
+
+async function generateVuReports(client, settings, outputDir, docs, tmpRoot) {
   const fs   = require('fs');
   const path = require('path');
 
+  const s = settings || {};
+
   const vuDir = path.join(outputDir, 'Воинский учёт');
   fs.mkdirSync(vuDir, { recursive: true });
 
+  // Миграция старой плоской структуры (если ещё не переносили)
+  migrateVuFolders(vuDir);
+
+  const myTmpRoot = tmpRoot || path.join(outputDir, '__tmp_vu_reports');
+  fs.mkdirSync(myTmpRoot, { recursive: true });
+
   const generated = [];
   const errors    = [];
+  const report    = { userModified: [] };
+
+  const run = makeRunner(client, s, outputDir, myTmpRoot, generated, errors, report);
 
   const available = {
-    form18: { fn: gen_vu_04, name: 'ВУ-04 Карточка учёта организации (Форма №18)' },
-    plan:   { fn: gen_vu_03, name: 'ВУ-03 План работы по воинскому учёту' },
+    form18: { fn: gen_vu_04, file: 'ВУ-04 Карточка учёта организации (Форма №18).docx' },
+    plan:   { fn: gen_vu_03, file: 'ВУ-03 План работы по осуществлению воинского учёта.docx' },
   };
 
   for (const key of docs) {
     const doc = available[key];
     if (!doc) continue;
-    try {
-      const result = await doc.fn(client, settings, vuDir);
-      if (result) generated.push(result);
-    } catch(e) {
-      errors.push(`${doc.name}: ${e.message}`);
-    }
+    const folder   = sectionFolder('VU', sectionOf('VU', doc.file));
+    const finalDir = path.join(vuDir, folder);
+    fs.mkdirSync(finalDir, { recursive: true });
+    await run(doc.fn, finalDir);
   }
 
-  return { generated, errors };
+  if (!tmpRoot) {
+    try { fs.rmSync(myTmpRoot, {recursive:true, force:true}); } catch(e) {}
+  }
+
+  return { generated, errors, report };
 }
 
 module.exports = { generateVuPackage, generateVuReports };

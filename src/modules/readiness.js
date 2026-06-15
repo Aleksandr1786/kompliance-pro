@@ -90,7 +90,7 @@ async function openReadinessCenter(clientId) {
       detail: 'Локальные акты не разработаны',
       law: 'ч.1 ст.5.27.1 КоАП РФ',
       fineMin: 50000, fineMax: 80000,
-      fix: 'Сгенерировать документы в разделе ОТ',
+      fix: 'Сформировать документы в разделе ОТ',
     });
   } else if (okDocs < totalDocs) {
     const outdated = totalDocs - okDocs;

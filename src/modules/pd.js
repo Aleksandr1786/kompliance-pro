@@ -279,7 +279,7 @@ async function generatePdDocs(clientId) {
   } catch(e) {
     showToast('Ошибка генерации: ' + e.message, 'var(--red)');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '${ic("zap",14)} Сгенерировать'; }
+    if (btn) { btn.disabled = false; btn.textContent = '${ic("zap",14)} Сформировать пакет'; }
   }
 }
 
@@ -311,7 +311,7 @@ async function renderPdReadiness(clientId) {
   const risks = [];
   if (!pdRkn) risks.push({ level:'high', title:'РКН не уведомлена об ИСПДн', law:'ст. 22 ФЗ-152', fine:'до 5 000 ₽ / день', fix:'Подать уведомление на rkn.gov.ru' });
   if (!pdResp) risks.push({ level:'high', title:'Не назначен ответственный за ПДн', law:'ч.1 ст.18.1 ФЗ-152', fine:'до 100 000 ₽', fix:'Назначить приказом во вкладке ПДн' });
-  if (docs.length === 0) risks.push({ level:'high', title:'Отсутствует пакет документов ПДн', law:'ст. 18.1 ФЗ-152', fine:'до 300 000 ₽', fix:'Сгенерировать документы во вкладке ПДн' });
+  if (docs.length === 0) risks.push({ level:'high', title:'Отсутствует пакет документов ПДн', law:'ст. 18.1 ФЗ-152', fine:'до 300 000 ₽', fix:'Сформировать документы во вкладке ПДн' });
   if (ispdn === 0) risks.push({ level:'medium', title:'Не указаны ИСПДн', law:'ст. 22 ФЗ-152', fine:'до 100 000 ₽', fix:'Добавить ИСПДн во вкладке ПДн' });
   if (pdDate) {
     const daysSince = Math.floor((now - pdDate) / 86400000);

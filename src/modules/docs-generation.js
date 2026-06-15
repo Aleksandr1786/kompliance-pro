@@ -14,7 +14,15 @@ async function generateDocs(clientId, scope = 'OT') {
     showToast('Ошибка: ' + result.error, 'var(--red)');
     return;
   }
+  showGenerationReportModal(result, clientId, moduleName);
+}
 
+// ── ОБЩЕЕ ОКНО ОТЧЁТА О ФОРМИРОВАНИИ ──────────────────────
+// Единое окно результата для «Сформировать пакет» (ОТ/ПДн/ВУ/всё) и
+// «Сдать отчёт» (ВУ) — бэклог №2. Принимает result в любом из двух
+// форматов: с result.dir (docs:generate) или result.folder
+// (vu:generate-reports) — оба нормализуются ниже.
+function showGenerationReportModal(result, clientId, moduleName) {
   // Показываем отчёт об изменениях
   const r = result.report || {};
   const updated   = r.updated   || [];
@@ -22,6 +30,7 @@ async function generateDocs(clientId, scope = 'OT') {
   const unchanged = r.unchanged || [];
   const archived  = r.archived  || [];
   const errors    = result.errors || [];
+  const dir       = result.dir || result.folder || '';
 
   // Формируем модальное окно с отчётом
   const modal = document.createElement('div');
@@ -34,6 +43,26 @@ async function generateDocs(clientId, scope = 'OT') {
         <span style="font-size:12px">${icon}</span>
         <span style="font-size:12px;color:${color}">${cleanName(n)}</span>
       </div>`).join('')
+    : '';
+
+  // «Почему изменился документ» (Фаза 1). Поддерживает оба формата:
+  //   - старый: updated = массив строк (на случай старых данных в БД,
+  //     где template_version/last_gen_snapshot ещё не записывались);
+  //   - новый: updated = массив { name, reason }, reason может быть null
+  //     (например, первое формирование после внедрения фичи — снимка
+  //     данных клиента ещё нет, причину честно не показываем).
+  const makeUpdatedList = items => items.length
+    ? items.map(it => {
+        const name   = (typeof it === 'string') ? it : it.name;
+        const reason = (typeof it === 'string') ? null : it.reason;
+        return `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px">📝</span>
+            <span style="font-size:12px;color:#60a5fa">${cleanName(name)}</span>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin:2px 0 0 20px">${reason || 'причина уточнится при следующем формировании'}</div>
+        </div>`;
+      }).join('')
     : '';
 
   const hasChanges = updated.length > 0 || added.length > 0;
@@ -64,7 +93,7 @@ async function generateDocs(clientId, scope = 'OT') {
       <div style="margin-bottom:14px">
         <div style="font-size:11px;font-weight:700;color:#60a5fa;letter-spacing:.5px;margin-bottom:6px">🔄 ОБНОВЛЕНЫ (${updated.length})</div>
         <div style="background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:8px;padding:8px 12px">
-          ${makeList(updated, '#60a5fa', '📝')}
+          ${makeUpdatedList(updated)}
         </div>
       </div>` : ''}
 
@@ -97,7 +126,7 @@ async function generateDocs(clientId, scope = 'OT') {
 
       <div style="display:flex;gap:10px;margin-top:20px">
         <button onclick="this.closest('[style*=fixed]').remove();navigate('client',${clientId})" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Закрыть</button>
-        ${result.dir ? `<button onclick="window.api.docsOpenFolder('${result.dir.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');this.closest('[style*=fixed]').remove();navigate('client',${clientId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">📁 Открыть папку</button>` : ''}
+        ${dir ? `<button onclick="window.api.docsOpenFolder('${dir.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');this.closest('[style*=fixed]').remove();navigate('client',${clientId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">📁 Открыть папку</button>` : ''}
       </div>
     </div>`;
 

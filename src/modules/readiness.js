@@ -140,12 +140,14 @@ async function openReadinessCenter(clientId) {
   const totalFineMax = risks.reduce((s,r) => s + r.fineMax, 0);
   const highRisks = risks.filter(r => r.level === 'high').length;
 
-  // ── Расчёт готовности (для паспорта) ──
+  // ── Расчёт готовности (для паспорта и детальной разбивки) ──
+  // Итоговое число — единая формула, см. readiness-calc.js (calcOtReadiness).
+  // Разбивка по компонентам (scoreBreakdown) оставлена здесь же для
+  // отображения отдельных полосок — это та же формула, просто не свёрнутая
+  // в одно число; обе версии гарантированно дают одинаковый realScore.
   const scoreBreakdown = [];
-  // Документы 35
   let docsScoreP = totalDocs > 0 ? Math.round(okDocs / totalDocs * 35) : 0;
   scoreBreakdown.push({ label:'Документация', score:docsScoreP, max:35 });
-  // Обучение 25
   let trScoreP = 25;
   if (emps.length === 0) trScoreP = 0;
   else {
@@ -165,17 +167,15 @@ async function openReadinessCenter(clientId) {
     trScoreP = Math.max(0, Math.round((1 - bad/(emps.length*4)) * 25));
   }
   scoreBreakdown.push({ label:'Обучение персонала', score:trScoreP, max:25 });
-  // Данные 25
   const reqF = ['inn','okved','manager_name','manager_position','address','city','phone','staff','region','form'];
   const fF = reqF.filter(k => c[k] && String(c[k]).trim() !== '' && String(c[k]) !== '0').length;
   const dataScoreP = Math.round(fF / reqF.length * 25);
   scoreBreakdown.push({ label:'Кадровые данные', score:dataScoreP, max:25 });
-  // Сотрудники 15
   let empScoreP = 0;
   if (emps.length > 0) empScoreP = Math.round(emps.filter(e => e.position && e.position.trim()).length / emps.length * 15);
   scoreBreakdown.push({ label:'Сотрудники', score:empScoreP, max:15 });
 
-  const realScore = Math.min(100, docsScoreP + trScoreP + dataScoreP + empScoreP);
+  const realScore = calcOtReadiness(c, docs, emps);
   const scoreColor = realScore >= 80 ? 'var(--green)' : realScore >= 40 ? 'var(--amber)' : 'var(--red)';
 
   // Вероятность штрафа (эвристика)
@@ -574,7 +574,7 @@ async function downloadPassport(clientId) {
   sb.push({ label:'Кадровые данные', score:Math.round(fF/reqF.length*25), max:25 });
   let es=0; if(emps.length>0) es=Math.round(emps.filter(e=>e.position&&e.position.trim()).length/emps.length*15);
   sb.push({ label:'Сотрудники', score:es, max:15 });
-  const total = Math.min(100, sb.reduce((a,b)=>a+b.score,0));
+  const total = calcOtReadiness(c, docs, emps);
   const tColor = total>=80?'#059669':total>=40?'#d97706':'#dc2626';
 
   const rows = sb.map(x => {

@@ -811,7 +811,9 @@ async function renderVuReadiness(clientId) {
   const vuCount = vuEmps.length;
   const hasBron = vuData.has_bronirowanie === true || vuData.has_bronirowanie === 'true';
 
-  // Score ВУ — базовые проверки + доп. для бронирования
+  // Score ВУ — единая формула, см. readiness-calc.js (calcVuReadiness).
+  // checks/hasBron оставлены здесь же — они нужны ниже для рендера
+  // чек-листа и списка рисков, а не только для самого числа.
   const checks = {
     responsible: !!(vuData.responsible_name && vuData.order_number),
     plan:        !!(vuData.last_reconciliation),
@@ -826,7 +828,7 @@ async function renderVuReadiness(clientId) {
     checks.gov_organ   = !!(vuData.gov_organ);
   }
 
-  const scorePct = Math.round(Object.values(checks).filter(Boolean).length / Object.keys(checks).length * 100);
+  const scorePct = calcVuReadiness(c, emps, vuData);
   const scoreColor = scorePct >= 80 ? '#34d399' : scorePct >= 50 ? '#fbbf24' : '#f87171';
 
   // Риски ВУ — базовые

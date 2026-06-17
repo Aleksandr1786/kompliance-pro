@@ -46,7 +46,7 @@ async function gen_06_01(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...empRows,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'Журнал регистрации вводного инструктажа.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'Журнал регистрации вводного инструктажа.docx');
 }
 
 async function gen_06_02(c,s,dir){
@@ -79,7 +79,7 @@ async function gen_06_02(c,s,dir){
     ...eL(1),
     p([{t:'Виды инструктажей: ',b:true},{t:'П — первичный; Пв — повторный; Вн — внеплановый; Ц — целевой.'}],{sz:SZ_S}),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'Журнал регистрации инструктажа на рабочем месте.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'Журнал регистрации инструктажа на рабочем месте.docx');
 }
 
 async function gen_06_03(c,s,dir){
@@ -109,7 +109,7 @@ async function gen_06_03(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'Журнал учёта микротравм.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'Журнал учёта микротравм.docx');
 }
 
 async function gen_06_04(c,s,dir){
@@ -140,7 +140,7 @@ async function gen_06_04(c,s,dir){
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'Журнал учёта выдачи СИЗ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'Журнал учёта выдачи СИЗ.docx');
 }
 
 async function gen_06_05(c,s,dir){
@@ -198,7 +198,7 @@ async function gen_06_06(c,s,dir){
     ...eL(2),
     pL('Ответственный за ДСИЗ: ________________  '+(c.dsiz_name||c.manager_name)),
   ];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'Личная карточка учёта выдачи СИЗ.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'Личная карточка учёта выдачи СИЗ.docx');
 }
 
 // ── РАЗДЕЛ 7 ───────────────────────────────────────────
@@ -316,7 +316,110 @@ async function gen_07_03(c,s,dir){
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.03')},children:ch}],dir,'Программа противопожарного инструктажа.docx');
 }
 
-// ── ЧЕК-ЛИСТ ──────────────────────────────────────────
+// ── РАЗДЕЛ 7 (новое) — ПРОТОКОЛЫ ОБУЧЕНИЯ ──────────────
+// Закрывают два реальных пробела (не дублируют существующие журналы 06.xx):
+//  1) противопожарный инструктаж — программа (07.03) есть, журнала
+//     фактического проведения не было;
+//  2) проверка знания требований ОТ после обучения — обязательный документ
+//     по п.92 ПП №2464, до этого не генерировался вовсе.
+// Вводный/первичный/повторный/внеплановый/целевой инструктажи по ОТ уже
+// покрыты журналами 06.01/06.02 — отдельные «протоколы» для них не нужны.
+
+async function gen_08_01(c,s,dir){
+  // Журнал регистрации противопожарных инструктажей
+  const colW = [500, 1200, 3800, 2200, 1700, 2200, 1900, 1898];
+  const hdr = row([
+    cell('№',                        colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('Дата',                     colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО инструктируемого',     colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',                colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Вид инструктажа',          colW[4],{bold:true,center:true,sz:SZ_S}),
+    cell('Инструктаж проводил',      colW[5],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктора',      colW[6],{bold:true,center:true,sz:SZ_S}),
+    cell('Подпись инструктируемого', colW[7],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const emp = c.employees||[];
+  const empRows = emp.map((e,i)=>row([
+    cell(String(i+1),colW[0],{center:true,sz:SZ_S}),
+    cell(safe(c.doc_date), colW[1],{center:true,sz:SZ_S}),
+    cell('',          colW[2],{sz:SZ_S}),
+    cell(e.position,  colW[3],{sz:SZ_S}),
+    cell('Вв',         colW[4],{center:true,sz:SZ_S}),
+    cell('',          colW[5],{sz:SZ_S}),
+    cell('',          colW[6],{sz:SZ_S}),
+    cell('',          colW[7],{sz:SZ_S}),
+  ]));
+  const emptyRows = Array.from({length:25},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(emp.length+i+1):'',w,{center:j===0,sz:SZ_S}))));
+  const ch = [
+    pC(safe(c.name),{bold:true}),
+    ...eL(1),
+    H('ЖУРНАЛ'),
+    H('регистрации противопожарных инструктажей',SZ),
+    ...eL(1),
+    pL('Начат: «____» __________________ '+safe(c.doc_year)+' г.'),
+    pL('Окончен: «____» __________________ ______ г.'),
+    pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
+    ...eL(1),
+    tbl(colW,[hdr,...empRows,...emptyRows]),
+    ...eL(1),
+    p([{t:'Виды инструктажей: ',b:true},{t:'Вв — вводный (при приёме на работу); Пв — повторный (не реже 1 раза в год); Вн — внеплановый (при изменении противопожарного режима, после случаев пожара); Ц — целевой (перед выполнением пожароопасных работ).'}],{sz:SZ_S}),
+    p('Основание: Правила противопожарного режима в Российской Федерации (утв. постановлением Правительства РФ от 16.09.2020 № 1479); Программа № 03-ПИ (Раздел 6).',{sz:SZ_S}),
+  ];
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('07.01')},children:ch}],dir,'Журнал регистрации противопожарных инструктажей.docx');
+}
+
+async function gen_08_02(c,s,dir){
+  // Протокол проверки знания требований охраны труда — упрощённая форма
+  // для микропредприятий (Раздел X Правил, ПП №2464): проверку проводит
+  // одно назначенное лицо, без создания комиссии; передача сведений в
+  // реестр обученных лиц Минтруда не требуется.
+  const respN = oNum(c,1); // «Приказ о назначении ответственных лиц» — назначает отв. за ОТ
+  const emp = c.employees||[];
+  const colW=[500,2400,2200,2400,1572];
+  const hdr=row([
+    cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО',colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),
+    cell('Программа обучения',colW[3],{bold:true,center:true,sz:SZ_S}),
+    cell('Результат / подпись',colW[4],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const progEmp = 'Вводный, первичный инструктажи (№ 01-ПИ, 02-ПИ), противопожарный инструктаж (№ 03-ПИ)'+(c.hazard_works?'; Программа В':'');
+  const empRows = emp.map((e,i)=>row([
+    cell(String(i+1),colW[0],{center:true,sz:SZ_S}),
+    cell('',colW[1],{sz:SZ_S}),
+    cell(e.position,colW[2],{sz:SZ_S}),
+    cell(progEmp,colW[3],{sz:SZ_S}),
+    cell('сдал / _________',colW[4],{sz:SZ_S}),
+  ]));
+  const mgrRow = row([
+    cell(String(emp.length+1),colW[0],{center:true,sz:SZ_S}),
+    cell(safe(c.manager_name_full||c.manager_name),colW[1],{sz:SZ_S}),
+    cell(safe(c.manager_position),colW[2],{sz:SZ_S}),
+    cell('Программа А (СУОТ)',colW[3],{sz:SZ_S}),
+    cell('сдал / _________',colW[4],{sz:SZ_S}),
+  ]);
+  const ch=[pC(safe(c.name),{bold:true}),...eL(1),
+    H('ПРОТОКОЛ № ___'),
+    H('от «'+safe(c.doc_date)+'» проверки знания требований охраны труда',SZ),
+    ...eL(1),
+    p('В соответствии с Правилами обучения по охране труда и проверки знания требований охраны труда, утверждёнными постановлением Правительства Российской Федерации от 24.12.2021 № 2464 (далее — Правила), на основании раздела X Правил (особенности организации обучения по охране труда на микропредприятиях) проверку знания требований охраны труда провёл(а):',{indent:true}),
+    pL(safe(c.ot_position)+'  '+safe(c.ot_name_full||c.ot_name)+','),
+    pL('назначенный(ая) ответственным за проведение проверки знания требований охраны труда приказом '+safe(c.name)+' от «'+safe(c.doc_date)+'» № '+respN+'.'),
+    ...eL(1),
+    SH('Результаты проверки'),
+    tbl(colW,[hdr,...empRows,mgrRow]),
+    ...eL(1),
+    p('Лица, успешно прошедшие проверку, допущены к самостоятельной работе. Лица, не прошедшие проверку, к работе не допускаются до повторной проверки знания требований охраны труда.',{indent:true}),
+    ...eL(2),
+    pL(safe(c.ot_position)+':  ________________  '+safe(c.ot_name)),
+    pL('«'+safe(c.doc_date)+'»'),
+    ...eL(2),
+    p([{t:'Примечание. ',b:true},{t:'Протокол оформлен по упрощённой форме для микропредприятий (раздел X Правил): проверку знаний проводит одно назначенное лицо без создания комиссии, передача сведений в реестр обученных лиц Минтруда России не требуется. Для организаций, не являющихся микропредприятиями, проверку знания требований охраны труда проводит комиссия в составе не менее 3 человек (председатель и члены комиссии, прошедшие обучение по тем же программам), а результаты подлежат внесению в реестр обученных лиц через личный кабинет по охране труда (раздел XI Правил).'}],{sz:SZ_S}),
+  ];
+  return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.02')},children:ch}],dir,'Протокол проверки знания требований охраны труда.docx');
+}
+
+
 
 async function gen_checklist(c,s,dir){
   const colW=[400,3500,700,1200,800,1472];
@@ -357,9 +460,17 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
     d1:path.join(otDir,'Раздел 1. Организационно-распорядительная документация'),
     d2:path.join(otDir,'Раздел 2. Локальные нормативные акты'),
     d3:path.join(otDir,'Раздел 3. Электробезопасность'),
-    d5:path.join(otDir,'Раздел 5. Инструкции по охране труда'),
-    d6:path.join(otDir,'Раздел 6. Журналы учёта'),
-    d7:path.join(otDir,'Раздел 7. Программы обучения'),
+    // Папки 4/5/6/7 — синхронизированы с sections.js (OT_INSTRUCT/OT_JOURNALS/
+    // OT_PROGRAMS/OT_PROTOCOLS). До этой правки здесь были «Раздел 5/6/7»
+    // (старая нумерация до ренумерации в sections.js в чате 9) — несовпадение
+    // не ломало приложение (аккордеон классифицирует по имени файла, не по
+    // папке на диске), но визуально путало при просмотре файлов в проводнике.
+    // Для уже существующих тестовых клиентов старые папки 5/6/7 останутся на
+    // диске как дубли после первого формирования — удалить вручную.
+    d5:path.join(otDir,'Раздел 4. Инструкции по охране труда'),
+    d6:path.join(otDir,'Раздел 5. Журналы учёта'),
+    d7:path.join(otDir,'Раздел 6. Программы обучения'),
+    d8:path.join(otDir,'Раздел 7. Протоколы обучения'),
   };
 
   // Временная папка для генерации
@@ -418,6 +529,10 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   await run(gen_06_05,dirs.d6); // журнал контроля аптечки — всегда
 
   await run(gen_07_01,dirs.d7);await run(gen_07_02,dirs.d7);await run(gen_07_03,dirs.d7);
+
+  // Раздел 7. Протоколы обучения (новое)
+  await run(gen_08_01,dirs.d8); // Журнал противопожарных инструктажей
+  await run(gen_08_02,dirs.d8); // Протокол проверки знания требований ОТ (микропредприятия)
 
   await run(gen_checklist,otDir);
 

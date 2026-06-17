@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Сотрудники
   employeesList:  (cid)       => ipcRenderer.invoke('employees:list', cid),
+  employeesListAll: ()        => ipcRenderer.invoke('employees:list-all'),
   employeeAdd:    (data)      => ipcRenderer.invoke('employees:add', data),
   employeeDelete: (id)        => ipcRenderer.invoke('employees:delete', id),
   employeeUpdate: (id, data)  => ipcRenderer.invoke('employees:update', id, data),
@@ -25,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Документы
   documentsList:  (cid)       => ipcRenderer.invoke('documents:list', cid),
+  documentsListAll: ()        => ipcRenderer.invoke('documents:list-all'),
   documentAdd:    (data)      => ipcRenderer.invoke('documents:add', data),
   documentStatus: (id, s)     => ipcRenderer.invoke('documents:update-status', id, s),
 

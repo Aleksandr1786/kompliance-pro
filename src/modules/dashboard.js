@@ -24,7 +24,16 @@ async function renderDashboard() {
   const isOutsourcer = typeof LICENSE !== 'undefined' && LICENSE.type === 'OUTSOURCE';
 
   if (isOutsourcer && clients.length >= 1) {
-    renderDashboardOutsourcer(clients, events, alerts, tasks);
+    // Все документы и сотрудники всех клиентов одним запросом каждый,
+    // плюс settings (для vu_data_* — чек-листы готовности ВУ). Нужны
+    // для расчёта готовности по модулям ТЕМИ ЖЕ формулами, что и Центр
+    // готовности (calcOtReadiness/calcPdReadiness/calcVuReadiness из
+    // readiness-calc.js) — иначе дашборд и карточка клиента показывают
+    // разные числа для одного и того же клиента.
+    const allDocs = await window.api.documentsListAll();
+    const allEmps = await window.api.employeesListAll();
+    const settings = await window.api.settingsGet();
+    renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings);
   } else {
     await renderDashboardSpecialist(clients, events, alerts, tasks);
   }
@@ -33,12 +42,44 @@ async function renderDashboard() {
 // ─────────────────────────────────────────────────────────────
 // РЕЖИМ А — АУТСОРСЕР
 // ─────────────────────────────────────────────────────────────
-function renderDashboardOutsourcer(clients, events, alerts, tasks) {
+function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings) {
   const now = new Date();
 
   // Считаем просрочки и «на неделе» по каждому клиенту
   const endOfWeek = new Date(now);
   endOfWeek.setDate(now.getDate() + (7 - now.getDay() || 7));
+
+  // Готовность по модулям для кольца — те же формулы, что в Центре
+  // готовности (readiness-calc.js), а не отдельная метрика дашборда.
+  // Иначе кольцо на дашборде и проценты в карточке клиента расходятся
+  // (например, кольцо ОТ показывало 100% по статусу документов, пока
+  // «Индекс риска ГИТ» в Центре готовности честно учитывал просроченное
+  // обучение сотрудников и не подключённые данные клиента).
+  const MODULE_META = {
+    OT: { label: 'ОТ',  color: '#60a5fa' },
+    PD: { label: 'ПДн', color: '#a78bfa' },
+    VU: { label: 'ВУ',  color: '#fb923c' },
+  };
+  function moduleReadiness(c, emps, moduleCode) {
+    if (moduleCode === 'OT') {
+      const docsOt = allDocs.filter(d => String(d.client_id) === String(c.id) && d.module === 'OT');
+      if (!docsOt.length && !emps.length) return null; // пакет не формировался и сотрудников нет — нет данных вовсе
+      return calcOtReadiness(c, docsOt, emps);
+    }
+    if (moduleCode === 'PD') {
+      const docsPd = allDocs.filter(d => String(d.client_id) === String(c.id) && d.module === 'PD');
+      if (!docsPd.length) return null;
+      return calcPdReadiness(c, docsPd);
+    }
+    if (moduleCode === 'VU') {
+      const vuData = parseVuData(settings, c.id);
+      // Если по ВУ вообще ничего не настроено и пакет не формировался — нет данных
+      const docsVu = allDocs.filter(d => String(d.client_id) === String(c.id) && d.module === 'VU');
+      if (!docsVu.length && !Object.keys(vuData).length) return null;
+      return calcVuReadiness(c, emps, vuData);
+    }
+    return null;
+  }
 
   const clientStats = clients.map(c => {
     const cid = String(c.id);
@@ -59,7 +100,26 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks) {
     }).length;
     const thisWeek = weekTraining + weekEvents;
 
-    return { ...c, overdue, thisWeek };
+    // Ближайшее будущее событие клиента — конкретная дата вместо
+    // абстрактного «1 на неделе» (events:list уже отдаёт client_name,
+    // но здесь он не нужен — событие явно привязано к этому клиенту).
+    const futureEvents = events
+      .filter(e => String(e.client_id) === cid && new Date(e.due_date) >= now)
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    const nextEvent = futureEvents[0] || null;
+
+    // Готовность по подключённым модулям (только те, что есть в c.modules)
+    const empsOfClient = allEmps.filter(e => String(e.client_id) === cid);
+    const mods = (c.modules || 'OT').split(',').map(m => m.trim()).filter(Boolean);
+    const segments = mods
+      .filter(m => MODULE_META[m])
+      .map(m => {
+        const val = moduleReadiness(c, empsOfClient, m);
+        return { code: m, label: MODULE_META[m].label, color: MODULE_META[m].color, value: val };
+      })
+      .filter(s => s.value !== null); // модуль подключён, но данных по нему нет вовсе — не учитываем в кольце
+
+    return { ...c, overdue, thisWeek, nextEvent, segments };
   });
 
   // Сортировка: сначала с просрочками (по убыванию), затем с недельными, затем зелёные
@@ -109,67 +169,49 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks) {
       .oc-badge-red   { background: rgba(248,113,113,0.1); border-color: rgba(248,113,113,0.25); color: #f87171; }
       .oc-badge-amber { background: rgba(251,191,36,0.1);  border-color: rgba(251,191,36,0.25);  color: #fbbf24; }
       .oc-badge-green { background: rgba(52,211,153,0.1);  border-color: rgba(52,211,153,0.25);  color: #34d399; }
-      .outsourcer-table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .outsourcer-table th {
-        font-size: 11px;
-        font-weight: 600;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        padding: 0 12px 10px;
-        text-align: left;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-      }
-      .outsourcer-table th.col-num { text-align: center; }
-      .outsourcer-table td {
-        padding: 0;
-        border-bottom: 1px solid rgba(255,255,255,0.04);
-      }
-      .outsourcer-row {
+      .oc-cards { display: flex; flex-direction: column; gap: 12px; }
+      .oc-card {
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 10px 12px;
+        gap: 20px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 16px;
+        padding: 16px 20px;
         cursor: pointer;
-        border-radius: 8px;
-        transition: background .15s;
+        transition: border-color .2s, transform .2s;
       }
-      .outsourcer-row:hover { background: rgba(255,255,255,0.03); }
-      .or-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      .or-status-red   { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.5); }
-      .or-status-amber { background: #fbbf24; box-shadow: 0 0 6px rgba(251,191,36,0.4); }
-      .or-status-green { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,0.4); }
-      .or-name {
-        flex: 1;
-        min-width: 0;
-        font-size: 13px;
-        font-weight: 600;
-        color: #e2e8f0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      .oc-card:hover { border-color: rgba(96,165,250,0.35); transform: translateY(-1px); }
+      .oc-ring-wrap { position: relative; width: 76px; height: 76px; flex-shrink: 0; }
+      .oc-ring-center {
+        position: absolute; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
       }
-      .or-meta {
-        font-size: 11px;
-        color: var(--muted);
-        margin-top: 1px;
+      .oc-ring-pct { font-size: 18px; font-weight: 800; color: #f1f5f9; line-height: 1; }
+      .oc-ring-label { font-size: 8px; color: #64748b; margin-top: 2px; letter-spacing: .3px; }
+      .oc-card-body { flex: 1; min-width: 0; }
+      .oc-card-name { font-size: 15px; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .oc-card-meta { font-size: 11px; color: #64748b; margin: 2px 0 8px; }
+      .oc-card-segs { display: flex; gap: 12px; flex-wrap: wrap; }
+      .oc-seg { display: flex; align-items: center; gap: 5px; font-size: 11px; }
+      .oc-seg-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+      .oc-seg-label { color: #94a3b8; }
+      .oc-seg-val { color: #cbd5e1; font-weight: 700; }
+      .oc-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+      .oc-mini-badges { display: flex; gap: 6px; }
+      .oc-mini-badge {
+        display: flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 7px;
+        font-size: 11px; font-weight: 700; border: 1px solid; position: relative;
       }
-      .or-num {
-        width: 60px;
-        text-align: center;
-        font-size: 13px;
-        font-weight: 700;
-        flex-shrink: 0;
+      .oc-next-event { font-size: 11px; color: #64748b; white-space: nowrap; }
+      @keyframes ocPulseDot {
+        0% { box-shadow: 0 0 0 0 rgba(248,113,113,0.55); }
+        70% { box-shadow: 0 0 0 5px rgba(248,113,113,0); }
+        100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); }
       }
-      .or-score {
-        width: 52px;
-        text-align: right;
-        font-size: 12px;
-        font-weight: 700;
-        flex-shrink: 0;
+      .oc-pulse-dot {
+        position: absolute; top: -3px; right: -3px; width: 6px; height: 6px;
+        border-radius: 50%; background: #f87171; animation: ocPulseDot 1.8s infinite;
       }
     </style>
 
@@ -191,20 +233,8 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks) {
       </div>
     </div>
 
-    <div class="panel" style="padding: 0; overflow: hidden;">
-      <table class="outsourcer-table" style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr>
-            <th style="padding: 10px 12px 10px 44px; text-align:left;">Клиент</th>
-            <th class="col-num" style="color: #f87171; width:100px;">Просрочено</th>
-            <th class="col-num" style="color: #fbbf24; width:100px;">На неделе</th>
-            <th class="col-num" style="color: #94a3b8; width:100px; padding-right:16px;">Готовность</th>
-          </tr>
-        </thead>
-        <tbody id="outsourcerClientList">
-          ${renderOutsourcerRows(clientStats)}
-        </tbody>
-      </table>
+    <div class="oc-cards">
+      ${renderOutsourcerRows(clientStats)}
     </div>
 
     ${tasks.filter(t => !t.done).length ? `
@@ -220,42 +250,89 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks) {
   `;
 }
 
+// SVG-кольцо готовности, разбитое на сегменты по модулям (ОТ/ПДн/ВУ).
+// Если у клиента подключён только один модуль — кольцо просто рисует одну
+// дугу его цветом. Если сегментов нет вовсе (пакет никогда не формировался) —
+// рисуем пустое серое кольцо с прочерком, чтобы не врать нулём.
+function renderReadinessRing(segments, size = 76, stroke = 8) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const cx = size / 2, cy = size / 2;
+
+  if (!segments.length) {
+    return `<div class="oc-ring-wrap">
+      <svg width="${size}" height="${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="${stroke}"/></svg>
+      <div class="oc-ring-center"><div class="oc-ring-pct" style="color:#475569">—</div><div class="oc-ring-label">нет данных</div></div>
+    </div>`;
+  }
+
+  const overall = Math.round(segments.reduce((s, x) => s + x.value, 0) / segments.length);
+  const overallColor = overall >= 80 ? '#34d399' : overall >= 40 ? '#fbbf24' : '#f87171';
+  let offset = 0;
+  const arcs = segments.map(seg => {
+    const segLen = (c / segments.length) - (segments.length > 1 ? 3 : 0);
+    const dash = `${(seg.value / 100) * segLen} ${c}`;
+    const arc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash}" stroke-dashoffset="${-offset}" stroke-linecap="round"/>`;
+    offset += c / segments.length;
+    return arc;
+  }).join('');
+
+  return `<div class="oc-ring-wrap">
+    <svg width="${size}" height="${size}" style="transform:rotate(-90deg)">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="${stroke}"/>
+      ${arcs}
+    </svg>
+    <div class="oc-ring-center"><div class="oc-ring-pct" style="color:${overallColor}">${overall}%</div><div class="oc-ring-label">готовность</div></div>
+  </div>`;
+}
+
 function renderOutsourcerRows(clientStats) {
   if (!clientStats.length) {
-    return `<tr><td colspan="4" style="padding: 24px; text-align: center; color: var(--muted); font-size: 13px;">
+    return `<div class="panel" style="padding:24px;text-align:center;color:var(--muted);font-size:13px">
       ${term('clientsGenPl')} пока нет — нажмите «+ ${term('addClient')}»
-    </td></tr>`;
+    </div>`;
   }
 
   return clientStats.map(c => {
-    const statusClass = c.overdue > 0 ? 'or-status-red' : c.thisWeek > 0 ? 'or-status-amber' : 'or-status-green';
-    const scoreColor  = (c.score||0) >= 80 ? '#34d399' : (c.score||0) >= 40 ? '#fbbf24' : '#f87171';
-    const initials    = getInitials(c.name);
+    const initials = getInitials(c.name);
 
-    return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background .15s;"
-      onclick="navigate('client',${c.id})"
-      onmouseover="this.style.background='rgba(255,255,255,0.03)'"
-      onmouseout="this.style.background='transparent'">
-      <td style="padding:10px 12px;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div class="or-status ${statusClass}"></div>
-          <div style="width:28px;height:28px;border-radius:8px;background:${c.color||'#60a5fa'}22;border:1px solid ${c.color||'#60a5fa'}44;color:${c.color||'#60a5fa'};font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${initials}</div>
-          <div>
-            <div class="or-name">${c.name}</div>
-            <div class="or-meta">${c.staff||0} чел. · ${c.region||'—'}</div>
-          </div>
-        </div>
-      </td>
-      <td style="text-align:center;font-size:13px;font-weight:700;width:100px;color:${c.overdue > 0 ? '#f87171' : 'var(--muted)'}">
-        ${c.overdue > 0 ? c.overdue : '—'}
-      </td>
-      <td style="text-align:center;font-size:13px;font-weight:700;width:100px;color:${c.thisWeek > 0 ? '#fbbf24' : 'var(--muted)'}">
-        ${c.thisWeek > 0 ? c.thisWeek : '—'}
-      </td>
-      <td style="text-align:right;font-size:12px;font-weight:700;width:100px;padding-right:16px;color:${scoreColor}">
-        ${c.score||0}%
-      </td>
-    </tr>`;
+    const segsHtml = c.segments.length ? c.segments.map(s => `
+      <div class="oc-seg">
+        <span class="oc-seg-dot" style="background:${s.color}"></span>
+        <span class="oc-seg-label">${s.label}</span>
+        <span class="oc-seg-val">${s.value}%</span>
+      </div>`).join('') : `<div class="oc-seg"><span class="oc-seg-label">Пакеты ещё не формировались</span></div>`;
+
+    const overdueBadge = c.overdue > 0
+      ? `<div class="oc-mini-badge" style="background:rgba(248,113,113,0.1);border-color:rgba(248,113,113,0.25);color:#f87171">
+           <span class="oc-pulse-dot"></span>${c.overdue} просрочено
+         </div>`
+      : `<div class="oc-mini-badge" style="background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.06);color:#475569">— просрочено</div>`;
+
+    const weekBadge = c.thisWeek > 0
+      ? `<div class="oc-mini-badge" style="background:rgba(251,191,36,0.1);border-color:rgba(251,191,36,0.25);color:#fbbf24">${c.thisWeek} на неделе</div>`
+      : `<div class="oc-mini-badge" style="background:rgba(255,255,255,0.03);border-color:rgba(255,255,255,0.06);color:#475569">— на неделе</div>`;
+
+    let nextEventHtml = '';
+    if (c.nextEvent) {
+      const diff = Math.round((new Date(c.nextEvent.due_date) - new Date()) / 86400000);
+      const evColor = diff <= 3 ? '#f87171' : diff <= 14 ? '#fbbf24' : '#64748b';
+      nextEventHtml = `<div class="oc-next-event" style="color:${evColor}">${c.nextEvent.title} · через ${diff} дн.</div>`;
+    }
+
+    return `<div class="oc-card" onclick="navigate('client',${c.id})">
+      ${renderReadinessRing(c.segments)}
+      <div class="oc-card-body">
+        <div class="oc-card-name">${c.name}</div>
+        <div class="oc-card-meta">${c.staff||0} чел. · ${c.region||'—'}</div>
+        <div class="oc-card-segs">${segsHtml}</div>
+      </div>
+      <div class="oc-card-right">
+        <div class="oc-mini-badges">${overdueBadge}${weekBadge}</div>
+        ${nextEventHtml}
+      </div>
+    </div>`;
   }).join('');
 }
 

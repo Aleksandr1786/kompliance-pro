@@ -167,7 +167,7 @@ async function gen_03_01(c,s,dir){
   const hdr=row([cell('№ п/п',colW[0],{bold:true,center:true,sz:SZ_S}),cell('ФИО работника',colW[1],{bold:true,center:true,sz:SZ_S}),cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),cell('Дата',colW[3],{bold:true,center:true,sz:SZ_S}),cell('Группа',colW[4],{bold:true,center:true,sz:SZ_S}),cell('Кто проводил инструктаж',colW[5],{bold:true,center:true,sz:SZ_S}),cell('Подпись',colW[6],{bold:true,center:true,sz:SZ_S})]);
   const er=Array.from({length:20},(_,i)=>row(colW.map((w,j)=>cell(j===0?String(i+1):'',w,{center:j===0,sz:SZ_S}))));
   const ch=[pC(safe(c.name),{bold:true}),...eL(2),H('ЖУРНАЛ'),H('учёта присвоения группы I по электробезопасности',SZ),H('неэлектротехническому персоналу',SZ),...eL(2),pL('Начат: «___» ____________ '+safe(c.doc_year)+' г.'),pL('Окончен: «___» ____________ ______ г.'),...eL(1),pL('Ответственный: '+(c.elec_position||c.manager_position)+'  '+(c.elec_name||c.manager_name)),new (require('docx').Paragraph)({children:[]}),p('Инструктаж с присвоением I группы проводится ежегодно. Основание: Приказ Минэнерго от 12.08.2022 № 811, Приказ Минтруда от 15.12.2020 № 903н.',{sz:SZ_S}),...eL(1),tbl(colW,[hdr,...er])];
-  return save([{properties:{page:{size:{width:16838,height:11906,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('03.01')},children:ch}],dir,'Журнал учёта присвоения I группы электробезопасности.docx');
+  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('03.01')},children:ch}],dir,'Журнал учёта присвоения I группы электробезопасности.docx');
 }
 
 async function gen_03_02(c,s,dir){

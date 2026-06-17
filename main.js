@@ -206,6 +206,7 @@ function initDB() {
       license_email: '',
       license_plan: '',
       license_expire: '',
+      license_limit: '',
     }
   }).write();
 
@@ -220,6 +221,96 @@ function nextId(collection) {
 }
 
 function now() { return new Date().toISOString(); }
+
+/**
+ * Валидация данных клиента. Используется и в clients:add, и в clients:update —
+ * единая точка проверки независимо от того, идут ли данные из формы рендерера
+ * или из любого другого источника (импорт, будущие интеграции). До этой правки
+ * clients:update писал в БД data без проверок вовсе — название/ОКВЭД/ИНН могли
+ * стать пустыми или некорректными при редактировании, в отличие от добавления.
+ * Возвращает null, если всё корректно, иначе { error }.
+ * partial=true — для update: проверяет только те поля, что реально пришли в data
+ * (не требует name/okved, если их не передавали — иначе нельзя было бы обновить
+ * только, например, ФИО руководителя без пересылки всех остальных полей).
+ */
+function validateClient(data, partial) {
+  if ((!partial || 'name' in data) && !data.name?.trim()) {
+    return { error: 'Название организации обязательно' };
+  }
+  if ((!partial || 'okved' in data) && !data.okved?.trim()) {
+    return { error: 'ОКВЭД обязателен' };
+  }
+  if ('inn' in data) {
+    const inn = (data.inn || '').trim();
+    if (inn && !/^\d{10}$|^\d{12}$/.test(inn)) {
+      return { error: 'ИНН должен содержать 10 или 12 цифр' };
+    }
+  }
+  if ('soat_class' in data && data.soat_class !== '' && data.soat_class != null) {
+    const cls = String(data.soat_class).trim();
+    // Реальные значения <option value="..."> в выпадающем списке СОУТ
+    // (clients.js, #e-soat-class и #c-soat-class) — БЕЗ точки: '31','32','33','34'.
+    // Старый regex требовал '3.1'/'3.2' и т.п. — ни одно реальное значение 3.x
+    // через него не проходило, из-за чего сохранение карточки клиента с любым
+    // классом условий труда 3.1–3.4 падало с этой ошибкой независимо от того,
+    // какие ещё поля редактировались.
+    if (cls && !/^(0|1|2|31|32|33|34|4)$/.test(cls)) {
+      return { error: 'Класс условий труда (СОУТ) указан некорректно' };
+    }
+  }
+  return null;
+}
+
+/**
+ * Синхронизирует «плановые» даты клиента (следующий обход / следующая
+ * проверка ГИТ) с коллекцией events — единственным источником данных,
+ * который читает dashboard.js (просрочки, «на этой неделе», «ближайшее
+ * событие» на карточке клиента, блок «Что делать сегодня»). Без этого
+ * синка даты, заполненные в форме редактирования клиента, сохранялись
+ * только в clients и никогда не попадали в events — на дашборде их
+ * просто не существовало.
+ * kind помечает событие как авто-сгенерированное из конкретного поля
+ * клиента — не пересекается с событиями, добавленными вручную через
+ * events:add (у них kind не задан). Вызов идемпотентен: повторное
+ * сохранение той же даты не создаёт дублей, очистка поля удаляет событие.
+ */
+function syncClientDateEvent(clientId, kind, title, dateValue) {
+  const existing = db.get('events').find({ client_id: clientId, kind }).value();
+  const date = (dateValue || '').trim();
+  if (!date) {
+    if (existing) db.get('events').remove({ client_id: clientId, kind }).write();
+    return;
+  }
+  if (existing) {
+    if (existing.due_date !== date) {
+      db.get('events').find({ client_id: clientId, kind }).assign({ due_date: date, status: 'pending' }).write();
+    }
+  } else {
+    const id = nextId('events');
+    db.get('events').push({ id, client_id: clientId, kind, title, due_date: date, status: 'pending' }).write();
+  }
+}
+
+/** Вызывается из clients:add и clients:update — прогоняет обе плановые даты через syncClientDateEvent. */
+function syncClientEvents(clientId, data) {
+  if ('next_visit_date' in data) {
+    syncClientDateEvent(clientId, 'next_visit', 'Плановый обход', data.next_visit_date);
+  }
+  if ('git_next_date' in data) {
+    syncClientDateEvent(clientId, 'git_check', 'Плановая проверка ГИТ', data.git_next_date);
+  }
+}
+
+/** Аналогично validateClient — для сотрудников, используется в add и update. */
+function validateEmployee(data, partial) {
+  if ((!partial || 'full_name' in data) && !data.full_name?.trim()) {
+    return { error: 'ФИО сотрудника обязательно' };
+  }
+  if ((!partial || 'position' in data) && !data.position?.trim()) {
+    return { error: 'Должность обязательна' };
+  }
+  return null;
+}
 
 /**
  * Корневая папка для документов клиентов.
@@ -249,10 +340,8 @@ ipcMain.handle('clients:get', (_, id) => {
 });
 
 ipcMain.handle('clients:add', (_, data) => {
-  if (!data.name?.trim()) return { error: 'Название организации обязательно' };
-  if (!data.okved?.trim()) return { error: 'ОКВЭД обязателен' };
-  const inn = (data.inn || '').trim();
-  if (inn && !/^\d{10}$|^\d{12}$/.test(inn)) return { error: 'ИНН должен содержать 10 или 12 цифр' };
+  const err = validateClient(data, false);
+  if (err) return err;
 
   // Ограничение триала: максимум 2 клиента
   const trial = checkTrial(db);
@@ -263,14 +352,31 @@ ipcMain.handle('clients:add', (_, data) => {
     }
   }
 
+  // Лимит тарифа «Аутсорсер» (до 10 клиентов) — «Аутсорсер Про» (limit=0)
+  // безлимитный. Проверяется только на собранном приложении (exe) — в
+  // dev-режиме (start.bat) лицензия не действует вообще, см. checkTrial.
+  if (app.isPackaged) {
+    const settings = db.get('settings').value();
+    if (settings.license_type === 'OUTSOURCE' && Number(settings.license_limit) > 0) {
+      const activeCount = db.get('clients').filter({ archived: 0 }).value().length;
+      if (activeCount >= Number(settings.license_limit)) {
+        return { error: `Лимит тарифа «Аутсорсер» — ${settings.license_limit} клиентов. Перейдите на «Аутсорсер Про» для безлимитного количества.` };
+      }
+    }
+  }
+
   const id = nextId('clients');
   const client = { ...data, id, created_at: now(), score: 0 };
   db.get('clients').push(client).write();
+  syncClientEvents(id, data);
   return { id };
 });
 
 ipcMain.handle('clients:update', (_, id, data) => {
+  const err = validateClient(data, true);
+  if (err) return err;
   db.get('clients').find({ id }).assign(data).write();
+  syncClientEvents(id, data);
   return { ok: true };
 });
 
@@ -286,6 +392,14 @@ ipcMain.handle('clients:delete', (_, id) => {
 // ─── СОТРУДНИКИ ──────────────────────────────────────────
 ipcMain.handle('employees:list', (_, clientId) => {
   return db.get('employees').filter({ client_id: clientId }).sortBy('full_name').value();
+});
+
+// Для дашборда аутсорсера: учёт обучения (Программа А/Первая помощь/Пожарный
+// минимум/Повторный инструктаж) при подсчёте кольца готовности ОТ. Без этого
+// готовность считалась только по статусу документов и могла показывать 100%
+// даже при просроченном обучении у сотрудников — см. training:alerts.
+ipcMain.handle('employees:list-all', () => {
+  return db.get('employees').value();
 });
 
 // ─── ПОДРАЗДЕЛЕНИЯ ───────────────────────────────────────
@@ -312,14 +426,30 @@ ipcMain.handle('divisions:delete', (_, id) => {
 });
 
 ipcMain.handle('employees:add', (_, data) => {
-  if (!data.full_name?.trim()) return { error: 'ФИО сотрудника обязательно' };
-  if (!data.position?.trim()) return { error: 'Должность обязательна' };
+  const err = validateEmployee(data, false);
+  if (err) return err;
+
+  // Лимит тарифа SOLO (Микро/Малый/Средний — по числу сотрудников). В
+  // режиме «Своя организация» клиент всегда один, поэтому считаем всех
+  // сотрудников в базе целиком. Не действует в dev-режиме (start.bat).
+  if (app.isPackaged) {
+    const settings = db.get('settings').value();
+    if (settings.license_type === 'SOLO' && Number(settings.license_limit) > 0) {
+      const empCount = db.get('employees').value().length;
+      if (empCount >= Number(settings.license_limit)) {
+        return { error: `Лимит вашего тарифа — ${settings.license_limit} сотрудников. Перейдите на тариф выше для увеличения лимита.` };
+      }
+    }
+  }
+
   const id = nextId('employees');
   db.get('employees').push({ ...data, id }).write();
   return { id };
 });
 
 ipcMain.handle('employees:update', (_, id, data) => {
+  const err = validateEmployee(data, true);
+  if (err) return err;
   db.get('employees').find({ id }).assign(data).write();
   return { ok: true };
 });
@@ -332,6 +462,14 @@ ipcMain.handle('employees:delete', (_, id) => {
 // ─── ДОКУМЕНТЫ ───────────────────────────────────────────
 ipcMain.handle('documents:list', (_, clientId) => {
   return db.get('documents').filter({ client_id: clientId }).value();
+});
+
+// Для дашборда аутсорсера: готовность по модулям (ОТ/ПДн/ВУ) считается по
+// всем клиентам сразу. Один проход по всей таблице документов вместо N
+// отдельных documents:list — иначе при росте числа клиентов (цель — 200+)
+// открытие дашборда дёргало бы IPC по разу на каждого клиента.
+ipcMain.handle('documents:list-all', () => {
+  return db.get('documents').value();
 });
 
 ipcMain.handle('documents:add', (_, data) => {
@@ -459,9 +597,21 @@ ipcMain.handle('open-external', async (_, url) => {
 
 // ─── ГЕНЕРАЦИЯ ДОКУМЕНТОВ ────────────────────────────────────
 ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
-  const client = db.get('clients').find({ id: clientId }).value();
+  let client = db.get('clients').find({ id: clientId }).value();
   if (!client) return { ok: false, error: 'Клиент не найден' };
   const settings = db.get('settings').value();
+
+  // Фиксируем дату документов один раз — при первом формировании.
+  // Без этого c.doc_date (gen_p1.js) каждый день фоллбэчился бы на
+  // «сегодня», и тексты документов с датой («от «ДД.ММ.ГГГГ» №…»,
+  // «Утвердить с ДД.ММ.ГГГГ», «Разработал … «ДД.ММ.ГГГГ»») менялись
+  // бы ЕЖЕДНЕВНО без какой-либо причины в доказательной базе (doc_date
+  // не входит в FIELD_LABELS — диф никогда бы это не объяснил).
+  if (!client.doc_date) {
+    const fixedDate = new Date().toLocaleDateString('ru-RU');
+    db.get('clients').find({ id: clientId }).assign({ doc_date: fixedDate }).write();
+    client = db.get('clients').find({ id: clientId }).value();
+  }
 
   const rootDir  = getOutputRoot();
   const safeName = (client.name || 'Клиент').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 60).replace(/[ .]+$/, '') || 'Клиент';
@@ -541,6 +691,8 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
 
         // «Почему изменился документ» (Фаза 1, хвост для пути «Сдать отчёт» —
         // та же логика, что в docs:generate; см. utils.diffClientFields).
+        // Снимок — per-модульный, ветка VU (см. комментарий в docs:generate
+        // про touchedModules / last_gen_snapshot[docModule]).
         const docMeta = DOC_META[baseName] || {};
         const newTemplateVersion = docMeta.version || 1;
         let changeReason = null;
@@ -552,7 +704,8 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
               + (docMeta.npa ? ': ' + docMeta.npa : '')
               + ` (версия документа ${oldTemplateVersion} → ${newTemplateVersion})`;
           } else {
-            const changedFields = diffClientFields(client.last_gen_snapshot, clientWithEmployees);
+            const moduleSnapshot = client.last_gen_snapshot && client.last_gen_snapshot.VU;
+            const changedFields = diffClientFields(moduleSnapshot, clientWithEmployees);
             if (changedFields.length) {
               changeReason = 'Изменились данные клиента: '
                 + changedFields.map(c => `${c.label} (${c.from} → ${c.to})`).join(', ');
@@ -586,10 +739,10 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
         }).write();
       }
 
-      // Снимок отслеживаемых полей клиента — общий с docs:generate
-      // (см. utils.diffClientFields / snapshotClientFields).
+      // Снимок отслеживаемых полей клиента — per-модульный, обновляем
+      // только ветку VU (см. docs:generate / touchedModules).
       db.get('clients').find({ id: clientId }).assign({
-        last_gen_snapshot: snapshotClientFields(clientWithEmployees),
+        last_gen_snapshot: { ...(client.last_gen_snapshot || {}), VU: snapshotClientFields(clientWithEmployees) },
       }).write();
     } catch(e) { /* запись в реестр не критична для самой генерации файлов */ }
 
@@ -612,9 +765,17 @@ ipcMain.handle('vu:generate-reports', async (_, clientId, docs) => {
 });
 
 ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
-  const client = db.get('clients').find({ id: clientId }).value();
+  let client = db.get('clients').find({ id: clientId }).value();
   if (!client) return { ok: false, error: 'Клиент не найден' };
   const settings = db.get('settings').value();
+
+  // Фиксируем дату документов один раз — при первом формировании
+  // (см. комментарий в vu:generate-reports — та же причина).
+  if (!client.doc_date) {
+    const fixedDate = new Date().toLocaleDateString('ru-RU');
+    db.get('clients').find({ id: clientId }).assign({ doc_date: fixedDate }).write();
+    client = db.get('clients').find({ id: clientId }).value();
+  }
 
   // Папка клиента: <корень документов> / Название организации
   const rootDir  = getOutputRoot();
@@ -718,6 +879,9 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
 
     const report = { updated: [], added: [], unchanged: [] };
     const seenNames = new Set(); // защита от дублей внутри одной генерации
+    // Какие модули реально обрабатывались в этом запуске — для точечного
+    // обновления per-модульного снимка last_gen_snapshot (см. ниже).
+    const touchedModules = new Set();
 
     for (const filename of result.generated) {
       maxId++;
@@ -752,14 +916,27 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
         }
       }
 
-      // «Почему изменился документ» (Фаза 1, только основной путь
-      // generatePackage). Разделитель причин:
+      // Определяем модуль по папке файла — нужен и для причины (свой снимок
+      // на модуль), и для записи в реестр.
+      const filePath = filename.replace(/\\/g, '/');
+      let docModule = 'OT';
+      if (filePath.includes('Персональные данные'))   docModule = 'PD';
+      else if (filePath.includes('Воинский учёт'))     docModule = 'VU';
+      touchedModules.add(docModule);
+
+      // «Почему изменился документ» (Фаза 1). Разделитель причин:
       //   - версия шаблона выросла (doc-meta.js) → обновлены требования НПА;
       //   - версия та же, но изменились отслеживаемые поля клиента
       //     (FIELD_LABELS) → изменились данные клиента;
-      //   - ни то ни другое (например, первое формирование после внедрения
-      //     фичи, нет снимка) → причина не подбирается, чтобы не показать
-      //     ложную информацию в доказательной базе.
+      //   - ни то ни другое (например, первое формирование этого модуля
+      //     после внедрения фичи, нет снимка) → причина не подбирается,
+      //     чтобы не показать ложную информацию в доказательной базе.
+      //
+      // Снимок — per-модульный (client.last_gen_snapshot[docModule]), а не
+      // общий: doc_content_hash документов каждого модуля «протухает» в свой
+      // момент — когда этот модуль формировался последний раз. Общий снимок
+      // приводил к тому, что формирование одного модуля «съедало» диф и
+      // следующее формирование другого модуля его уже не видело.
       const docMeta = DOC_META[baseName] || {};
       const newTemplateVersion = docMeta.version || 1;
       let changeReason = null;
@@ -771,7 +948,8 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
             + (docMeta.npa ? ': ' + docMeta.npa : '')
             + ` (версия документа ${oldTemplateVersion} → ${newTemplateVersion})`;
         } else {
-          const changedFields = diffClientFields(client.last_gen_snapshot, clientWithEmployees);
+          const moduleSnapshot = client.last_gen_snapshot && client.last_gen_snapshot[docModule];
+          const changedFields = diffClientFields(moduleSnapshot, clientWithEmployees);
           if (changedFields.length) {
             changeReason = 'Изменились данные клиента: '
               + changedFields.map(c => `${c.label} (${c.from} → ${c.to})`).join(', ');
@@ -783,11 +961,6 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
       else if (changeType === 'updated') report.updated.push({ name: baseName, reason: changeReason });
       else report.added.push(baseName);
 
-      // Определяем модуль по папке файла
-      const filePath = filename.replace(/\\/g, '/');
-      let docModule = 'OT';
-      if (filePath.includes('Персональные данные'))   docModule = 'PD';
-      else if (filePath.includes('Воинский учёт'))     docModule = 'VU';
       const npaText =
           docModule === 'PD' ? 'ФЗ-152 от 27.07.2006, ФЗ-266 от 14.07.2022, ПП РФ №1119'
         : docModule === 'VU' ? 'ФЗ-53 от 28.03.1998, ПП РФ №719 от 27.11.2006'
@@ -820,11 +993,18 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
       }).write();
     }
 
-    // Снимок отслеживаемых полей клиента — основа для причины «изменились
-    // данные клиента» при следующем формировании (см. utils.diffClientFields).
-    db.get('clients').find({ id: clientId }).assign({
-      last_gen_snapshot: snapshotClientFields(clientWithEmployees),
-    }).write();
+    // Снимок отслеживаемых полей клиента — per-модульный (см. комментарий
+    // выше про touchedModules): обновляем только те ветки last_gen_snapshot,
+    // модули которых реально формировались в этом запуске. Остальные ветки
+    // (например, VU, если формировали только ОТ/ПДн) остаются как были —
+    // иначе следующее формирование VU не увидело бы диф, накопленный с
+    // момента ЕГО последнего формирования.
+    {
+      const newSnapshot = { ...(client.last_gen_snapshot || {}) };
+      const currentSnapshot = snapshotClientFields(clientWithEmployees);
+      for (const m of touchedModules) newSnapshot[m] = currentSnapshot;
+      db.get('clients').find({ id: clientId }).assign({ last_gen_snapshot: newSnapshot }).write();
+    }
 
     return {
       ok:           true,
@@ -1171,6 +1351,21 @@ const TRIAL_DAYS      = 14;
 const TRIAL_MAX_CLIENTS = 2;
 const LICENSE_SECRET  = 'KP-2026-SECRET-XJ9'; // не менять после релиза!
 
+// Тарифные комбинации (тип лицензии + лимит). Для OUTSOURCE лимит — это
+// максимум АКТИВНЫХ клиентов, для SOLO — максимум сотрудников. 0 = без
+// ограничений. ВАЖНО: этот список должен СОВПАДАТЬ построчно с TARIFFS
+// в keygen.js — если меняешь тарифы (цену, лимит, добавляешь новый),
+// меняй сразу в обоих файлах, иначе уже выданные ключи перестанут
+// проходить проверку или новые ключи не будут совпадать с тем, что
+// генерирует keygen.js.
+const TARIFF_COMBOS = [
+  { type: 'OUTSOURCE', limit: 10  }, // Аутсорсер — до 10 клиентов — 3990₽
+  { type: 'OUTSOURCE', limit: 0   }, // Аутсорсер Про — без лимита — 4990₽
+  { type: 'SOLO',       limit: 15  }, // Микро — до 15 сотрудников — 2490₽
+  { type: 'SOLO',       limit: 100 }, // Малый — до 100 сотрудников — 3990₽
+  { type: 'SOLO',       limit: 250 }, // Средний — до 250 сотрудников — 5990₽
+];
+
 // Уникальный ID машины — серийник диска C: + имя компьютера
 function getMachineId() {
   const crypto = require('crypto');
@@ -1186,14 +1381,25 @@ function getMachineId() {
   }
 }
 
-// Генерация ключа: SECRET + тип + дата + ID машины
-function generateMachineKey(type, expireDate, machineId) {
+// Генерация ключа: SECRET + тип + дата + ID машины + лимит.
+// Лимит добавлен в хеш, чтобы его нельзя было подменить вручную в
+// settings.json — он криптографически зашит в сам ключ, как и тип.
+function generateMachineKey(type, expireDate, machineId, limit) {
   const crypto = require('crypto');
-  const raw = LICENSE_SECRET + ':' + type + ':' + expireDate + ':' + machineId;
+  const raw = LICENSE_SECRET + ':' + type + ':' + expireDate + ':' + machineId + ':' + limit;
   return 'KP-' + crypto.createHash('sha256').update(raw).digest('hex').substring(0, 24).toUpperCase();
 }
 
 function checkTrial(db) {
+  // Dev-режим: запуск через start.bat (электрон не упакован в exe).
+  // Это твой собственный рабочий инструмент — баннер триала/лицензии
+  // тут не нужен вообще, независимо от того, что лежит в settings.
+  // На собранный exe (твой личный или клиентский) это не влияет —
+  // там app.isPackaged === true и весь код ниже работает как раньше.
+  if (!app.isPackaged) {
+    return { status: 'licensed', daysLeft: null, machineId: getMachineId(), dev: true };
+  }
+
   const settings  = db.get('settings').value();
   const machineId = getMachineId();
 
@@ -1265,25 +1471,30 @@ ipcMain.handle('license:activate', (_, key, expireDate, type) => {
       license_expires: expireDate,
       license_machine: machineId,
       license_type:    'OUTSOURCE',
+      license_limit:   0, // безлимит
       license_modules: 'OT,PD,VU',
       trial_status:    'licensed',
     }).write();
     return { ok: true };
   }
 
-  // Проверяем ключ с привязкой к машине
-  for (const t of ['OUTSOURCE', 'SOLO']) {
-    const expected = generateMachineKey(t, expireDate, machineId);
+  // Проверяем ключ с привязкой к машине — перебираем все известные
+  // тарифные комбинации (тип+лимит), а не просто два «голых» типа:
+  // лимит зашит в хеш, поэтому угадывать его отдельно не нужно — какая
+  // комбинация совпала, та и верна.
+  for (const combo of TARIFF_COMBOS) {
+    const expected = generateMachineKey(combo.type, expireDate, machineId, combo.limit);
     if (key.trim().toUpperCase() === expected) {
       db.get('settings').assign({
         license_key:     key.trim().toUpperCase(),
         license_expires: expireDate,
         license_machine: machineId,
-        license_type:    t,
+        license_type:    combo.type,
+        license_limit:   combo.limit,
         license_modules: 'OT,PD,VU',
         trial_status:    'licensed',
       }).write();
-      return { ok: true, type: t };
+      return { ok: true, type: combo.type, limit: combo.limit };
     }
   }
 
@@ -1298,6 +1509,7 @@ ipcMain.handle('trial:reset', () => {
     license_key:     '',
     license_expires: '',
     license_machine: '',
+    license_limit:   '',
     license_type:    '',
     license_modules: '',
   }).write();

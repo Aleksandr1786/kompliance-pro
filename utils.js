@@ -450,6 +450,7 @@ const FIELD_LABELS = {
   medcheck_required: 'Медосмотры обязательны',
   ot_position:       'Должность отв. за ОТ',
   ot_name:           'ФИО отв. за ОТ',
+  doc_date:          'Дата документов',
 };
 
 /**

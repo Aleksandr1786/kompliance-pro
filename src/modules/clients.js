@@ -362,7 +362,8 @@ async function submitEditClient(clientId) {
     soat_med_req:      parseInt(document.getElementById('e-soat-med-req')?.value) || 0,
   };
 
-  await window.api.clientUpdate(clientId, data);
+  const result = await window.api.clientUpdate(clientId, data);
+  if (result?.error) { showToast(result.error, 'var(--red)'); return; }
   closeModal('modalEditClient');
   showToast('Данные ' + term('clientGen') + ' сохранены ✓');
   await navigate('client', clientId);

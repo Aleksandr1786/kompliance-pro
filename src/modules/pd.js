@@ -293,18 +293,13 @@ async function renderPdReadiness(clientId) {
   const emps = await window.api.employeesList(clientId);
   const now = new Date();
 
-  // Score ПДн
+  // Score ПДн — единая формула, см. readiness-calc.js (calcPdReadiness)
   const pdResp = c.pd_responsible_name || '';
   const pdRkn  = c.pd_notified_rkn;
   const pdDate = c.pd_notification_date ? new Date(c.pd_notification_date) : null;
   const ispdn  = (c.pd_ispdn_list || []).length;
 
-  let score = 0;
-  if (docs.length > 0) score += 35;
-  if (pdRkn) score += 25;
-  if (pdResp) score += 25;
-  if (ispdn > 0) score += 15;
-
+  const score = calcPdReadiness(c, docs);
   const scoreColor = score >= 80 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)';
 
   // Риски ПДн

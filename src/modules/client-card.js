@@ -4,6 +4,24 @@
 // Декомпозиция app.js — батч 2, 10.06.2026
 // ============================================================
 
+// Компактное кольцо общей готовности для шапки карточки клиента — тот же
+// визуальный язык, что у колец на дашборде аутсорсера (dashboard.js), но
+// одноцветное (здесь один клиент, не разбивка по 3 модулям) и меньше
+// размером, чтобы поместиться в строку рядом с мини-полосками компонентов.
+function renderScoreRing(score, color, size = 56, stroke = 6) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const dash = (score / 100) * c;
+  return `<div style="position:relative;width:${size}px;height:${size}px;flex-shrink:0">
+    <svg width="${size}" height="${size}" style="transform:rotate(-90deg)">
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="${stroke}"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+        stroke-dasharray="${dash} ${c}" stroke-linecap="round"/>
+    </svg>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:${color}">${score}%</div>
+  </div>`;
+}
+
 async function renderClientCard(id) {
   const c = await window.api.clientGet(id);
   if (!c) { renderComingSoon('Клиент не найден'); return; }
@@ -85,7 +103,36 @@ async function renderClientCard(id) {
   scoreTotal += empScore;
   scoreBreakdown.push({ label:'Сотрудники', score:empScore, max:15 });
 
-  const realScore = Math.min(100, scoreTotal);
+  // realScore — ОБЩАЯ готовность клиента по ВСЕМ подключённым модулям,
+  // а не только по ОТ. До этой правки здесь считалась смешанная метрика
+  // (docsScore по ВСЕМ документам клиента сразу, без разделения по
+  // модулям, плюс чисто ОТ-специфичные обучение/данные/сотрудники) —
+  // из-за этого «Готовность» в шапке карточки не совпадала ни с одной
+  // из формул в Центре готовности (readiness-calc.js: calcOtReadiness/
+  // calcPdReadiness/calcVuReadiness), что и заметил пользователь на
+  // примере ИП Свинцова (83% в шапке vs 35% на вкладке ПДн — оба числа
+  // были «правильными» по своей же логике, но про разные вещи).
+  // Теперь realScore = среднее по тем модулям, что реально подключены
+  // у клиента (c.modules) — тот же принцип, что и в кольце на дашборде.
+  async function calcOverallScore() {
+    const settingsAll = await window.api.settingsGet();
+    const scores = [];
+    if (mods.includes('OT')) {
+      const docsOt = docs.filter(d => d.module === 'OT');
+      if (docsOt.length || emps.length) scores.push(calcOtReadiness(c, docsOt, emps));
+    }
+    if (mods.includes('PD')) {
+      const docsPd = docs.filter(d => d.module === 'PD');
+      if (docsPd.length) scores.push(calcPdReadiness(c, docsPd));
+    }
+    if (mods.includes('VU')) {
+      const vuData = parseVuData(settingsAll, id);
+      const docsVu = docs.filter(d => d.module === 'VU');
+      if (docsVu.length || Object.keys(vuData).length) scores.push(calcVuReadiness(c, emps, vuData));
+    }
+    return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  }
+  const realScore = await calcOverallScore();
   // Обновляем score в базе если изменился
   if (realScore !== (c.score||0)) window.api.clientUpdate(id, { score: realScore });
   const scoreColor = realScore >= 80 ? 'var(--green)' : realScore >= 40 ? 'var(--amber)' : 'var(--red)';
@@ -141,22 +188,24 @@ async function renderClientCard(id) {
             ${c.git_next_date?`<span class="hero-tag" title="Плановая проверка ГИТ" style="color:var(--red)">⚠️ Пл.ГИТ: ${formatDate(c.git_next_date)}</span>`:''}
           </div>
         </div>
-        <div class="hero-score" style="text-align:right;cursor:pointer;position:relative" onclick="toggleScoreBreakdown()" title="Нажмите для деталей">
-          <div class="score-val" style="color:${scoreColor}">${realScore}%</div>
-          <div class="score-label">Готовность</div>
-          <div style="display:flex;gap:3px;justify-content:flex-end;margin-top:4px">
-            ${scoreBreakdown.map(s => {
-              const pct = Math.round(s.score/s.max*100);
-              const c = pct===100?'#34d399':pct>=50?'#fbbf24':'#f87171';
-              return `<div title="${s.label}: ${s.score}/${s.max}" style="width:18px;height:3px;border-radius:2px;background:${c}"></div>`;
-            }).join('')}
+        <div class="hero-score" style="text-align:right;cursor:pointer;position:relative;display:flex;align-items:center;gap:14px" onclick="toggleScoreBreakdown()" title="Нажмите для деталей">
+          <div style="text-align:right">
+            <div class="score-label" style="margin-bottom:2px">Готовность</div>
+            <div style="display:flex;gap:3px;justify-content:flex-end">
+              ${scoreBreakdown.map(s => {
+                const pct = Math.round(s.score/s.max*100);
+                const c = pct===100?'#34d399':pct>=50?'#fbbf24':'#f87171';
+                return `<div title="${s.label}: ${s.score}/${s.max}" style="width:18px;height:3px;border-radius:2px;background:${c}"></div>`;
+              }).join('')}
+            </div>
           </div>
+          ${renderScoreRing(realScore, scoreColor)}
         </div>
         <!-- Score breakdown panel -->
         <div id="score-breakdown" style="display:none;position:absolute;top:100%;right:0;margin-top:8px;z-index:100;
           background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:16px 18px;
           min-width:240px;box-shadow:0 16px 40px rgba(0,0,0,0.5)">
-          <div style="font-size:11px;font-weight:700;color:#475569;letter-spacing:.8px;margin-bottom:10px">ДЕТАЛИЗАЦИЯ ГОТОВНОСТИ</div>
+          <div style="font-size:11px;font-weight:700;color:#475569;letter-spacing:.8px;margin-bottom:10px">ДЕТАЛИЗАЦИЯ ПО ОХРАНЕ ТРУДА</div>
           ${scoreBreakdown.map(s => {
             const pct = Math.round(s.score/s.max*100);
             const col = pct===100?'#34d399':pct>=50?'#fbbf24':'#f87171';
@@ -171,6 +220,12 @@ async function renderClientCard(id) {
               ${s.missing?.length ? `<div style="font-size:10px;color:#475569;margin-top:3px">Не заполнено: ${s.missing.slice(0,3).join(', ')}${s.missing.length>3?'...':''}</div>` : ''}
             </div>`;
           }).join('')}
+          ${(mods.includes('PD') || mods.includes('VU')) ? `
+            <div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:6px;padding-top:10px">
+              <div style="font-size:10px;color:#475569;margin-bottom:6px">ДРУГИЕ МОДУЛИ — см. вкладки ПДн/ВУ для деталей</div>
+              ${mods.includes('PD') ? `<div style="font-size:11px;color:#94a3b8;margin-bottom:3px">ПДн — отдельная готовность на вкладке «ПДн»</div>` : ''}
+              ${mods.includes('VU') ? `<div style="font-size:11px;color:#94a3b8">ВУ — отдельная готовность на вкладке «Воинский учёт»</div>` : ''}
+            </div>` : ''}
         </div>
       </div>
       <div class="hero-stats">
@@ -180,6 +235,40 @@ async function renderClientCard(id) {
         <div class="hstat"><div class="hstat-val">${emps.length}</div><div class="hstat-label">Сотрудников</div></div>
       </div>
     </div>
+
+    ${(() => {
+      // «Следующий шаг» — одна точечная подсказка о самом важном незаполненном
+      // поле, а не полный список. Цель: тихо, но заметно подталкивать к 100%
+      // заполненности карточки, от которой зависит качество документов.
+      const dataBlock = scoreBreakdown.find(s => s.label === 'Данные клиента');
+      const missingField = dataBlock?.missing?.[0];
+      const empNoPosition = emps.find(e => !e.position || !e.position.trim());
+      if (missingField) {
+        return `
+        <div onclick="openEditModal(${id})" style="
+          display:flex;align-items:center;gap:10px;cursor:pointer;
+          background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);
+          border-radius:10px;padding:10px 16px;margin-bottom:14px;transition:all .2s"
+          onmouseover="this.style.borderColor='rgba(251,191,36,0.4)'"
+          onmouseout="this.style.borderColor='rgba(251,191,36,0.2)'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span style="font-size:12px;color:#e2e8f0">Не заполнено: <strong>${missingField}</strong> — нажмите, чтобы указать</span>
+        </div>`;
+      }
+      if (empNoPosition) {
+        return `
+        <div onclick="editEmployeePrompt(${empNoPosition.id})" style="
+          display:flex;align-items:center;gap:10px;cursor:pointer;
+          background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);
+          border-radius:10px;padding:10px 16px;margin-bottom:14px;transition:all .2s"
+          onmouseover="this.style.borderColor='rgba(251,191,36,0.4)'"
+          onmouseout="this.style.borderColor='rgba(251,191,36,0.2)'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span style="font-size:12px;color:#e2e8f0">У сотрудника <strong>${empNoPosition.full_name}</strong> не указана должность — нажмите, чтобы заполнить</span>
+        </div>`;
+      }
+      return '';
+    })()}
 
     <!-- ЦЕНТР ГОТОВНОСТИ — кнопка-баннер -->
     <div onclick="openReadinessCenter(${id})" style="
@@ -199,7 +288,7 @@ async function renderClientCard(id) {
           <span style="font-size:11px;font-weight:600;padding:2px 8px;background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.25);border-radius:6px;color:#f87171">ГИТ</span>
           ${(c.modules||'').includes('PD') ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.25);border-radius:6px;color:#60a5fa">РКН</span>` : ''}
           ${(c.modules||'').includes('VU') ? `<span style="font-size:11px;font-weight:600;padding:2px 8px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.25);border-radius:6px;color:#a78bfa">Военкомат</span>` : ''}
-          <span style="font-size:11px;color:#475569">· индекс риска · прогноз · отчёт</span>
+          <span style="font-size:11px;color:#475569">· Индекс риска · Машина времени · Паспорт безопасности</span>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
@@ -225,11 +314,23 @@ async function renderClientCard(id) {
       <div class="grid2">
         <div class="panel">
           <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="panel-title">Ближайшие события</div></div>
-          <div>${events.length ? events.slice(0,6).map(e=>renderEventRow(e)).join('') : emptyState("calendar","Событий нет")}</div>
+          <div>${events.length ? events.slice(0,6).map(e=>renderEventRow(e)).join('') : `
+            <div class="empty-state" style="cursor:pointer" onclick="openEditModal(${id})">
+              <div class="empty-icon">${ic('calendar',32)}</div>
+              <div class="empty-title">Событий нет</div>
+              <div class="empty-sub">Укажите даты обхода/проверки в карточке клиента — здесь появится отсчёт</div>
+            </div>
+          `}</div>
         </div>
         <div class="panel">
           <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="addTaskForClient(${id})">+ Добавить</div></div>
-          <div>${clientTasks.length ? clientTasks.map(t=>renderTaskRow(t)).join('') : emptyState("check-circle","Задач нет")}</div>
+          <div>${clientTasks.length ? clientTasks.map(t=>renderTaskRow(t)).join('') : `
+            <div class="empty-state" style="cursor:pointer" onclick="addTaskForClient(${id})">
+              <div class="empty-icon">${ic('check-circle',32)}</div>
+              <div class="empty-title">Задач нет</div>
+              <div class="empty-sub">Нажмите, чтобы добавить первую</div>
+            </div>
+          `}</div>
         </div>
       </div>
     </div>
@@ -1460,7 +1561,7 @@ async function editEmployeePrompt(empId) {
       }
 
       modal.remove();
-      await window.api.employeeUpdate(empId, {
+      const empResult = await window.api.employeeUpdate(empId, {
         full_name:         name,
         position:          pos,
         birth_date:        birth,
@@ -1476,6 +1577,12 @@ async function editEmployeePrompt(empId) {
         name_ins:          declension?.ins   || '',
         name_short:        declension?.short || '',
       });
+      if (empResult?.error) {
+        showToast(empResult.error, 'var(--red)');
+        await navigate('client', currentClientId);
+        resolve(false);
+        return;
+      }
       if (declension?.dat) {
         showToast('✅ Сотрудник обновлён · ' + declension.short);
       } else {

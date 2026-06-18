@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld('api', {
   settingsGet:    ()          => ipcRenderer.invoke('settings:get'),
   settingsSave:   (data)      => ipcRenderer.invoke('settings:save', data),
 
+  // Telegram и автозапуск
+  telegramBind:    (token)    => ipcRenderer.invoke('telegram:bind', token),
+  appSetAutostart: (enabled)  => ipcRenderer.invoke('app:setAutostart', enabled),
+
   // Статистика
   dashboardStats: ()          => ipcRenderer.invoke('stats:dashboard'),
 

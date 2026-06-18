@@ -84,20 +84,23 @@ async function renderSettings() {
         </div>
 
         <div class="section" id="s-tg">
-          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span><div class="section-title">Telegram-уведомления</div></div>
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></span><div class="section-title">Telegram-уведомления</div>${s.tg_chat_id ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--green);background:rgba(52,211,153,0.12);padding:3px 10px;border-radius:6px">✓ Привязан</span>` : ''}</div>
           <div class="section-body">
             <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;font-size:12.5px;color:var(--muted2);line-height:1.7">
               1. Открой Telegram → найди <b style="color:var(--text)">@BotFather</b> → напиши <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;color:var(--cyan)">/newbot</code><br>
               2. Придумай название и username для бота<br>
               3. Скопируй токен вида <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px;color:var(--cyan)">7123456789:AAH...</code> — вставь ниже<br>
-              4. Нажми «Привязать» → напиши боту любое сообщение
+              4. Открой своего бота в Telegram, напиши ему любое сообщение (например «привет»)<br>
+              5. Вернись сюда и нажми «Привязать»
             </div>
             <div class="form-row">
               <div class="form-group"><div class="form-label">Токен бота</div><input class="form-input" id="s-tg_token" value="${s.tg_token||''}" placeholder="7123456789:AAHxxxxx..."></div>
-              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" onclick="testTelegram()">🔗 Привязать</button></div>
+              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" id="tg-bind-btn" onclick="testTelegram()">🔗 Привязать</button></div>
             </div>
             <div class="toggle-row"><div class="toggle-info"><div class="toggle-label">Утренняя сводка в 8:00</div><div class="toggle-desc">Задачи и события на день</div></div><label class="toggle"><input type="checkbox" ${s.tg_morning==='1'?'checked':''} onchange="saveSetting('tg_morning',this.checked?'1':'0')"><span class="toggle-slider"></span></label></div>
             <div class="toggle-row"><div class="toggle-info"><div class="toggle-label">Срочные уведомления</div><div class="toggle-desc">При просрочке или критическом событии</div></div><label class="toggle"><input type="checkbox" ${s.tg_urgent!=='0'?'checked':''} onchange="saveSetting('tg_urgent',this.checked?'1':'0')"><span class="toggle-slider"></span></label></div>
+            <div class="toggle-row"><div class="toggle-info"><div class="toggle-label">Запускать при включении компьютера</div><div class="toggle-desc">Повышает шанс получить сводку и уведомления, даже если забыли открыть программу</div></div><label class="toggle"><input type="checkbox" ${s.autostart==='1'?'checked':''} onchange="setAutostart(this.checked)"><span class="toggle-slider"></span></label></div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.6">Уведомления приходят, пока приложение открыто на компьютере (фоновой службы без открытого приложения пока нет).</div>
           </div>
         </div>
 
@@ -365,9 +368,30 @@ async function saveAllSettings() {
 
 async function testTelegram() {
   const token = document.getElementById('s-tg_token')?.value?.trim();
+  const btn = document.getElementById('tg-bind-btn');
   if (!token) { showToast('Введите токен бота', 'var(--red)'); return; }
-  showToast('Проверка подключения...');
-  setTimeout(() => showToast('Бот подключён! Напишите ему любое сообщение', 'var(--green)'), 1500);
+
+  const oldText = btn.textContent;
+  btn.textContent = 'Проверяем...';
+  btn.disabled = true;
+
+  const result = await window.api.telegramBind(token);
+
+  btn.textContent = oldText;
+  btn.disabled = false;
+
+  if (result.ok) {
+    showToast('✅ Бот подключён! Проверьте сообщение в Telegram', 'var(--green)', 5000);
+    settings = await window.api.settingsGet();
+    renderSettings();
+  } else {
+    showToast(result.error || 'Не удалось привязать бота', 'var(--red)', 7000);
+  }
+}
+
+async function setAutostart(checked) {
+  await window.api.appSetAutostart(checked);
+  showToast(checked ? 'Автозапуск включён' : 'Автозапуск выключён', checked ? 'var(--green)' : 'var(--muted)');
 }
 
 async function chooseBackupFolder() {

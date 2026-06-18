@@ -189,6 +189,8 @@ function initDB() {
       tg_chat_id: '',
       tg_morning: '1',
       tg_urgent: '1',
+      tg_last_morning_date: '',
+      autostart: '0',
       backup_path: '',
       ai_provider: 'claude',
       ai_key: '',
@@ -529,6 +531,161 @@ ipcMain.handle('tasks:delete', (_, id) => {
   db.get('tasks').remove({ id }).write();
   return { ok: true };
 });
+
+// ─── TELEGRAM ────────────────────────────────────────────
+// Минимальный клиент Bot API на чистом https, без новых npm-зависимостей —
+// тот же стиль, что уже использован в ai:request.
+function telegramApi(token, method, params) {
+  return new Promise((resolve) => {
+    const https = require('https');
+    const data = JSON.stringify(params || {});
+    const req = https.request({
+      hostname: 'api.telegram.org',
+      path: `/bot${token}/${method}`,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      timeout: 10000,
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); }
+        catch (e) { resolve({ ok: false, description: 'Некорректный ответ Telegram (' + res.statusCode + ')' }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, description: e.message }));
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, description: 'Таймаут запроса к Telegram' }); });
+    req.write(data);
+    req.end();
+  });
+}
+
+// Привязка бота: берём последнее сообщение пользователя боту через getUpdates,
+// достаём оттуда chat_id (без него слать сообщения некому), сохраняем и сразу
+// шлём настоящее подтверждение в сам чат — чтобы человек увидел реальный
+// результат в Telegram, а не просто зелёный тост в приложении.
+ipcMain.handle('telegram:bind', async (_, token) => {
+  token = (token || '').trim();
+  if (!token) return { ok: false, error: 'Введите токен бота' };
+
+  const updates = await telegramApi(token, 'getUpdates', {});
+  if (!updates.ok) {
+    return { ok: false, error: 'Не удалось подключиться к Telegram: ' + (updates.description || 'проверьте токен') };
+  }
+  if (!updates.result || !updates.result.length) {
+    return { ok: false, error: 'Сообщений от вас боту не найдено. Откройте бота в Telegram, напишите ему что угодно, и нажмите «Привязать» ещё раз.' };
+  }
+
+  const last = updates.result[updates.result.length - 1];
+  const chatId = last.message?.chat?.id ?? last.channel_post?.chat?.id;
+  if (!chatId) return { ok: false, error: 'Не удалось определить chat_id из последнего сообщения' };
+
+  const sent = await telegramApi(token, 'sendMessage', {
+    chat_id: chatId,
+    text: '✅ КомплаенсПро привязан к этому чату.\n\nСюда будут приходить утренняя сводка и срочные уведомления о просрочках — пока приложение открыто на компьютере.',
+  });
+  if (!sent.ok) {
+    return { ok: false, error: 'Бот найден, но сообщение не отправилось: ' + (sent.description || '') };
+  }
+
+  db.get('settings').assign({ tg_token: token, tg_chat_id: String(chatId) }).write();
+  return { ok: true, chatId: String(chatId) };
+});
+
+// Собирает текст утренней сводки: просрочено + сегодня + открытые срочные задачи.
+function buildMorningDigestText() {
+  const today    = new Date().toISOString().slice(0, 10);
+  const clients  = db.get('clients').value();
+  const events   = db.get('events').value();
+  const tasks    = db.get('tasks').filter({ done: 0 }).value();
+
+  const overdue = events.filter(e => e.status === 'pending' && e.due_date < today);
+  const todayEv = events.filter(e => e.status === 'pending' && e.due_date === today);
+  const urgentTasks = tasks.filter(t => t.priority === 'urgent');
+
+  const clientName = (id) => (clients.find(c => c.id === id) || {}).name || 'Клиент';
+
+  let text = `☀️ Доброе утро! Сводка на ${new Date().toLocaleDateString('ru-RU')}\n`;
+
+  if (!overdue.length && !todayEv.length && !urgentTasks.length) {
+    text += '\nНа сегодня всё в порядке, просрочек нет ✅';
+    return text;
+  }
+
+  if (overdue.length) {
+    text += `\n🔴 Просрочено (${overdue.length}):\n`;
+    text += overdue.slice(0, 8).map(e => `• ${e.title} — ${clientName(e.client_id)}`).join('\n');
+    if (overdue.length > 8) text += `\n…и ещё ${overdue.length - 8}`;
+  }
+  if (todayEv.length) {
+    text += `\n\n🟡 Сегодня (${todayEv.length}):\n`;
+    text += todayEv.slice(0, 8).map(e => `• ${e.title} — ${clientName(e.client_id)}`).join('\n');
+  }
+  if (urgentTasks.length) {
+    text += `\n\n⚡ Срочных задач открыто: ${urgentTasks.length}`;
+  }
+  return text;
+}
+
+// Если включена утренняя сводка, не отправлена сегодня и сейчас 8:00 или позже —
+// отправляем. Это даёт «догоняющую» логику само по себе: если приложение
+// открыли в 14:00, а сводка за сегодня ещё не уходила — она уйдёт прямо сейчас.
+async function maybeSendMorningDigest() {
+  const s = db.get('settings').value();
+  if (!s.tg_token || !s.tg_chat_id || s.tg_morning !== '1') return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (s.tg_last_morning_date === today) return;
+  if (new Date().getHours() < 8) return;
+
+  const text = buildMorningDigestText();
+  const res = await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
+  if (res.ok) {
+    db.get('settings').assign({ tg_last_morning_date: today }).write();
+  }
+}
+
+// Срочные уведомления: шлём только про события, которые СТАЛИ просроченными
+// и о которых ещё не уведомляли (флаг tg_notified на самом событии) — чтобы
+// не дублировать одно и то же сообщение при каждой проверке.
+async function checkUrgentEvents() {
+  const s = db.get('settings').value();
+  if (!s.tg_token || !s.tg_chat_id || s.tg_urgent !== '1') return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const clients = db.get('clients').value();
+  const newlyOverdue = db.get('events')
+    .filter(e => e.status === 'pending' && e.due_date < today && !e.tg_notified)
+    .value();
+
+  for (const e of newlyOverdue) {
+    const name = (clients.find(c => c.id === e.client_id) || {}).name || 'Клиент';
+    const text = `🔴 Просрочено: «${e.title}» — ${name}\nСрок был: ${e.due_date}`;
+    const res = await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
+    if (res.ok) {
+      db.get('events').find({ id: e.id }).assign({ tg_notified: 1 }).write();
+    }
+  }
+}
+
+function startTelegramScheduler() {
+  // Первая проверка — с небольшой задержкой, чтобы БД успела инициализироваться.
+  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); }, 15000);
+  // Дальше — каждые 5 минут, пока приложение открыто.
+  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); }, 5 * 60 * 1000);
+}
+
+// ─── АВТОЗАПУСК ──────────────────────────────────────────
+ipcMain.handle('app:setAutostart', (_, enabled) => {
+  app.setLoginItemSettings({ openAtLogin: !!enabled });
+  db.get('settings').assign({ autostart: enabled ? '1' : '0' }).write();
+  return { ok: true };
+});
+
+function applyAutostartSetting() {
+  const s = db.get('settings').value();
+  app.setLoginItemSettings({ openAtLogin: s.autostart === '1' });
+}
 
 // ─── НАСТРОЙКИ ───────────────────────────────────────────
 ipcMain.handle('settings:get', () => {
@@ -1421,9 +1578,9 @@ function checkTrial(db) {
         db.get('settings').assign({ trial_status: 'subscription_expired' }).write();
         return { status: 'subscription_expired', machineId };
       }
-      return { status: 'licensed', daysLeft, machineId };
+      return { status: 'licensed', daysLeft, machineId, expires: settings.license_expires };
     }
-    return { status: 'licensed', daysLeft: null, machineId };
+    return { status: 'licensed', daysLeft: null, machineId, expires: settings.license_expires || '' };
   }
 
   // ── Подписка истекла ────────────────────────────────
@@ -1696,6 +1853,8 @@ function createWindow() {
 app.whenReady().then(() => {
   initDB();
   autoBackup();
+  applyAutostartSetting();
+  startTelegramScheduler();
   createWindow();
   setupAutoUpdater();
 });

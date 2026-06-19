@@ -39,9 +39,9 @@ async function navigate(page, clientId = null) {
   else if (page === 'tasks')     await renderTasks();
   else if (page === 'reporting') await renderReporting();
   else if (page === 'settings')  await renderSettings();
-  else if (page === 'pd') { checkAccess('PD') ? renderPd() : showModuleLocked('Персональные данные (152-ФЗ)'); }
-  else if (page === 'ot') { checkAccess('OT') ? renderOt() : showModuleLocked('Охрана труда'); }
-  else if (page === 'vu') { checkAccess('VU') ? renderVu() : showModuleLocked('Воинский учёт'); }
+  else if (page === 'pd') { checkAccess('PD') ? await renderPd() : showModuleLocked('Персональные данные (152-ФЗ)'); }
+  else if (page === 'ot') { checkAccess('OT') ? await renderOt() : showModuleLocked('Охрана труда'); }
+  else if (page === 'vu') { checkAccess('VU') ? await renderVu() : showModuleLocked('Воинский учёт'); }
   else renderComingSoon(titles[page] || page);
 }
 

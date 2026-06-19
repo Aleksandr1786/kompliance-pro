@@ -190,6 +190,8 @@ function initDB() {
       tg_chat_id: '',
       tg_morning: '1',
       tg_urgent: '1',
+      tg_npa: '1',
+      npa_general_feed: '1',
       tg_last_morning_date: '',
       npa_last_check_date: '',
       autostart: '0',
@@ -820,7 +822,7 @@ async function _checkNpaUpdates(force = false) {
         ai_summary: aiSummary, ai_verified: isRelevant, seen: 0, created_at: now(),
       }).write();
 
-      if (isRelevant && s.tg_token && s.tg_chat_id && tgSentThisRun < TG_LIMIT_PER_RUN) {
+      if (isRelevant && s.tg_npa !== '0' && s.tg_token && s.tg_chat_id && tgSentThisRun < TG_LIMIT_PER_RUN) {
         const text = `⚖️ Изменение в законодательстве\n\n${watch.label}\n\n${item.title || item.complexName}\n\n${aiSummary || 'Откройте документ на pravo.gov.ru для деталей.'}`;
         await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
         tgSentThisRun++;
@@ -830,19 +832,25 @@ async function _checkNpaUpdates(force = false) {
 
   // Уровень 2 — широкая лента по охране труда (правила по видам работ,
   // изменения ТК РФ и т.п.), без AI и без Telegram — просто копится для
-  // бокового меню «Охрана труда».
-  const general = await pravoApiSearch({ Name: 'охране труда', PublishDateFrom: sinceDate, PublishDateTo: today });
-  if (!general.error) anySuccess = true;
-  for (const item of (general.items || [])) {
-    if (existingIds.has(item.eoNumber)) continue;
-    existingIds.add(item.eoNumber);
-    db.get('npa_changes').push({
-      id: nextId('npa_changes'), eoNumber: item.eoNumber,
-      title: item.title || item.complexName || item.name,
-      number: item.number, documentDate: item.documentDate, publishDate: item.publishDateShort,
-      module: 'ot', matched: 'Общая лента по охране труда', tier: 'general',
-      ai_summary: '', seen: 0, created_at: now(),
-    }).write();
+  // бокового меню «Охрана труда». Стоп-слова убирают региональный мусор
+  // без дополнительных AI-вызовов.
+  const STOP_WORDS = ['конкурс', 'аппарат', 'межведомственн', 'состав комисс', 'губернатор', 'республик', 'городск', 'областн комисс', 'муниципальн'];
+  if (s.npa_general_feed !== '0') {
+    const general = await pravoApiSearch({ Name: 'охране труда', PublishDateFrom: sinceDate, PublishDateTo: today });
+    if (!general.error) anySuccess = true;
+    for (const item of (general.items || [])) {
+      if (existingIds.has(item.eoNumber)) continue;
+      const title = (item.title || item.complexName || '').toLowerCase();
+      if (STOP_WORDS.some(w => title.includes(w))) continue;
+      existingIds.add(item.eoNumber);
+      db.get('npa_changes').push({
+        id: nextId('npa_changes'), eoNumber: item.eoNumber,
+        title: item.title || item.complexName || item.name,
+        number: item.number, documentDate: item.documentDate, publishDate: item.publishDateShort,
+        module: 'ot', matched: 'Общая лента по охране труда', tier: 'general',
+        ai_summary: '', seen: 0, created_at: now(),
+      }).write();
+    }
   }
 
   if (anySuccess) {

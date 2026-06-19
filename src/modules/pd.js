@@ -5,8 +5,12 @@
 // ============================================================
 
 
-function renderPd() {
+async function renderPd() {
   const content = document.getElementById('content');
+
+  const npaFeedFull = await window.api.npaList('pd');
+  const npaFeedPd = npaFeedFull.slice(0, 20);
+  const unseenPd = npaFeedFull.filter(n => !n.seen).length;
 
   const npa = [
     { title: 'Федеральный закон №152-ФЗ', date: '27.07.2006', desc: 'Об обработке персональных данных — основной закон', url: 'http://www.consultant.ru/document/cons_doc_LAW_61801/' },
@@ -128,6 +132,55 @@ function renderPd() {
               <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;flex-shrink:0" onclick="openUrl(this.getAttribute('data-url'))" data-url="${n.url}">🔗</button>
             </div>`).join('')}
         </div>
+      </div>
+
+      <!-- ЛЕНТА ИЗМЕНЕНИЙ 152-ФЗ -->
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px;font-weight:700;color:var(--text)">⚖️ Изменения в законодательстве ПДн</span>
+            ${unseenPd > 0 ? `<span style="font-size:10px;font-weight:800;color:#fff;background:#f87171;padding:2px 8px;border-radius:10px">${unseenPd}</span>` : ''}
+          </div>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="checkNpaNow()">🔄 Проверить</button>
+        </div>
+        ${npaFeedPd.length === 0 ? `
+          <div style="text-align:center;padding:16px;color:#475569;font-size:12px">Изменений не найдено — мониторинг активен</div>
+        ` : (() => {
+          const critical   = npaFeedPd.filter(n => n.tier === 'critical' && n.ai_verified);
+          const unverified = npaFeedPd.filter(n => n.tier === 'critical' && !n.ai_verified);
+          function renderCard(n) {
+            const dateStr = (n.documentDate || n.created_at || '').slice(0, 10);
+            const borderColor = n.ai_verified ? '#f87171' : '#fb923c';
+            return `<div style="padding:10px 12px;background:rgba(255,255,255,0.02);border-left:3px solid ${borderColor};border-radius:8px;opacity:${n.seen?0.5:1}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="min-width:0">
+                  <div style="font-size:10px;color:#64748b;margin-bottom:3px">${dateStr}${n.matched ? ' · ' + n.matched : ''}</div>
+                  <div style="font-size:12px;color:#f1f5f9;font-weight:600;line-height:1.4">${n.title || ''}</div>
+                  ${n.ai_summary ? `<div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5">${n.ai_summary}</div>` : ''}
+                </div>
+                ${!n.seen ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;flex-shrink:0" onclick="markNpaSeen(${n.id})">✓</button>` : ''}
+              </div>
+            </div>`;
+          }
+          function renderGroup(id, label, color, bg, items, open) {
+            if (!items.length) return '';
+            return `<div style="border:1px solid ${bg};border-radius:8px;overflow:hidden;margin-bottom:6px">
+              <div onclick="var el=document.getElementById('pd-npa-${id}');el.style.display=el.style.display==='none'?'block':'none'"
+                style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${bg};cursor:pointer">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;font-weight:700;color:${color}">${label}</span>
+                  <span style="font-size:10px;color:#fff;background:${color};padding:1px 6px;border-radius:8px;font-weight:800">${items.length}</span>
+                </div>
+                <span style="font-size:10px;color:#64748b">▼</span>
+              </div>
+              <div id="pd-npa-${id}" style="display:${open?'block':'none'}">
+                <div style="padding:8px;display:grid;gap:5px">${items.map(renderCard).join('')}</div>
+              </div>
+            </div>`;
+          }
+          return renderGroup('critical','⚠ Касается шаблонов','#f87171','rgba(248,113,113,0.08)',critical,true)
+               + renderGroup('unverified','? Требует проверки','#fb923c','rgba(251,146,60,0.08)',unverified,true);
+        })()}
       </div>
 
       <!-- КАЛЕНДАРЬ -->
@@ -283,6 +336,22 @@ async function generatePdDocs(clientId) {
   }
 }
 
+async function markNpaSeen(id) {
+  await window.api.npaMarkSeen(id);
+  renderPd();
+}
+
+async function checkNpaNow() {
+  showToast('Проверяем pravo.gov.ru...');
+  try {
+    const res = await window.api.npaCheckNow();
+    showToast(res && res.ok ? 'Проверка завершена' : 'Не удалось проверить', res && res.ok ? 'var(--green)' : 'var(--red)');
+  } catch (e) {
+    showToast('Нет связи с pravo.gov.ru', 'var(--red)');
+  }
+  renderPd();
+}
+
 // ═══════════════════════════════════════════════════════════
 
 
@@ -432,28 +501,6 @@ async function renderPdReadiness(clientId) {
               ${risks.length > 0 ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);color:#94a3b8">Срок устранения нарушений: <strong style="color:#fbbf24">30 календарных дней</strong> с даты получения предписания.</div>` : ''}
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ЖИВАЯ ЛЕНТА ИЗМЕНЕНИЙ 152-ФЗ -->
-      <div class="rc-card panel">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            ${ic('bar-chart',18)}
-          </div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:#f1f5f9">Живая лента изменений 152-ФЗ</div>
-            <div style="font-size:11px;color:#94a3b8">Последние изменения на человеческом языке</div>
-          </div>
-        </div>
-        <div style="display:grid;gap:8px">
-          ${newsItems.map(n => `
-            <div style="display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:start;padding:10px;background:rgba(255,255,255,0.02);border-radius:8px">
-              <span style="font-size:11px;color:#64748b;white-space:nowrap">${n.date}</span>
-              <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${n.color}22;color:${n.color};font-weight:700;white-space:nowrap">${n.tag}</span>
-              <span style="font-size:12px;color:#cbd5e1;line-height:1.5">${n.text}</span>
-            </div>
-          `).join('')}
         </div>
       </div>
 

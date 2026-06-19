@@ -8,7 +8,11 @@
 // МОДУЛЬ: ВОИНСКИЙ УЧЁТ
 // ══════════════════════════════════════════════════════════
 
-function renderVu() {
+async function renderVu() {
+  const npaFeedFull = await window.api.npaList('vu');
+  const npaFeedVu = npaFeedFull.slice(0, 20);
+  const unseenVu = npaFeedFull.filter(n => !n.seen).length;
+
   const btn = document.getElementById('topbarAction');
   btn.style.display = 'none';
 
@@ -153,6 +157,55 @@ function renderVu() {
               <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px;flex-shrink:0;margin-left:12px" onclick="openUrl(this.getAttribute('data-url'))" data-url="${n.url}">🔗 Открыть</button>
             </div>`).join('')}
         </div>
+      </div>
+
+      <!-- ЛЕНТА ИЗМЕНЕНИЙ В ЗАКОНОДАТЕЛЬСТВЕ ВУ -->
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px;font-weight:700;color:var(--text)">⚖️ Изменения в законодательстве ВУ</span>
+            ${unseenVu > 0 ? `<span style="font-size:10px;font-weight:800;color:#fff;background:#f87171;padding:2px 8px;border-radius:10px">${unseenVu}</span>` : ''}
+          </div>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="checkNpaNow()">🔄 Проверить</button>
+        </div>
+        ${npaFeedVu.length === 0 ? `
+          <div style="text-align:center;padding:16px;color:#475569;font-size:12px">Изменений не найдено — мониторинг активен</div>
+        ` : (() => {
+          const critical   = npaFeedVu.filter(n => n.tier === 'critical' && n.ai_verified);
+          const unverified = npaFeedVu.filter(n => n.tier === 'critical' && !n.ai_verified);
+          function renderCard(n) {
+            const dateStr = (n.documentDate || n.created_at || '').slice(0, 10);
+            const borderColor = n.ai_verified ? '#f87171' : '#fb923c';
+            return `<div style="padding:10px 12px;background:rgba(255,255,255,0.02);border-left:3px solid ${borderColor};border-radius:8px;opacity:${n.seen?0.5:1}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                <div style="min-width:0">
+                  <div style="font-size:10px;color:#64748b;margin-bottom:3px">${dateStr}${n.matched ? ' · ' + n.matched : ''}</div>
+                  <div style="font-size:12px;color:#f1f5f9;font-weight:600;line-height:1.4">${n.title || ''}</div>
+                  ${n.ai_summary ? `<div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.5">${n.ai_summary}</div>` : ''}
+                </div>
+                ${!n.seen ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;flex-shrink:0" onclick="markNpaSeen(${n.id})">✓</button>` : ''}
+              </div>
+            </div>`;
+          }
+          function renderGroup(id, label, color, bg, items, open) {
+            if (!items.length) return '';
+            return `<div style="border:1px solid ${bg};border-radius:8px;overflow:hidden;margin-bottom:6px">
+              <div onclick="var el=document.getElementById('vu-npa-${id}');el.style.display=el.style.display==='none'?'block':'none'"
+                style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:${bg};cursor:pointer">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;font-weight:700;color:${color}">${label}</span>
+                  <span style="font-size:10px;color:#fff;background:${color};padding:1px 6px;border-radius:8px;font-weight:800">${items.length}</span>
+                </div>
+                <span style="font-size:10px;color:#64748b">▼</span>
+              </div>
+              <div id="vu-npa-${id}" style="display:${open?'block':'none'}">
+                <div style="padding:8px;display:grid;gap:5px">${items.map(renderCard).join('')}</div>
+              </div>
+            </div>`;
+          }
+          return renderGroup('critical','⚠ Касается шаблонов','#f87171','rgba(248,113,113,0.08)',critical,true)
+               + renderGroup('unverified','? Требует проверки','#fb923c','rgba(251,146,60,0.08)',unverified,true);
+        })()}
       </div>
 
       <!-- ОБЯЗАТЕЛЬНЫЕ МЕРОПРИЯТИЯ -->
@@ -777,6 +830,22 @@ async function markVuReportDone(clientId, type, btnEl) {
   }
 
   showToast('✅ Отмечено как сданное');
+}
+
+async function markNpaSeen(id) {
+  await window.api.npaMarkSeen(id);
+  renderVu();
+}
+
+async function checkNpaNow() {
+  showToast('Проверяем pravo.gov.ru...');
+  try {
+    const res = await window.api.npaCheckNow();
+    showToast(res && res.ok ? 'Проверка завершена' : 'Не удалось проверить', res && res.ok ? 'var(--green)' : 'var(--red)');
+  } catch (e) {
+    showToast('Нет связи с pravo.gov.ru', 'var(--red)');
+  }
+  renderVu();
 }
 
 function renderVuCategoryField(emp) {

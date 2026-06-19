@@ -8,9 +8,19 @@
 // МОДУЛЬ: ОХРАНА ТРУДА — СПРАВОЧНИК
 // ══════════════════════════════════════════════════════════
 
-function renderOt() {
+async function renderOt() {
   const btn = document.getElementById('topbarAction');
   btn.style.display = 'none';
+
+  const [npaFeedFull, s] = await Promise.all([
+    window.api.npaList('ot'),
+    window.api.settingsGet(),
+  ]);
+  const npaFeed = npaFeedFull.slice(0, 30);
+  const unseenCount = npaFeedFull.filter(n => !n.seen).length;
+  const lastCheck = s.npa_last_check_date
+    ? new Date(s.npa_last_check_date).toLocaleDateString('ru-RU')
+    : '';
 
   const npa = [
     { title: 'Трудовой кодекс РФ, раздел X', date: '30.12.2001', desc: 'Охрана труда — основные права и обязанности', url: 'https://www.consultant.ru/document/cons_doc_LAW_34683/' },
@@ -241,6 +251,63 @@ function renderOt() {
         </div>
       </div>
 
+      <!-- Изменения в законодательстве -->
+      <div style="background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:12px">
+          <div style="font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px">
+            <span>⚖️</span> Изменения в законодательстве
+            ${unseenCount > 0 ? `<span style="font-size:10px;font-weight:800;color:#fff;background:#f87171;padding:2px 8px;border-radius:10px">${unseenCount}</span>` : ''}
+          </div>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:11px;flex-shrink:0" onclick="checkNpaNow()">🔄 Проверить сейчас</button>
+        </div>
+        ${npaFeed.length === 0 ? `
+          <div style="text-align:center;padding:22px 10px;color:#475569;font-size:12px;line-height:1.6">
+            ${lastCheck ? `Изменений не найдено. Последняя проверка: ${lastCheck}` : 'Проверка ещё не проводилась — нажмите «Проверить сейчас» или подождите автоматической проверки при следующем запуске.'}
+          </div>` : (() => {
+          const critical   = npaFeed.filter(n => n.tier === 'critical' && n.ai_verified);
+          const unverified = npaFeed.filter(n => n.tier === 'critical' && !n.ai_verified);
+          const general    = npaFeed.filter(n => n.tier === 'general');
+
+          function renderCard(n) {
+            const dateStr = (n.documentDate || n.created_at || '').slice(0, 10);
+            const borderColor = n.ai_verified ? '#f87171' : n.tier === 'critical' ? '#fb923c' : '#334155';
+            return `
+              <div style="padding:12px 14px;background:rgba(255,255,255,0.02);border-left:3px solid ${borderColor};border-radius:8px;opacity:${n.seen?0.5:1}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+                  <div style="min-width:0">
+                    <div style="font-size:10px;color:#475569;margin-bottom:4px">${dateStr}${n.matched ? ` · ${n.matched}` : ''}</div>
+                    <div style="font-size:12.5px;color:var(--text);font-weight:600;line-height:1.4">${n.title || ''}</div>
+                    ${n.ai_summary ? `<div style="font-size:11.5px;color:#94a3b8;margin-top:7px;line-height:1.5">${n.ai_summary}</div>` : ''}
+                  </div>
+                  ${!n.seen ? `<button class="btn btn-ghost" style="padding:4px 10px;font-size:10px;flex-shrink:0" onclick="markNpaSeen(${n.id})">✓ Просмотрел</button>` : ''}
+                </div>
+              </div>`;
+          }
+
+          function renderGroup(id, label, color, bg, items, openByDefault) {
+            if (!items.length) return '';
+            return `
+              <div style="border:1px solid ${bg};border-radius:10px;overflow:hidden;margin-bottom:8px">
+                <div onclick="document.getElementById('npa-group-${id}').style.display=document.getElementById('npa-group-${id}').style.display==='none'?'block':'none'"
+                  style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:${bg};cursor:pointer;user-select:none">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:11px;font-weight:700;color:${color}">${label}</span>
+                    <span style="font-size:10px;font-weight:800;color:#fff;background:${color};padding:1px 7px;border-radius:8px">${items.length}</span>
+                  </div>
+                  <span style="font-size:10px;color:#64748b">▼</span>
+                </div>
+                <div id="npa-group-${id}" style="display:${openByDefault?'block':'none'};display:${openByDefault?'block':'none'};padding:10px;display:${openByDefault?'block':'none'}">
+                  <div style="display:grid;gap:6px">${items.map(renderCard).join('')}</div>
+                </div>
+              </div>`;
+          }
+
+          return renderGroup('critical', '⚠ Касается шаблонов документов', '#f87171', 'rgba(248,113,113,0.08)', critical, true)
+               + renderGroup('unverified', '? Требует проверки', '#fb923c', 'rgba(251,146,60,0.08)', unverified, true)
+               + renderGroup('general', 'Общая лента по охране труда', '#64748b', 'rgba(255,255,255,0.03)', general, false);
+        })()}
+      </div>
+
       <!-- 8 направлений -->
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:20px">
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px">
@@ -372,4 +439,20 @@ function renderOt() {
         ТК РФ раздел X · Приказ Минтруда №771н от 29.10.2021 · Приказ Минтруда №782н от 29.10.2021 · ФЗ №426-ФЗ от 28.12.2013 · Приказ Минздрава №29н от 28.01.2021
       </div>
     </div>`;
+}
+
+async function markNpaSeen(id) {
+  await window.api.npaMarkSeen(id);
+  renderOt();
+}
+
+async function checkNpaNow() {
+  showToast('Проверяем pravo.gov.ru...');
+  try {
+    const res = await window.api.npaCheckNow();
+    showToast(res && res.ok ? 'Проверка завершена' : 'Не удалось проверить', res && res.ok ? 'var(--green)' : 'var(--red)');
+  } catch (e) {
+    showToast('Не удалось проверить — нет связи с pravo.gov.ru', 'var(--red)');
+  }
+  renderOt();
 }

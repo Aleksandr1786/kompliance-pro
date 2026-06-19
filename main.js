@@ -171,6 +171,7 @@ function initDB() {
     documents: [],
     events: [],
     tasks: [],
+    npa_changes: [],
     divisions: [],
     settings: {
       user_name: '',
@@ -190,6 +191,7 @@ function initDB() {
       tg_morning: '1',
       tg_urgent: '1',
       tg_last_morning_date: '',
+      npa_last_check_date: '',
       autostart: '0',
       backup_path: '',
       ai_provider: 'claude',
@@ -670,10 +672,198 @@ async function checkUrgentEvents() {
 
 function startTelegramScheduler() {
   // Первая проверка — с небольшой задержкой, чтобы БД успела инициализироваться.
-  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); }, 15000);
-  // Дальше — каждые 5 минут, пока приложение открыто.
-  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); }, 5 * 60 * 1000);
+  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); }, 15000);
+  // Дальше — каждые 5 минут, пока приложение открыто (checkNpaUpdates сам
+  // ограничивает себя одним реальным запуском в день, см. npa_last_check_date).
+  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); }, 5 * 60 * 1000);
 }
+
+// ─── МОНИТОРИНГ НПА ──────────────────────────────────────
+// Уровень 1 — узкий список фундаментальных актов, на которых построены сами
+// шаблоны документов (взято напрямую из gen_p1.js/gen_p2.js/gen_pd.js/gen_vu.js
+// 18.06.2026). Изменение любого из них касается практически всех клиентов
+// модуля — уходит в Telegram немедленно. Если меняете шаблон и он начинает
+// ссылаться на новый акт — добавьте его сюда же.
+const NPA_WATCHLIST = [
+  { module: 'ot', code: '2464',   label: 'ПП РФ № 2464 — обучение по охране труда' },
+  { module: 'ot', code: '772н',   label: 'Приказ Минтруда № 772н — обеспечение СИЗ' },
+  { module: 'ot', code: '766н',   label: 'Приказ Минтруда № 766н — нормы выдачи СИЗ' },
+  { module: 'ot', code: '776н',   label: 'Приказ Минтруда № 776н — система управления охраной труда' },
+  { module: 'ot', code: '632н',   label: 'Приказ Минтруда № 632н' },
+  { module: 'ot', code: '223н',   label: 'Приказ Минтруда № 223н — расследование несчастных случаев' },
+  { module: 'ot', code: '398н',   label: 'Приказ Минтруда № 398н — аптечки первой помощи' },
+  { module: 'ot', code: '811',    label: 'Приказ Минэнерго № 811 — электробезопасность' },
+  { module: 'ot', code: '903н',   label: 'Приказ Минтруда № 903н — электробезопасность' },
+  { module: 'ot', code: '29н',    label: 'Приказ Минздрава № 29н — медосмотры' },
+  { module: 'pd', code: '152-ФЗ', label: 'ФЗ № 152-ФЗ — о персональных данных' },
+  { module: 'pd', code: '266-ФЗ', label: 'ФЗ № 266-ФЗ — поправки в 152-ФЗ' },
+  { module: 'pd', code: '1119',   label: 'ПП РФ № 1119 — защита ПДн в информационных системах' },
+  { module: 'pd', code: '178',    label: 'Приказ РКН № 178' },
+  { module: 'vu', code: '719',    label: 'ПП РФ № 719 — положение о воинском учёте' },
+  { module: 'vu', code: '53-ФЗ',  label: 'ФЗ № 53-ФЗ — о воинской обязанности и военной службе' },
+];
+
+// Официальный read-only API публикации правовых актов (без AI, без скрейпинга
+// HTML — структурированный JSON). Документация: publication.pravo.gov.ru/help
+function pravoApiSearch(params) {
+  return new Promise((resolve) => {
+    const https = require('https');
+    const http = require('http');
+    const qs = new URLSearchParams(params).toString();
+    console.log('[NPA] запрос →', `http://publication.pravo.gov.ru/api/Documents?${qs}`);
+    const req = http.request({
+      hostname: 'publication.pravo.gov.ru',
+      path: `/api/Documents?${qs}`,
+      method: 'GET',
+      timeout: 15000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      },
+    }, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => {
+        console.log('[NPA] статус:', res.statusCode, '| длина ответа:', body.length, '| начало:', body.slice(0, 300));
+        try {
+          const parsed = JSON.parse(body);
+          console.log('[NPA] ключи в ответе:', Object.keys(parsed), '| найдено items:', (parsed.items || []).length);
+          resolve(parsed);
+        }
+        catch (e) { console.log('[NPA] не распарсился JSON:', e.message); resolve({ items: [], error: 'Некорректный ответ pravo.gov.ru (' + res.statusCode + ')' }); }
+      });
+    });
+    req.on('error', (e) => { console.log('[NPA] ошибка сети:', e.message); resolve({ items: [], error: e.message }); });
+    req.on('timeout', () => { req.destroy(); console.log('[NPA] таймаут'); resolve({ items: [], error: 'Таймаут запроса к pravo.gov.ru' }); });
+    req.end();
+  });
+}
+
+// Раз в день: точный список (Уровень 1, → Telegram + запись с пометкой
+// critical) и общая лента по охране труда (Уровень 2, → только запись с
+// пометкой general, для ленты в боковом меню). Догоняющая логика как у
+// утренней сводки: если не проверяли неделю — спросим за весь пропущенный
+// период, а не только за сегодня.
+let npaCheckInProgress = false;
+
+async function checkNpaUpdates(force = false) {
+  if (npaCheckInProgress) { console.log('[NPA] уже запущено, пропускаем'); return { ok: true, skipped: true }; }
+  npaCheckInProgress = true;
+  try {
+    return await _checkNpaUpdates(force);
+  } finally {
+    npaCheckInProgress = false;
+  }
+}
+
+async function _checkNpaUpdates(force = false) {
+  const s = db.get('settings').value();
+  const today = new Date().toISOString().slice(0, 10);
+  if (!force && s.npa_last_check_date === today) return { ok: true, skipped: true };
+
+  const sinceDate = s.npa_last_check_date || new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+  const existingIds = new Set(db.get('npa_changes').value().map(n => n.eoNumber));
+
+  let anySuccess = false;
+  let tgSentThisRun = 0;
+  const TG_LIMIT_PER_RUN = 3; // не более 3 уведомлений за один прогон, чтобы не спамить
+
+  for (const watch of NPA_WATCHLIST) {
+    // Ищем по Number (точный номер) чтобы не ловить совпадения в названиях других документов.
+    // NumberSearchType=1 означает "содержит" — это лучше чем Name для коротких кодов вроде "2464"
+    const res = await pravoApiSearch({ Number: watch.code, NumberSearchType: 1, PublishDateFrom: sinceDate, PublishDateTo: today, PageSize: 10 });
+    if (!res.error) anySuccess = true;
+    for (const item of (res.items || [])) {
+      if (existingIds.has(item.eoNumber)) continue;
+
+      // Спрашиваем ИИ — реально ли этот документ меняет тот акт, который мы отслеживаем.
+      // Требуем строго ДА/НЕТ без пояснений, чтобы не путаться в интерпретации.
+      const relevanceCheck = await callAI(
+        `Документ с портала pravo.gov.ru: "${item.title || item.complexName}".\n` +
+        `Мы отслеживаем изменения в: ${watch.label}.\n` +
+        `Ответь ТОЛЬКО одним словом без пояснений:\n` +
+        `ДА — если этот документ напрямую вносит изменения, поправки или отменяет именно этот конкретный федеральный акт.\n` +
+        `НЕТ — во всех остальных случаях: региональный акт, случайное совпадение номера, косвенная связь, признание утратившим силу другого акта, иная тематика.`
+      );
+      const aiAnswer = relevanceCheck.ok ? relevanceCheck.text.trim().toUpperCase().slice(0, 10) : 'НЕТ (нет ключа)';
+      const isRelevant = aiAnswer.startsWith('ДА');
+      const hasKey = relevanceCheck.ok || (aiAnswer !== 'НЕТ (нет ключа)');
+      console.log('[NPA] ИИ-фильтр:', isRelevant ? '✅ ДА' : '❌ НЕТ', '|', aiAnswer, '|', (item.title || item.complexName || '').slice(0, 80));
+      if (!isRelevant && hasKey) continue;
+
+      existingIds.add(item.eoNumber);
+
+      const ai = await callAI(
+        `Документ с портала pravo.gov.ru: "${item.title || item.complexName}".\n` +
+        `Он вносит изменения в: ${watch.label}.\n` +
+        `Напиши одно-два предложения по-русски: что это значит для работодателя и какие документы (по охране труда / ПДн / воинскому учёту) нужно проверить или обновить.\n` +
+        `Отвечай только текстом, без JSON, без кавычек, без структуры.`
+      );
+
+      // На случай если ИИ всё равно вернул JSON — вытаскиваем текст
+      let aiSummary = '';
+      if (ai.ok) {
+        const raw = ai.text.trim();
+        try {
+          const parsed = JSON.parse(raw);
+          aiSummary = parsed.summary || parsed.text || parsed.result || raw;
+        } catch (e) {
+          aiSummary = raw;
+        }
+      }
+
+      db.get('npa_changes').push({
+        id: nextId('npa_changes'), eoNumber: item.eoNumber,
+        title: item.title || item.complexName || item.name,
+        number: item.number, documentDate: item.documentDate, publishDate: item.publishDateShort,
+        module: watch.module, matched: watch.label, tier: 'critical',
+        ai_summary: aiSummary, ai_verified: isRelevant, seen: 0, created_at: now(),
+      }).write();
+
+      if (isRelevant && s.tg_token && s.tg_chat_id && tgSentThisRun < TG_LIMIT_PER_RUN) {
+        const text = `⚖️ Изменение в законодательстве\n\n${watch.label}\n\n${item.title || item.complexName}\n\n${aiSummary || 'Откройте документ на pravo.gov.ru для деталей.'}`;
+        await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
+        tgSentThisRun++;
+      }
+    }
+  }
+
+  // Уровень 2 — широкая лента по охране труда (правила по видам работ,
+  // изменения ТК РФ и т.п.), без AI и без Telegram — просто копится для
+  // бокового меню «Охрана труда».
+  const general = await pravoApiSearch({ Name: 'охране труда', PublishDateFrom: sinceDate, PublishDateTo: today });
+  if (!general.error) anySuccess = true;
+  for (const item of (general.items || [])) {
+    if (existingIds.has(item.eoNumber)) continue;
+    existingIds.add(item.eoNumber);
+    db.get('npa_changes').push({
+      id: nextId('npa_changes'), eoNumber: item.eoNumber,
+      title: item.title || item.complexName || item.name,
+      number: item.number, documentDate: item.documentDate, publishDate: item.publishDateShort,
+      module: 'ot', matched: 'Общая лента по охране труда', tier: 'general',
+      ai_summary: '', seen: 0, created_at: now(),
+    }).write();
+  }
+
+  if (anySuccess) {
+    db.get('settings').assign({ npa_last_check_date: today }).write();
+  }
+  return { ok: anySuccess, skipped: false };
+} // конец _checkNpaUpdates
+
+ipcMain.handle('npa:checkNow', async () => {
+  return await checkNpaUpdates(true);
+});
+
+ipcMain.handle('npa:list', (_, module) => {
+  const all = db.get('npa_changes').sortBy('created_at').value().reverse();
+  return module ? all.filter(n => n.module === module) : all;
+});
+
+ipcMain.handle('npa:markSeen', (_, id) => {
+  db.get('npa_changes').find({ id }).assign({ seen: 1 }).write();
+  return { ok: true };
+});
 
 // ─── АВТОЗАПУСК ──────────────────────────────────────────
 ipcMain.handle('app:setAutostart', (_, enabled) => {
@@ -1190,7 +1380,7 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
 });
 
 // ─── AI ЗАПРОСЫ ──────────────────────────────────────────
-ipcMain.handle('ai:request', async (_, { prompt, system }) => {
+async function callAI(prompt, system) {
   const s = db.get('settings').value();
   const provider = s.ai_provider || 'deepseek';
   const apiKey   = s.ai_key || '';
@@ -1271,6 +1461,10 @@ ipcMain.handle('ai:request', async (_, { prompt, system }) => {
   } catch(e) {
     return { ok: false, error: e.message };
   }
+}
+
+ipcMain.handle('ai:request', async (_, { prompt, system }) => {
+  return callAI(prompt, system);
 });
 // ─── ОБУЧЕНИЕ СОТРУДНИКОВ ────────────────────────────────
 ipcMain.handle('training:get', (_, employeeId) => {

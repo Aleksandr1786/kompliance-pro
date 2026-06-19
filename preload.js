@@ -48,6 +48,11 @@ contextBridge.exposeInMainWorld('api', {
   telegramBind:    (token)    => ipcRenderer.invoke('telegram:bind', token),
   appSetAutostart: (enabled)  => ipcRenderer.invoke('app:setAutostart', enabled),
 
+  // Мониторинг НПА
+  npaList:         (module)   => ipcRenderer.invoke('npa:list', module),
+  npaMarkSeen:      (id)      => ipcRenderer.invoke('npa:markSeen', id),
+  npaCheckNow:      ()        => ipcRenderer.invoke('npa:checkNow'),
+
   // Статистика
   dashboardStats: ()          => ipcRenderer.invoke('stats:dashboard'),
 

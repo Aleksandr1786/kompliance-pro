@@ -324,7 +324,7 @@ async function renderClientCard(id) {
         </div>
         <div class="panel">
           <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span><div class="panel-title">Задачи</div><div class="panel-action" onclick="addTaskForClient(${id})">+ Добавить</div></div>
-          <div>${clientTasks.length ? clientTasks.map(t=>renderTaskRow(t)).join('') : `
+          <div>${clientTasks.length ? clientTasks.map(t=>renderTaskRow(t, {inClientCard:true})).join('') : `
             <div class="empty-state" style="cursor:pointer" onclick="addTaskForClient(${id})">
               <div class="empty-icon">${ic('check-circle',32)}</div>
               <div class="empty-title">Задач нет</div>

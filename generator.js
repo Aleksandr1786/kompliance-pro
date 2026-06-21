@@ -520,6 +520,14 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   await run(p2.gen_05_01,dirs.d5);await run(p2.gen_05_employees,dirs.d5);
   await run(p2.gen_05_06,dirs.d5);await run(p2.gen_05_07,dirs.d5);await run(p2.gen_05_08,dirs.d5);
 
+  // Инструкции по видам работ повышенной опасности — не по должности,
+  // а по факту наличия таких работ у клиента (тот же hasHazard, что и выше).
+  if(hasHazard){
+    await run(p2.gen_05_18,dirs.d5); // работы на высоте
+    await run(p2.gen_05_19,dirs.d5); // замкнутые пространства (ОЗП)
+    await run(p2.gen_05_20,dirs.d5); // универсальный наряд-допуск
+  }
+
   await run(gen_06_01,dirs.d6);await run(gen_06_02,dirs.d6);await run(gen_06_03,dirs.d6);
   // Журнал выдачи СИЗ — только если СОУТ 3+ или работы повышенной опасности
   if(soatClass>=31||hasHazard){

@@ -639,28 +639,101 @@ function renderEventRow(e) {
   </div>`;
 }
 
-function renderTaskRow(t) {
+function renderTaskRow(t, opts = {}) {
   const tagClass = t.module==='OT'?'tag-ot':t.module==='PD'?'tag-pd':'tag-vu';
   const tagLabel = t.module==='OT'?'ОТ':t.module==='PD'?'ПД':'ВУ';
   const isDone   = !!t.done;
+  // Задача "раскрывается" по клику только если есть что показать сверх заголовка —
+  // AI-объяснение находки по НПА и/или список конкретных документов для обновления.
+  // Обычные ручные задачи без этих полей остаются простой строкой без курсора-указателя.
+  const hasDetails = !!(t.npa_summary || (Array.isArray(t.npa_related_docs) && t.npa_related_docs.length));
   const checkInner = isDone
     ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:linear-gradient(135deg,#00c853,#69f0ae);box-shadow:0 0 8px rgba(0,200,83,0.5);flex-shrink:0"><svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6.5 5,9.5 10,3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
     : `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
-  return `<div class="task-row" id="task-row-${t.id}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;transition:background .15s" onmouseover="this.querySelector('.task-del-btn').style.opacity='1'" onmouseout="this.querySelector('.task-del-btn').style.opacity='0'">
-    <div class="task-check ${isDone?'done':''}" onclick="toggleTask(${t.id},this)" id="task-check-${t.id}" style="flex-shrink:0;cursor:pointer">${checkInner}</div>
-    <div class="task-text ${isDone?'done':''}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}${t.client_name?' <span style="color:var(--muted);font-size:11px">· '+t.client_name+'</span>':''}</div>
-    ${t.module?`<div class="task-tag ${tagClass}" style="flex-shrink:0">${tagLabel}</div>`:''}
-    <button class="task-del-btn" onclick="deleteTask(${t.id})" title="Удалить задачу"
-      style="flex-shrink:0;opacity:0;background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;color:#475569;transition:all .15s;display:flex;align-items:center"
-      onmouseover="this.style.color='#f87171';this.style.background='rgba(248,113,113,0.1)'"
-      onmouseout="this.style.color='#475569';this.style.background='none'">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-    </button>
+  const chevron = hasDetails
+    ? `<svg id="task-chevron-${t.id}" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;transition:transform .2s"><polyline points="9 18 15 12 9 6"/></svg>`
+    : `<span style="width:11px;flex-shrink:0"></span>`;
+  const rowStyle = `display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;transition:background .15s${hasDetails?';cursor:pointer':''}`;
+  const rowClick = hasDetails ? ` onclick="toggleTaskDetails(${t.id})"` : '';
+  // Имя клиента вынесено из обрезаемого блока заголовка в отдельную колонку
+  // фиксированной ширины — раньше при длинных заголовках (например, с перечнем
+  // документов по найденному НПА) имя клиента полностью пропадало под ellipsis.
+  // Внутри карточки клиента (opts.inClientCard) колонка не нужна — имя уже видно в шапке.
+  const clientCol = (t.client_name && !opts.inClientCard)
+    ? `<div style="flex-shrink:0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px" title="${t.client_name}">${t.client_name}</div>`
+    : '';
+  return `<div class="task-item" id="task-item-${t.id}">
+    <div class="task-row" id="task-row-${t.id}" style="${rowStyle}"${rowClick} onmouseover="this.querySelector('.task-del-btn').style.opacity='1'" onmouseout="this.querySelector('.task-del-btn').style.opacity='0'">
+      <div class="task-check ${isDone?'done':''}" onclick="event.stopPropagation();toggleTask(${t.id},this)" id="task-check-${t.id}" style="flex-shrink:0;cursor:pointer">${checkInner}</div>
+      ${chevron}
+      <div class="task-text ${isDone?'done':''}" id="task-text-${t.id}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
+      ${clientCol}
+      ${t.module?`<div class="task-tag ${tagClass}" style="flex-shrink:0">${tagLabel}</div>`:''}
+      <button class="task-del-btn" onclick="event.stopPropagation();deleteTask(${t.id})" title="Удалить задачу"
+        style="flex-shrink:0;opacity:0;background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;color:#475569;transition:all .15s;display:flex;align-items:center"
+        onmouseover="this.style.color='#f87171';this.style.background='rgba(248,113,113,0.1)'"
+        onmouseout="this.style.color='#475569';this.style.background='none'">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
+    </div>
+    ${hasDetails ? `<div class="task-details" id="task-details-${t.id}" style="display:none">${renderTaskDetailsContent(t, opts)}</div>` : ''}
   </div>`;
 }
 
+// Содержимое разворачиваемой панели задачи: полный (без обрезки) заголовок,
+// срок, AI-объяснение находки по НПА (если есть) и список конкретных
+// документов для перегенерации (если есть) + быстрый переход в карточку клиента.
+// opts.inClientCard=true — рендерим внутри самой карточки клиента: кнопка
+// перехода туда же не нужна, инструкция короче (без "откройте карточку").
+function renderTaskDetailsContent(t, opts = {}) {
+  const due = t.due_date ? formatDate(t.due_date) : '';
+  const MODULE_TAB_LABELS = { OT: 'Охрана труда', PD: 'ПДн', VU: 'Воинский учёт' };
+  const moduleTabLabel = MODULE_TAB_LABELS[t.module] || '';
+  const moduleHint = moduleTabLabel
+    ? (opts.inClientCard
+        ? `<div style="margin-top:6px;color:var(--muted);font-size:11.5px">Перейдите во вкладку «${moduleTabLabel}» выше и сформируйте документы заново. Старые версии будут заменены актуальными.</div>`
+        : `<div style="margin-top:6px;color:var(--muted);font-size:11.5px">Откройте карточку клиента → вкладка «${moduleTabLabel}» → сформируйте документы заново. Старые версии будут заменены актуальными.</div>`)
+    : '';
+  const docsList = (Array.isArray(t.npa_related_docs) && t.npa_related_docs.length)
+    ? `<div style="margin-top:10px">
+        <div style="font-size:10.5px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Нужно сформировать заново</div>
+        <ul style="margin:0;padding-left:18px;color:var(--text);font-size:12.5px;line-height:1.7">${t.npa_related_docs.map(d=>`<li>${d}</li>`).join('')}</ul>
+        ${moduleHint}
+      </div>`
+    : '';
+  const summary = t.npa_summary
+    ? `<div style="margin-top:10px">
+        <div style="font-size:10.5px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Почему это важно</div>
+        <div style="color:var(--text);font-size:12.5px;line-height:1.5">${t.npa_summary}</div>
+      </div>`
+    : '';
+  const clientLink = (t.client_id && !opts.inClientCard)
+    ? `<button onclick="event.stopPropagation();navigate('client',${t.client_id})"
+        style="margin-top:12px;padding:7px 14px;background:rgba(59,130,246,0.12);border:1px solid rgba(59,130,246,0.3);border-radius:8px;color:#60a5fa;font-size:12px;font-weight:600;cursor:pointer;transition:background .15s"
+        onmouseover="this.style.background='rgba(59,130,246,0.2)'" onmouseout="this.style.background='rgba(59,130,246,0.12)'">
+        Открыть карточку клиента →
+      </button>`
+    : '';
+  return `<div style="padding:2px 16px 16px 43px;font-size:12.5px;color:var(--text)">
+    <div style="color:var(--text);line-height:1.5;font-size:13px">${t.title}</div>
+    ${due?`<div style="margin-top:5px;color:var(--muted);font-size:11.5px">Срок: ${due}</div>`:''}
+    ${summary}
+    ${docsList}
+    ${clientLink}
+  </div>`;
+}
+
+function toggleTaskDetails(id) {
+  const details = document.getElementById('task-details-' + id);
+  const chevron = document.getElementById('task-chevron-' + id);
+  if (!details) return;
+  const isOpen = details.style.display !== 'none';
+  details.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(90deg)';
+}
+
 async function deleteTask(id) {
-  const row = document.getElementById('task-row-' + id);
+  const row = document.getElementById('task-item-' + id);
   if (row) {
     row.style.transition = 'all .25s ease';
     row.style.opacity = '0';
@@ -693,7 +766,7 @@ async function toggleTask(id, checkEl) {
   await window.api.taskToggle(id);
   const row    = document.getElementById('task-row-' + id);
   const isDone = checkEl.classList.contains('done');
-  const textEl = checkEl.nextElementSibling;
+  const textEl = document.getElementById('task-text-' + id);
   if (!isDone) {
     checkEl.classList.add('done');
     if (textEl) textEl.classList.add('done');

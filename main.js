@@ -686,17 +686,103 @@ function startTelegramScheduler() {
 // 18.06.2026). Изменение любого из них касается практически всех клиентов
 // модуля — уходит в Telegram немедленно. Если меняете шаблон и он начинает
 // ссылаться на новый акт — добавьте его сюда же.
+// Создаёт по отдельной задаче каждому подходящему клиенту, когда ИИ
+// подтвердил реальное изменение отслеживаемого акта. Не общая задача на
+// всех — у каждого клиента своя, с указанием какой конкретно закон
+// изменился и почему это важно (используем уже готовое ai-объяснение).
+// Если акт меняется повторно — создаём новую задачу, не объединяем со старой
+// (решение от 19.06.2026): так нагляднее видно историю изменений по клиенту.
+function createNpaTasksForClients(watch, item, aiSummary) {
+  const MODULE_LABELS = { ot: 'охране труда', pd: 'персональным данным', vu: 'воинскому учёту' };
+  const moduleCode = (watch.module || 'ot').toUpperCase(); // 'OT' | 'PD' | 'VU' — как хранится в client.modules
+  const moduleLabel = MODULE_LABELS[watch.module] || watch.module;
+
+  const clients = db.get('clients').value();
+  const targets = clients.filter(c => {
+    if (c.archived) return false;
+    const mods = (c.modules || '').split(',').map(m => m.trim());
+    if (!mods.includes(moduleCode)) return false;
+    if (typeof watch.clientFilter === 'function' && !watch.clientFilter(c)) return false;
+    return true;
+  });
+
+  const dueDate = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const existingTasks = db.get('tasks').value();
+
+  // Конкретные документы, которые нужно перегенерировать — если знаем (relatedDocs),
+  // показываем их явно вместо общей фразы «проверить документы по модулю».
+  const docs = Array.isArray(watch.relatedDocs) && watch.relatedDocs.length ? watch.relatedDocs : null;
+  const docsText = docs ? `Обновите: ${docs.join(', ')}.` : `Проверьте документы по ${moduleLabel}.`;
+  const policyNote = mightAffectPolicy(aiSummary)
+    ? ' Возможно, затрагивает Политику в области охраны труда — проверьте вручную (структурное изменение).'
+    : '';
+
+  for (const c of targets) {
+    // Защита от дублей: если у этого клиента уже есть незакрытая задача
+    // по этому же самому документу (eoNumber) — не плодим вторую. Повторное
+    // РЕАЛЬНОЕ изменение акта будет иметь другой eoNumber и создаст новую
+    // задачу как договаривались — это именно защита от случайных повторов.
+    const alreadyExists = existingTasks.some(t =>
+      t.client_id === c.id && t.npa_eoNumber === item.eoNumber && !t.done
+    );
+    if (alreadyExists) continue;
+
+    db.get('tasks').push({
+      id: nextId('tasks'),
+      title: `Изменился ${watch.label} — ${docsText}${policyNote}`,
+      client_id: c.id,
+      module: moduleCode, // 'OT'/'PD'/'VU' — без этого dashboard.js не знает, в какую вкладку отправлять подсказку
+      priority: 'urgent',
+      due_date: dueDate,
+      done: 0,
+      source: 'npa', // помечаем автосозданные задачи отдельно от ручных
+      npa_summary: aiSummary || '',
+      npa_eoNumber: item.eoNumber || '',
+      npa_related_docs: docs || [],
+      created_at: now(),
+    }).write();
+  }
+}
+
+
+// clientFilter — необязательная функция (client) => boolean. Если не задана,
+// задача создаётся всем клиентам у которых подключён указанный module.
+// Используем уже существующие поля карточки клиента — medcheck_required и hazard_works.
+//
+// relatedDocs — список конкретных документов, которые нужно перегенерировать
+// при изменении этого акта (составлено по реальным ссылкам на законы внутри
+// генераторов, не предположительно). «Политика в области ОТ» НЕ включена
+// в список для № 2464 намеренно: это документ верхнего уровня, который
+// должен меняться только при структурных изменениях (новые разделы,
+// категории — например упрощёнка для микропредприятий), а не при любой
+// технической правке. Эта проверка вынесена отдельно — см. POLICY_SIGNAL_WORDS.
 const NPA_WATCHLIST = [
-  { module: 'ot', code: '2464',   label: 'ПП РФ № 2464 — обучение по охране труда' },
-  { module: 'ot', code: '772н',   label: 'Приказ Минтруда № 772н — обеспечение СИЗ' },
-  { module: 'ot', code: '766н',   label: 'Приказ Минтруда № 766н — нормы выдачи СИЗ' },
-  { module: 'ot', code: '776н',   label: 'Приказ Минтруда № 776н — система управления охраной труда' },
-  { module: 'ot', code: '632н',   label: 'Приказ Минтруда № 632н' },
-  { module: 'ot', code: '223н',   label: 'Приказ Минтруда № 223н — расследование несчастных случаев' },
-  { module: 'ot', code: '398н',   label: 'Приказ Минтруда № 398н — аптечки первой помощи' },
-  { module: 'ot', code: '811',    label: 'Приказ Минэнерго № 811 — электробезопасность' },
-  { module: 'ot', code: '903н',   label: 'Приказ Минтруда № 903н — электробезопасность' },
-  { module: 'ot', code: '29н',    label: 'Приказ Минздрава № 29н — медосмотры' },
+  { module: 'ot', code: '2464',   label: 'ПП РФ № 2464 — обучение по охране труда',
+    relatedDocs: ['Положение о системе управления охраной труда','Приказ об утверждении программ обучения','Положение о порядке обучения по охране труда'] },
+  { module: 'ot', code: '772н',   label: 'Приказ Минтруда № 772н — обеспечение СИЗ',
+    relatedDocs: ['Приказ об утверждении инструкций по охране труда','Положение о разработке инструкций по охране труда'] },
+  { module: 'ot', code: '766н',   label: 'Приказ Минтруда № 766н — нормы выдачи СИЗ',
+    relatedDocs: ['Приказ о назначении ответственного за СИЗ','Положение об обеспечении работников СИЗ'] },
+  { module: 'ot', code: '776н',   label: 'Приказ Минтруда № 776н — система управления охраной труда',
+    relatedDocs: ['Положение о системе управления охраной труда'] },
+  { module: 'ot', code: '632н',   label: 'Приказ Минтруда № 632н',
+    relatedDocs: ['Положение о системе управления охраной труда','Положение об учёте микротравм'] },
+  { module: 'ot', code: '223н',   label: 'Приказ Минтруда № 223н — расследование несчастных случаев',
+    relatedDocs: ['Положение о системе управления охраной труда'] },
+  { module: 'ot', code: '398н',   label: 'Приказ Минтруда № 398н — аптечки первой помощи',
+    relatedDocs: ['Приказ об обеспечении аптечками первой помощи','Инструкция о порядке использования аптечки'] },
+  { module: 'ot', code: '811',    label: 'Приказ Минэнерго № 811 — электробезопасность',
+    clientFilter: c => !!c.hazard_works,
+    relatedDocs: ['Приказ о назначении ответственного за электрохозяйство','Журнал учёта присвоения I группы электробезопасности','Программа инструктажа по электробезопасности'] },
+  { module: 'ot', code: '903н',   label: 'Приказ Минтруда № 903н — электробезопасность',
+    clientFilter: c => !!c.hazard_works,
+    relatedDocs: ['Приказ о назначении ответственного за электрохозяйство','Журнал учёта присвоения I группы электробезопасности','Программа инструктажа по электробезопасности'] },
+  { module: 'ot', code: '29н',    label: 'Приказ Минздрава № 29н — медосмотры',
+    clientFilter: c => !!c.medcheck_required,
+    relatedDocs: ['Приказ об организации медицинских осмотров','Список контингента для медицинских осмотров'] },
+  { module: 'ot', code: '782н',   label: 'Приказ Минтруда № 782н — работы на высоте',
+    clientFilter: c => !!c.hazard_works,
+    relatedDocs: ['Инструкция по охране труда при работах на высоте'] },
   { module: 'pd', code: '152-ФЗ', label: 'ФЗ № 152-ФЗ — о персональных данных' },
   { module: 'pd', code: '266-ФЗ', label: 'ФЗ № 266-ФЗ — поправки в 152-ФЗ' },
   { module: 'pd', code: '1119',   label: 'ПП РФ № 1119 — защита ПДн в информационных системах' },
@@ -704,6 +790,16 @@ const NPA_WATCHLIST = [
   { module: 'vu', code: '719',    label: 'ПП РФ № 719 — положение о воинском учёте' },
   { module: 'vu', code: '53-ФЗ',  label: 'ФЗ № 53-ФЗ — о воинской обязанности и военной службе' },
 ];
+
+// Сигнальные слова — если ИИ-объяснение находки содержит одно из них,
+// добавляем в задачу отдельную пометку проверить Политику в области ОТ
+// вручную. Это не замена экспертной оценки, а подсказка не пропустить
+// действительно структурное изменение.
+const POLICY_SIGNAL_WORDS = ['микропредприят', 'упрощён', 'упрощен', 'новый раздел', 'категори'];
+function mightAffectPolicy(aiSummary) {
+  const text = (aiSummary || '').toLowerCase();
+  return POLICY_SIGNAL_WORDS.some(w => text.includes(w));
+}
 
 // Официальный read-only API публикации правовых актов (без AI, без скрейпинга
 // HTML — структурированный JSON). Документация: publication.pravo.gov.ru/help
@@ -821,6 +917,12 @@ async function _checkNpaUpdates(force = false) {
         module: watch.module, matched: watch.label, tier: 'critical',
         ai_summary: aiSummary, ai_verified: isRelevant, seen: 0, created_at: now(),
       }).write();
+
+      // Автозадачи по клиентам — только для подтверждённых ИИ изменений.
+      // Каждому подходящему клиенту своя отдельная задача (не общая на всех).
+      if (isRelevant) {
+        createNpaTasksForClients(watch, item, aiSummary);
+      }
 
       if (isRelevant && s.tg_npa !== '0' && s.tg_token && s.tg_chat_id && tgSentThisRun < TG_LIMIT_PER_RUN) {
         const text = `⚖️ Изменение в законодательстве\n\n${watch.label}\n\n${item.title || item.complexName}\n\n${aiSummary || 'Откройте документ на pravo.gov.ru для деталей.'}`;

@@ -435,7 +435,7 @@ async function gen_vu_04(c, s, dir) {
       new TableRow({ children: [
         cell('Неосновные коды ОКВЭД', colCodes[0], { sz:SZ_S }),
         cell('', colCodes[1], { sz:SZ_S }),
-        cell(c.okved_extra || vu.okved_extra || '', colCodes[2]+colCodes[3]+colCodes[4], { sz:SZ_S }),
+        cell(c.okved_extra || vu.okved_extra || '', colCodes[2]+colCodes[3]+colCodes[4], { sz:SZ_S, cs:3 }),
       ]}),
     ],
   });
@@ -452,7 +452,7 @@ async function gen_vu_04(c, s, dir) {
     columnWidths: colStats,
     rows: [
       new TableRow({ children: [
-        cell('10. Сведения о работающих (чел.):', colStats[0]+colStats[1], { bold:true, sz:SZ_S }),
+        cell('10. Сведения о работающих (чел.):', colStats[0]+colStats[1], { bold:true, sz:SZ_S, cs:2 }),
       ]}),
       stat('   всего работающих', st.total),
       stat('   из них:', ''),

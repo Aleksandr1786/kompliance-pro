@@ -86,7 +86,8 @@ contextBridge.exposeInMainWorld('api', {
   addonStatus:    ()              => ipcRenderer.invoke('addon:status'),
 
   // Комиссия по проверке знаний
-  commissionGet:  (clientId)      => ipcRenderer.invoke('commission:get', clientId),
+  commissionGet:             (clientId)                    => ipcRenderer.invoke('commission:get', clientId),
+  generateCommissionOrder:   (clientId, orderNum, orderDate) => ipcRenderer.invoke('docs:generateCommissionOrder', clientId, orderNum, orderDate),
 
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),

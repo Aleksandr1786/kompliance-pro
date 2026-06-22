@@ -480,6 +480,57 @@ async function gen_02_hazard(c,s,dir){
     dir,'Программа В обучение работы повышенной опасности.docx');
 }
 
+// Приказ о создании комиссии по проверке знаний требований охраны труда
+async function gen_commission_order(c, commission, orderNum, orderDate, dir){
+  const base=require('./gen_p1');
+  const {orderHead,orderSign,famSheetOrder,save,p,pC,pR,pL,eL,cell,row,tbl,footer,MP,SZ,SZ_S}=base;
+  // Подставляем дату приказа (введённую пользователем) в копию клиента
+  const cc=Object.assign({},c,{doc_date:orderDate||c.doc_date});
+
+  const colW=[500,3500,3572];
+  const hdr=row([
+    cell('№',colW[0],{bold:true,center:true,sz:SZ_S}),
+    cell('ФИО',colW[1],{bold:true,center:true,sz:SZ_S}),
+    cell('Должность',colW[2],{bold:true,center:true,sz:SZ_S}),
+  ]);
+  const chairman=(commission||[]).filter(m=>m.commission_role==='chairman');
+  const members=(commission||[]).filter(m=>m.commission_role==='member');
+  const sorted=[...chairman,...members];
+  const dataRows=sorted.map((m,i)=>row([
+    cell(String(i+1),colW[0],{center:true,sz:SZ_S}),
+    cell((m.name||'').trim(),colW[1],{sz:SZ_S}),
+    cell((m.position||'').trim()+(m.commission_role==='chairman'?' (Председатель)':' (Член комиссии)'),colW[2],{sz:SZ_S}),
+  ]));
+  const tableRows=dataRows.length>0?dataRows:[
+    row([cell('1',colW[0],{center:true,sz:SZ_S}),cell('',colW[1],{sz:SZ_S}),cell('',colW[2],{sz:SZ_S})])
+  ];
+  const chairmanName=chairman.length>0?(chairman[0].name||'').trim():'';
+  const chairmanPos=chairman.length>0?(chairman[0].position||'').trim():'';
+
+  const ch=[
+    ...orderHead(cc,orderNum,'«О создании комиссии по проверке знаний требований охраны труда»'),
+    ...eL(1),
+    p('В соответствии со ст. 214, 219 Трудового кодекса Российской Федерации, Постановлением Правительства РФ от 24.12.2021 № 2464 «Об обучении по охране труда и проверке знания требований охраны труда»,',{indent:true}),
+    p('ПРИКАЗЫВАЮ:',{bold:true}),
+    p('1. Создать комиссию по проверке знаний требований охраны труда '+safe(c.name)+' в следующем составе:'),
+    ...eL(1),
+    tbl(colW,[hdr,...tableRows]),
+    ...eL(1),
+    p('2. Комиссии по проверке знаний требований охраны труда:'),
+    p('2.1. Проводить проверку знаний требований охраны труда в соответствии с Постановлением Правительства РФ от 24.12.2021 № 2464.',{indent:true}),
+    p('2.2. По результатам проверки знаний оформлять протокол и выдавать удостоверения установленного образца.',{indent:true}),
+    p('2.3. Не допускать к работе лиц, не прошедших проверку знаний требований охраны труда.',{indent:true}),
+    p('3. Председателем комиссии назначить'+(chairmanPos?' '+chairmanPos:'')+(chairmanName?' '+chairmanName:' ___________________')+'.'),
+    p('4. Контроль за исполнением настоящего приказа оставляю за собой.'),
+    ...orderSign(cc),
+    ...famSheetOrder(cc,'№ '+orderNum),
+  ];
+  return save(
+    [{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('commission')},children:ch}],
+    dir,'Приказ о создании комиссии по проверке знаний.docx'
+  );
+}
+
 // ── РАЗДЕЛ 5 (продолжение) — Инструкции для неофисных профессий ─────────
 // Добавлено по материалам пользователя (специалист по ОТ), 21.06.2026.
 // В отличие от positions{} (офисные должности с общим шаблоном и
@@ -802,6 +853,7 @@ module.exports={
   // Условная генерация
   gen_01_med,gen_02_med,
   gen_01_hazard,gen_02_hazard,
+  gen_commission_order,
   // Всегда генерируются
   gen_git_memo,gen_elec_contract,gen_act,
 };

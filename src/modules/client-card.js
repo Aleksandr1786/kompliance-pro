@@ -859,7 +859,12 @@ async function loadSelfTraining(clientId) {
               ? '<span style="font-size:10.5px;background:rgba(52,211,153,0.1);color:#34d399;padding:2px 8px;border-radius:6px;font-weight:600">Укомплектована</span>'
               : '<span style="font-size:10.5px;background:rgba(248,113,113,0.1);color:#f87171;padding:2px 8px;border-radius:6px;font-weight:600">Нужно ' + (3 - commission.length) + ' чел.</span>'}
           </div>
-          <span style="font-size:11px;color:var(--muted2)">${commission.length} / мин. 3</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;color:var(--muted2)">${commission.length} / мин. 3</span>
+            <button onclick="openCommissionOrderModal(${clientId})"
+              style="padding:4px 12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:7px;color:#a5b4fc;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap"
+              title="Сформировать приказ о создании комиссии">📄 Приказ</button>
+          </div>
         </div>
         ${commission.length ? `
         <div style="border-top:1px solid rgba(255,255,255,0.05)">
@@ -879,6 +884,101 @@ async function loadSelfTraining(clientId) {
         </div>` : '<div style="padding:16px;text-align:center;color:var(--muted2);font-size:12.5px;border-top:1px solid rgba(255,255,255,0.05)">Назначьте членов комиссии через «Редактировать сотрудника»</div>'}
       </div>`;
   } catch(e) {}
+}
+
+// Модалка «Сформировать приказ о создании комиссии»
+async function openCommissionOrderModal(clientId) {
+  const existing = document.getElementById('modal-commission-order');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modal-commission-order';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)';
+
+  modal.innerHTML = `
+    <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.7);animation:ob-card-in .25s ease both">
+      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">📄 Приказ о создании комиссии</div>
+      <div style="font-size:12px;color:#60a5fa;margin-bottom:20px">Укажите реквизиты приказа</div>
+
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Номер приказа</label>
+      <input id="co-num" type="text" placeholder="Например: 12-ОТ"
+        style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:14px">
+
+      <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Дата приказа</label>
+      <input id="co-date" type="date" value="${new Date().toISOString().slice(0,10)}"
+        style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;margin-bottom:20px;cursor:pointer">
+
+      <div id="co-error" style="display:none;font-size:11.5px;color:#f87171;margin-bottom:12px;padding:8px 12px;background:rgba(248,113,113,0.08);border-radius:7px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('modal-commission-order').remove()"
+          style="flex:1;padding:10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#94a3b8;font-size:13px;cursor:pointer">
+          Отмена
+        </button>
+        <button id="co-btn-generate"
+          onclick="submitCommissionOrder(${clientId})"
+          style="flex:2;padding:10px;background:linear-gradient(135deg,#6366f1,#4f46e5);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer">
+          Сформировать
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => document.getElementById('co-num')?.focus(), 50);
+}
+
+async function submitCommissionOrder(clientId) {
+  const numEl  = document.getElementById('co-num');
+  const dateEl = document.getElementById('co-date');
+  const errEl  = document.getElementById('co-error');
+  const btn    = document.getElementById('co-btn-generate');
+  if (!numEl || !dateEl) return;
+
+  const orderNum  = numEl.value.trim();
+  const orderDate = dateEl.value;
+
+  if (!orderNum) {
+    errEl.textContent = 'Введите номер приказа';
+    errEl.style.display = 'block';
+    numEl.focus();
+    return;
+  }
+  if (!orderDate) {
+    errEl.textContent = 'Укажите дату приказа';
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+
+  // Форматируем дату для документа: ДД.ММ.ГГГГ
+  const [y, m, d] = orderDate.split('-');
+  const formattedDate = d + '.' + m + '.' + y;
+
+  btn.disabled = true;
+  btn.textContent = 'Формируем...';
+
+  try {
+    const result = await window.api.generateCommissionOrder(clientId, orderNum, formattedDate);
+    if (result?.ok) {
+      document.getElementById('modal-commission-order')?.remove();
+      // Открываем папку с файлом
+      if (result.file) {
+        window.api.docsOpenFile(result.file).catch(() => {});
+      }
+      showToast('✅ Приказ сформирован');
+    } else {
+      errEl.textContent = result?.error || 'Ошибка формирования';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Сформировать';
+    }
+  } catch (err) {
+    errEl.textContent = 'Ошибка: ' + (err.message || err);
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Сформировать';
+  }
 }
 
 function toggleTrainingGroup(clientId, key) {

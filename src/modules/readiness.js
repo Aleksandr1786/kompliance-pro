@@ -846,9 +846,16 @@ async function openProtocolModal(clientId) {
   const staffCount = emps.length;
   const cat = getEnterpriseCategory(staffCount);
 
+  // Загружаем состав комиссии из трекера самообучения
+  let commission = [];
+  try { commission = await window.api.commissionGet(clientId); } catch(e) {}
+  // Передаём в generateProtocol через глобальную переменную (модал синхронный)
+  window._protocolCommission = commission;
+
   // ── ПРОВЕРКА УЛУЧШЕНИЙ ──────────────────────────
   const improvements = [];
-  if (cat.needsCommission && !c.ot_name) improvements.push('Не указан ответственный за ОТ (председатель комиссии)');
+  if (cat.needsCommission && commission.length < 3) improvements.push('Комиссия не укомплектована (нужно минимум 3 человека) — назначьте членов через «Редактировать сотрудника»');
+  else if (cat.needsCommission && !c.ot_name && commission.length === 0) improvements.push('Не указан ответственный за ОТ (председатель комиссии)');
   const noProgA = emps.filter(e => {
     const t = e.training?.prog_a;
     return t?.required && !t?.date;
@@ -917,6 +924,28 @@ async function openProtocolModal(clientId) {
 
       ${choiceBlock}
 
+      <!-- СОСТАВ КОМИССИИ -->
+      ${cat.needsCommission ? (() => {
+        if (commission.length === 0) return `
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#fbbf24">
+          👥 Комиссия не назначена — в протоколе будут пустые строки для подписей. Назначьте членов комиссии через «Редактировать сотрудника».
+        </div>`;
+        const rows = commission.map(m => {
+          const roleLabel = m.commission_role === 'chairman' ? 'Председатель' : 'Член комиссии';
+          const roleColor = m.commission_role === 'chairman' ? '#a78bfa' : '#60a5fa';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px">
+            <span style="flex:1;color:var(--text);font-weight:500">${m.full_name}</span>
+            <span style="color:var(--muted2);font-size:11px">${m.position||'—'}</span>
+            <span style="font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:5px;background:rgba(99,102,241,0.1);color:${roleColor};flex-shrink:0">${roleLabel}</span>
+          </div>`;
+        }).join('');
+        return `
+        <div style="background:rgba(99,102,241,0.05);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px 14px;margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:#a5b4fc;letter-spacing:.4px;margin-bottom:8px">👥 СОСТАВ КОМИССИИ</div>
+          ${rows}
+        </div>`;
+      })() : ''}
+
       <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;margin-bottom:10px">ВЫБЕРИТЕ СОТРУДНИКОВ</div>
       ${empRows}
 
@@ -967,8 +996,14 @@ async function generateProtocol(clientId, catKey) {
 
   const isMicro = catKey === 'micro';
   const protocolNum = `${(c.order_prefix||1)}-${isMicro?'ИН':'ПЗ'}/${yr}`;
-  const chairman = c.ot_name || c.manager_name || 'Председатель комиссии';
-  const chairmanPos = c.ot_position || 'Специалист по охране труда';
+
+  // Берём состав комиссии — из трекера (если назначена) или из полей клиента
+  const commission = window._protocolCommission || [];
+  const commChairman = commission.find(m => m.commission_role === 'chairman');
+  const commMembers  = commission.filter(m => m.commission_role === 'member');
+
+  const chairman    = commChairman ? commChairman.full_name : (c.ot_name || c.manager_name || 'Председатель комиссии');
+  const chairmanPos = commChairman ? commChairman.position  : (c.ot_position || 'Специалист по охране труда');
 
   const empTableRows = emps.map((e, i) => `
     <tr>
@@ -993,10 +1028,15 @@ async function generateProtocol(clientId, catKey) {
 
   const signBlock = isMicro
     ? `<div style="margin-bottom:24px"><b>Инструктаж и проверку провёл:</b><br><br>_______________________ / ${chairman} /</div>`
-    : `<div style="margin-bottom:24px"><b>Председатель комиссии:</b><br><br>_______________________ / ${chairman} /</div>
-       <div style="margin-bottom:14px;font-size:13px;color:#555">Члены комиссии:</div>
-       <div style="margin-bottom:14px">_______________________ / _________________ /</div>
-       <div style="margin-bottom:14px">_______________________ / _________________ /</div>`;
+    : (() => {
+        const memberLines = commMembers.length > 0
+          ? commMembers.map(m => `<div style="margin-bottom:14px">_______________________ / ${m.full_name} /</div>`).join('')
+          : `<div style="margin-bottom:14px">_______________________ / _________________ /</div>
+             <div style="margin-bottom:14px">_______________________ / _________________ /</div>`;
+        return `<div style="margin-bottom:24px"><b>Председатель комиссии:</b><br><br>_______________________ / ${chairman} /</div>
+                <div style="margin-bottom:14px;font-size:13px;color:#555">Члены комиссии:</div>
+                ${memberLines}`;
+      })();
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
   <style>*{margin:0;padding:0;box-sizing:border-box;font-family:'Times New Roman',serif}

@@ -1665,6 +1665,66 @@ ipcMain.handle('commission:get', (_, clientId) => {
     });
 });
 
+// Генерация приказа о создании комиссии по проверке знаний
+ipcMain.handle('docs:generateCommissionOrder', async (_, clientId, orderNum, orderDate) => {
+  try {
+    let client = db.get('clients').find({ id: clientId }).value();
+    if (!client) return { ok: false, error: 'Клиент не найден' };
+
+    // Получаем состав комиссии через тот же механизм что commission:get
+    const employees      = db.get('employees').filter({ client_id: clientId }).value();
+    const certifications = db.get('certifications').filter({ client_id: clientId }).value();
+    const today          = new Date();
+
+    const commission = employees
+      .filter(e => e.commission_role)
+      .map(e => {
+        const empCerts = certifications
+          .filter(c => c.employee_id === e.id)
+          .sort((a, b) => new Date(b.date_from || 0) - new Date(a.date_from || 0));
+        const progACert = empCerts.find(c =>
+          c.program && (c.program.toLowerCase().includes('прогр. а') ||
+                        c.program.toLowerCase().includes('программа а'))
+        ) || empCerts[0] || null;
+        return {
+          id:              e.id,
+          name:            e.full_name || '',
+          full_name:       e.full_name || '',
+          position:        e.position  || '',
+          commission_role: e.commission_role,
+          cert:            progACert,
+          cert_expired:    progACert?.date_to ? new Date(progACert.date_to) < today : false,
+        };
+      })
+      .sort((a, b) => {
+        if (a.commission_role === 'chairman') return -1;
+        if (b.commission_role === 'chairman') return 1;
+        return 0;
+      });
+
+    // Папка клиента
+    const rootDir  = getOutputRoot();
+    const safeName = (client.name || 'Клиент').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60).replace(/[ .]+$/, '') || 'Клиент';
+    const outputDir = path.join(rootDir, safeName);
+    fs.mkdirSync(outputDir, { recursive: true });
+
+    // Подготавливаем объект клиента (тот же паттерн что в docs:generate)
+    const clientObj = {
+      ...client,
+      city: (client.city || client.region || '').replace(/^г\.?\s*/i, '').trim() || '',
+      ot_name:     client.ot_name     || client.manager_name     || '',
+      ot_position: client.ot_position || client.manager_position || '',
+    };
+
+    const { gen_commission_order } = require('./gen_p2');
+    const filePath = await gen_commission_order(clientObj, commission, orderNum, orderDate, outputDir);
+
+    return { ok: true, file: filePath };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
 // ─── АДДОНЫ ─────────────────────────────────────────────────────────
 // Аддон-ключ: KP-ADDON-[TYPE]-[SHA256(SECRET+ADDON+TYPE+EXPIRE+MACHINE)[:20]]
 // Формула совпадает с keygen-tool.html — не менять в одном месте без другого.

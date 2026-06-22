@@ -18,6 +18,19 @@ const BN={style:BorderStyle.NONE,size:0,color:'FFFFFF'};
 const BALL={top:B,bottom:B,left:B,right:B};
 const BNONE={top:BN,bottom:BN,left:BN,right:BN};
 
+// Должность руководителя — фиксированный список из 5 вариантов в форме клиента
+// (clients.js, select #e-manager-position), поэтому родительный падеж можно
+// просто захардкодить — ИИ для такого ограниченного набора не нужен.
+// Используется там, где по тексту требуется родительный падеж
+// (например, "Утверждено приказом [кого?]").
+const MANAGER_POSITION_GEN = {
+  'Индивидуальный предприниматель': 'Индивидуального предпринимателя',
+  'Генеральный директор': 'Генерального директора',
+  'Директор': 'Директора',
+  'Исполнительный директор': 'Исполнительного директора',
+  'Руководитель': 'Руководителя',
+};
+
 function p(text,o={}){
   const runs=Array.isArray(text)
     ?text.map(t=>new TextRun({text:t.t,bold:t.b,size:o.sz||SZ,font:FONT}))
@@ -69,7 +82,7 @@ function approvalOrder(c,orderNum){
     rows:[new TableRow({children:[
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[new Paragraph('')]}),
       new TableCell({borders:BNONE,width:{size:CW/2,type:WidthType.DXA},children:[
-        pL('УТВЕРЖДЕНА',{bold:true}),pL('Приказом '+safe(c.manager_position)),
+        pL('УТВЕРЖДЕНА',{bold:true}),pL('Приказом '+safe(c.manager_position_gen)),
         pL(safe(c.name)),pL('от «'+safe(c.doc_date)+'» № ____'),
       ]}),
     ]})],
@@ -115,11 +128,21 @@ function norm(client){
   c.manager_name=c.manager_name||'Руководитель';
   c.manager_name_full=c.manager_name_full||c.manager_name;
   c.manager_position=c.manager_position||'Руководитель';
+  // Родительный падеж должности руководителя — для фраз вида "Приказом [кого?]"
+  c.manager_position_gen = MANAGER_POSITION_GEN[c.manager_position] || c.manager_position;
   // Ответственный за ОТ — если не указан отдельно, используем руководителя
   c.ot_name=c.ot_name||c.manager_name;
   c.ot_name_full=c.ot_name_full||c.ot_name;
   c.ot_position=c.ot_position||c.manager_position;
   c.ot_dative=c.ot_dative||c.ot_name_full||c.ot_name;
+  // Винительный падеж ФИО/должности ответственного за ОТ — для фраз вида
+  // "Назначить (кого?) [должность] [ФИО]". ot_name_acc/ot_position_acc
+  // приходят из ИИ-склонения (clients.js, при сохранении карточки клиента);
+  // если их ещё нет (клиент не пересохранялся после добавления этой фичи) —
+  // откатываемся на именительный падеж, как было раньше: грамматика не
+  // идеальна, но ничего не ломается.
+  c.ot_position_acc = c.ot_position_acc || c.ot_position;
+  c.ot_name_acc = c.ot_name_acc || c.ot_name_full || c.ot_name;
   // СОУТ и условия труда
   c.soat_class=c.soat_class||'2';
   c.hazard_works=c.hazard_works||0;
@@ -237,11 +260,12 @@ async function gen_01_03(c,s,dir){
 async function gen_01_04(c,s,dir){
   const num=oNum(c,1);
   const otN=c.ot_name_full||c.ot_name,otP=c.ot_position,otD=c.ot_dative;
+  const otN_acc=c.ot_name_acc,otP_acc=c.ot_position_acc;
   const ch=[...orderHead(c,num,'«О назначении ответственных лиц по охране труда»'),...eL(1),
     p('В соответствии с требованиями ст. 214, 217 ТК РФ,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Назначить ответственным за организацию работы по ОТ в '+safe(c.name)+' '+otP+' '+otN+'.'),
-    p('2. Возложить на '+otD+' следующие обязанности:'),
+    p('1. Назначить ответственным за организацию работы по ОТ в '+safe(c.name)+' '+otP_acc+' '+otN_acc+'.'),
+    p('2. Возложить на '+otN_acc+' следующие обязанности:'),
     p('2.1. Организация и контроль работы по охране труда.',{indent:true}),
     p('2.2. Проведение вводных инструктажей.',{indent:true}),
     p('2.3. Контроль первичных и повторных инструктажей.',{indent:true}),
@@ -278,10 +302,11 @@ async function gen_01_05(c,s,dir){
 async function gen_01_06(c,s,dir){
   const num=oNum(c,3);
   const dN=c.dsiz_name_full||c.ot_name_full||c.ot_name,dP=c.dsiz_position||c.ot_position,dD=c.dsiz_dative||c.ot_dative;
+  const dN_acc=c.dsiz_name_acc||c.ot_name_acc,dP_acc=c.dsiz_position_acc||c.ot_position_acc;
   const ch=[...orderHead(c,num,'«О назначении ответственного за обеспечение работников СИЗ и смывающими средствами»'),...eL(1),
     p('В соответствии со ст. 214, 221 ТК РФ, Приказа Минтруда от 29.10.2021 № 766н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Назначить ответственным за ДСИЗ '+dP+' '+dN+'.'),
+    p('1. Назначить ответственным за ДСИЗ '+dP_acc+' '+dN_acc+'.'),
     p('2. Возложить обязанности:'),
     p('2.1. Ведение учёта выдачи СИЗ в журналах и карточках.',{indent:true}),
     p('2.2. Контроль соответствия СИЗ техническим регламентам.',{indent:true}),
@@ -298,7 +323,7 @@ async function gen_01_07(c,s,dir){
     p('В соответствии со ст. 223 ТК РФ, Приказа Минтруда России от 09.08.2024 № 398н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
     p('1. Обеспечить наличие аптечки первой помощи в офисе '+safe(c.name)+'.'),
-    p('2. Назначить '+c.ot_position+' '+(c.ot_name_full||c.ot_name)+' ответственным за:'),
+    p('2. Назначить '+c.ot_position_acc+' '+c.ot_name_acc+' ответственным за:'),
     p('2.1. Приобретение, комплектацию и пополнение аптечки.',{indent:true}),
     p('2.2. Проверку комплектации не реже 1 раза в 3 месяца.',{indent:true}),
     p('2.3. Контроль сроков годности медицинских изделий.',{indent:true}),
@@ -312,10 +337,11 @@ async function gen_01_07(c,s,dir){
 async function gen_01_08(c,s,dir){
   const num=oNum(c,5);
   const eN=c.elec_name_full||c.ot_name_full||c.ot_name,eP=c.elec_position||c.ot_position;
+  const eN_acc=c.elec_name_acc||c.ot_name_acc,eP_acc=c.elec_position_acc||c.ot_position_acc;
   const ch=[...orderHead(c,num,'«О назначении ответственного за электрохозяйство»'),...eL(1),
     p('В соответствии с Приказом Минэнерго России от 12.08.2022 № 811, Приказом Минтруда России от 15.12.2020 № 903н,',{indent:true}),
     p('ПРИКАЗЫВАЮ:',{bold:true}),
-    p('1. Назначить ответственным за эксплуатацию электроустановок '+safe(c.name)+' '+eP+' '+eN+'.'),
+    p('1. Назначить ответственным за эксплуатацию электроустановок '+safe(c.name)+' '+eP_acc+' '+eN_acc+'.'),
     p('2. Возложить обязанности:'),
     p('2.1. Организация безопасной эксплуатации электрооборудования.',{indent:true}),
     p('2.2. Присвоение I группы электробезопасности неэлектротехническому персоналу.',{indent:true}),
@@ -334,7 +360,7 @@ async function gen_01_09(c,s,dir){
     p('1.1. № 01-ПИ — Программа вводного инструктажа по охране труда.',{indent:true}),
     p('1.2. № 02-ПИ — Программа первичного инструктажа на рабочем месте.',{indent:true}),
     p('1.3. № 03-ПИ — Программа противопожарного инструктажа.',{indent:true}),
-    p('2. Ответственным назначить '+c.ot_position+' '+(c.ot_name_full||c.ot_name)+'.'),
+    p('2. Ответственным назначить '+c.ot_position_acc+' '+c.ot_name_acc+'.'),
     p('3. Программы пересматривать не реже 1 раза в 3 года.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c)];

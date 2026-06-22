@@ -1036,7 +1036,7 @@ async function renderVuReadiness(clientId) {
             </div>
           </div>
           <div>
-            <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">Вероятность нарушений</div>
+            <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">Вероятность нарушений при проверках</div>
             <div style="font-size:16px;font-weight:800;color:${riskColor}">${riskLabel}</div>
             <div style="font-size:11px;color:var(--muted2);margin-top:4px">Макс. штраф: ~${totalFine > 0 ? (totalFine/1000).toFixed(0)+'K ₽' : '—'}</div>
           </div>

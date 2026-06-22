@@ -433,44 +433,32 @@ async function renderPdReadiness(clientId) {
       <!-- ИНДЕКС РИСКА + ПИСЬМО ОТ РКН -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-        <!-- Спидометр -->
+        <!-- Кольцевой гейдж риска (стиль ВУ) -->
         <div class="rc-card panel">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-            <div style="width:36px;height:36px;border-radius:10px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-              ${ic('target',18)}
+          <div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:14px">Индекс риска РКН</div>
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+            <div style="position:relative;width:80px;height:80px;flex-shrink:0">
+              <svg viewBox="0 0 80 80" style="width:80px;height:80px;transform:rotate(-90deg)">
+                <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+                <circle cx="40" cy="40" r="32" fill="none" stroke="${riskColor}" stroke-width="10"
+                  stroke-dasharray="${2*Math.PI*32}" stroke-dashoffset="${2*Math.PI*32*(1-probability/100)}"
+                  stroke-linecap="round"/>
+              </svg>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                <div style="font-size:18px;font-weight:800;color:${riskColor}">${probability}%</div>
+              </div>
             </div>
             <div>
-              <div style="font-size:14px;font-weight:700;color:#f1f5f9">Индекс риска РКН</div>
-              <div style="font-size:11px;color:#94a3b8">Вероятность нарушений при проверке</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Вероятность нарушений при проверках</div>
+              <div style="font-size:16px;font-weight:800;color:${riskColor}">${riskLabel}</div>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:center;padding:8px 0">
-            <svg width="220" height="130" viewBox="0 0 220 130">
-              <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18" stroke-linecap="round"/>
-              <path d="M 20 110 A 90 90 0 0 1 75 27" fill="none" stroke="#34d399" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-              <path d="M 75 27 A 90 90 0 0 1 145 27" fill="none" stroke="#fbbf24" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-              <path d="M 145 27 A 90 90 0 0 1 200 110" fill="none" stroke="#f87171" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-              ${(() => {
-                const pct = probability/100;
-                const angle = -180+pct*180;
-                const rad = angle*Math.PI/180;
-                const x = 110+90*Math.cos(rad), y = 110+90*Math.sin(rad);
-                const la = pct>0.5?1:0;
-                return `<path d="M 20 110 A 90 90 0 ${la} 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${riskColor}" stroke-width="18" stroke-linecap="round"/>
-                <line x1="110" y1="110" x2="${(110+72*Math.cos(rad)).toFixed(1)}" y2="${(110+72*Math.sin(rad)).toFixed(1)}" stroke="${riskColor}" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="110" cy="110" r="6" fill="${riskColor}"/>`;
-              })()}
-              <text x="14" y="126" fill="#475569" font-size="10" text-anchor="middle">0%</text>
-              <text x="110" y="18" fill="#475569" font-size="10" text-anchor="middle">50%</text>
-              <text x="206" y="126" fill="#475569" font-size="10" text-anchor="middle">100%</text>
-              <text x="110" y="95" fill="${riskColor}" font-size="26" font-weight="800" text-anchor="middle">${probability}%</text>
-              <text x="110" y="113" fill="#94a3b8" font-size="11" text-anchor="middle">${riskLabel}</text>
-            </svg>
+          <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+            <div style="width:${score}%;height:100%;background:${scoreColor};border-radius:3px;transition:width .8s ease"></div>
           </div>
-          <div style="display:flex;justify-content:center;gap:16px;margin-top:4px">
-            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#34d399"></div>Низкий</div>
-            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#fbbf24"></div>Средний</div>
-            <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#f87171"></div>Высокий</div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px">
+            <div style="font-size:11px;color:#94a3b8">Готовность ПДн</div>
+            <div style="font-size:11px;font-weight:700;color:${scoreColor}">${score}%</div>
           </div>
         </div>
 

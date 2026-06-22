@@ -75,6 +75,19 @@ contextBridge.exposeInMainWorld('api', {
   // AI / Ассистент
   aiRequest:      (data)      => ipcRenderer.invoke('ai:request', data),
 
+  // Центр обучения — реестр удостоверений
+  certsList:      (clientId)      => ipcRenderer.invoke('certs:list', clientId),
+  certsAdd:       (data)          => ipcRenderer.invoke('certs:add', data),
+  certsUpdate:    (id, data)      => ipcRenderer.invoke('certs:update', id, data),
+  certsDelete:    (id)            => ipcRenderer.invoke('certs:delete', id),
+
+  // Аддоны (дополнительные платные модули: TRAINING, FLEET, PASF)
+  addonActivate:  (key, expire, type) => ipcRenderer.invoke('addon:activate', key, expire, type),
+  addonStatus:    ()              => ipcRenderer.invoke('addon:status'),
+
+  // Комиссия по проверке знаний
+  commissionGet:  (clientId)      => ipcRenderer.invoke('commission:get', clientId),
+
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),
 

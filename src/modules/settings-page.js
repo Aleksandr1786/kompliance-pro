@@ -25,7 +25,7 @@ async function renderSettings() {
     LICENSE.status === 'trial' && LICENSE.daysLeft != null ? `осталось ${LICENSE.daysLeft} дн.` :
     '—';
 
-  // Загружаем Machine ID асинхронно после рендера
+  // Загружаем Machine ID и статус аддонов асинхронно после рендера
   setTimeout(async () => {
     const el = document.getElementById('machine-id-display');
     if (el) {
@@ -42,6 +42,32 @@ async function renderSettings() {
       } catch(e) { el.textContent = 'Ошибка'; }
     }
   }, 200);
+
+  // Загружаем актуальный статус аддонов
+  setTimeout(async () => {
+    try {
+      const addons = await window.api.addonStatus();
+      const ADDON_LABELS = {
+        TRAINING: 'Центр обучения — самообучение',
+        FLEET:    'Морской флот',
+        PASF:     'ПАСФ',
+      };
+      addons.forEach(a => {
+        const badge = document.getElementById('addon-badge-' + a.type);
+        const expires = document.getElementById('addon-expires-' + a.type);
+        if (badge) {
+          badge.textContent = a.active ? 'Активен' : 'Не подключён';
+          badge.style.color = a.active ? '#34d399' : '#475569';
+          badge.style.background = a.active ? 'rgba(52,211,153,0.1)' : 'rgba(71,85,105,0.12)';
+        }
+        if (expires) {
+          expires.textContent = a.expires
+            ? ('до ' + formatDate(a.expires))
+            : (a.active ? 'бессрочно' : '');
+        }
+      });
+    } catch(e) {}
+  }, 300);
 
   document.getElementById('content').innerHTML = `
     <div style="display:flex;gap:20px;align-items:flex-start">
@@ -256,6 +282,46 @@ async function renderSettings() {
                 </button>
               </div>
             </div>
+            <!-- АДДОНЫ — дополнительные платные модули -->
+            <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:12px">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em">Аддоны</div>
+              ${[
+                {type:'TRAINING', name:'Центр обучения — самообучение', desc:'Чек-лист внутреннего обучения организации'},
+                {type:'FLEET',    name:'Морской флот',                         desc:'Охрана труда на судах'},
+                {type:'PASF',     name:'ПАСФ',                                         desc:'Профессиональное аварийно-спасательное формирование'},
+              ].map(a => `
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12.5px;font-weight:600;color:var(--text)">${a.name}</div>
+                    <div style="font-size:11px;color:var(--muted2);margin-top:1px">${a.desc}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <span id="addon-badge-${a.type}" style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(71,85,105,0.12);color:#475569">Не подключён</span>
+                    <div id="addon-expires-${a.type}" style="font-size:10.5px;color:var(--muted2);margin-top:2px"></div>
+                  </div>
+                </div>`).join('')}
+              <div style="margin-top:12px">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">Активация аддона</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <select id="addon-type-select"
+                    style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
+                    <option value="TRAINING">Центр обучения — самообучение</option>
+                    <option value="FLEET">Морской флот</option>
+                    <option value="PASF">ПАСФ</option>
+                  </select>
+                  <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+                    <input id="addon-key-input" placeholder="Ключ аддона (KP-ADDON-...)"
+                      style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;font-family:monospace">
+                    <input id="addon-expire-input" type="date"
+                      style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
+                  </div>
+                  <button onclick="activateAddon()"
+                    style="padding:9px;background:linear-gradient(135deg,#d97706,#b45309);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+                    Активировать аддон
+                  </button>
+                </div>
+              </div>
+            </div>
             <!-- Переключатель режима дашборда -->
             <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:12px">
               <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Режим дашборда</div>
@@ -407,4 +473,38 @@ async function backupNow() {
   const result = await window.api.backupNow();
   if (result.ok) showToast('Резервная копия создана: ' + result.path);
   else showToast('Выберите папку для резервных копий', 'var(--amber)');
+}
+
+async function activateAddon() {
+  const key    = document.getElementById('addon-key-input')?.value?.trim();
+  const expire = document.getElementById('addon-expire-input')?.value;
+  const type   = document.getElementById('addon-type-select')?.value;
+
+  if (!key || !expire) {
+    showToast('Введите ключ и дату', 'var(--amber)');
+    return;
+  }
+
+  const result = await window.api.addonActivate(key, expire, type);
+  if (result.ok) {
+    showToast('Аддон активирован ✅');
+    // Обновляем бейджи без перезагрузки страницы
+    const addons = await window.api.addonStatus();
+    addons.forEach(a => {
+      const badge = document.getElementById('addon-badge-' + a.type);
+      const expiresEl = document.getElementById('addon-expires-' + a.type);
+      if (badge) {
+        badge.textContent = a.active ? 'Активен' : 'Не подключён';
+        badge.style.color = a.active ? '#34d399' : '#475569';
+        badge.style.background = a.active ? 'rgba(52,211,153,0.1)' : 'rgba(71,85,105,0.12)';
+      }
+      if (expiresEl) {
+        expiresEl.textContent = a.expires ? ('до ' + formatDate(a.expires)) : (a.active ? 'бессрочно' : '');
+      }
+    });
+    document.getElementById('addon-key-input').value = '';
+    document.getElementById('addon-expire-input').value = '';
+  } else {
+    showToast(result.error || 'Ключ не подходит', 'var(--red)');
+  }
 }

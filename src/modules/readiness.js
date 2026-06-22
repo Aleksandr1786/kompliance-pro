@@ -11,6 +11,7 @@ let _readinessClientId = null;
 
 async function openReadinessCenter(clientId) {
   _readinessClientId = clientId;
+  await loadAddonCache(); // загружаем актуальный статус аддонов перед любыми проверками
   const c = await window.api.clientGet(clientId);
   if (!c) return;
   const docs = await window.api.documentsList(clientId);
@@ -305,74 +306,33 @@ async function openReadinessCenter(clientId) {
     <!-- ВТОРАЯ СТРОКА: Спидометр + Машина времени -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
 
-      <!-- ВИДЖЕТ: ИНДЕКС РИСКА — СПИДОМЕТР -->
+      <!-- ВИДЖЕТ: ИНДЕКС РИСКА (стиль кольца — единый с ВУ) -->
       <div class="rc-card panel">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-          <div style="width:36px;height:36px;border-radius:10px;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        <div style="font-size:13px;font-weight:700;color:#f1f5f9;margin-bottom:14px">Индекс риска ГИТ</div>
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+          <div style="position:relative;width:80px;height:80px;flex-shrink:0">
+            <svg viewBox="0 0 80 80" style="width:80px;height:80px;transform:rotate(-90deg)">
+              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+              <circle cx="40" cy="40" r="32" fill="none" stroke="${riskColor}" stroke-width="10"
+                stroke-dasharray="${2*Math.PI*32}" stroke-dashoffset="${2*Math.PI*32*(1-probability/100)}"
+                stroke-linecap="round"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div style="font-size:18px;font-weight:800;color:${riskColor}">${probability}%</div>
+            </div>
           </div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:#f1f5f9">Индекс риска ГИТ</div>
-            <div style="font-size:11px;color:#94a3b8">Вероятность штрафа при проверке</div>
+            <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Вероятность штрафа при проверках</div>
+            <div style="font-size:16px;font-weight:800;color:${riskColor}">${riskLabel}</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px">Макс. штраф: ${totalFineMax > 0 ? (totalFineMin/1000).toFixed(0)+'–'+(totalFineMax/1000).toFixed(0)+'K ₽' : '—'}</div>
           </div>
         </div>
-
-        <!-- SVG Спидометр -->
-        <div style="display:flex;flex-direction:column;align-items:center;padding:8px 0">
-          <svg width="220" height="130" viewBox="0 0 220 130">
-            <!-- Фоновая дуга -->
-            <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="18" stroke-linecap="round"/>
-            <!-- Зелёная зона -->
-            <path d="M 20 110 A 90 90 0 0 1 75 27" fill="none" stroke="#34d399" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-            <!-- Жёлтая зона -->
-            <path d="M 75 27 A 90 90 0 0 1 145 27" fill="none" stroke="#fbbf24" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-            <!-- Красная зона -->
-            <path d="M 145 27 A 90 90 0 0 1 200 110" fill="none" stroke="#f87171" stroke-width="18" stroke-linecap="round" opacity=".35"/>
-
-            <!-- Активная дуга (прогресс) -->
-            ${(() => {
-              const pct = probability / 100;
-              // Угол от -180° до 0° (дуга 180°)
-              const angle = -180 + pct * 180;
-              const rad = (angle * Math.PI) / 180;
-              const cx = 110, cy = 110, r = 90;
-              const x = cx + r * Math.cos(rad);
-              const y = cy + r * Math.sin(rad);
-              const largeArc = pct > 0.5 ? 1 : 0;
-              const activeColor = probability >= 70 ? '#f87171' : probability >= 40 ? '#fbbf24' : '#34d399';
-              return `<path d="M 20 110 A 90 90 0 ${largeArc} 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="${activeColor}" stroke-width="18" stroke-linecap="round"/>`;
-            })()}
-
-            <!-- Стрелка -->
-            ${(() => {
-              const pct = probability / 100;
-              const angle = -180 + pct * 180;
-              const rad = (angle * Math.PI) / 180;
-              const cx = 110, cy = 110;
-              const nx = cx + 72 * Math.cos(rad);
-              const ny = cy + 72 * Math.sin(rad);
-              const activeColor = probability >= 70 ? '#f87171' : probability >= 40 ? '#fbbf24' : '#34d399';
-              return `
-                <line x1="110" y1="110" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="${activeColor}" stroke-width="3" stroke-linecap="round"/>
-                <circle cx="110" cy="110" r="6" fill="${activeColor}"/>
-              `;
-            })()}
-
-            <!-- Метки -->
-            <text x="14" y="126" fill="#475569" font-size="10" text-anchor="middle">0%</text>
-            <text x="110" y="18" fill="#475569" font-size="10" text-anchor="middle">50%</text>
-            <text x="206" y="126" fill="#475569" font-size="10" text-anchor="middle">100%</text>
-
-            <!-- Центральное значение -->
-            <text x="110" y="95" fill="${riskColor}" font-size="26" font-weight="800" text-anchor="middle">${probability}%</text>
-            <text x="110" y="113" fill="#94a3b8" font-size="11" text-anchor="middle">${riskLabel}</text>
-          </svg>
+        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+          <div style="width:${realScore}%;height:100%;background:${scoreColor};border-radius:3px;transition:width .8s ease"></div>
         </div>
-
-        <div style="display:flex;justify-content:center;gap:16px;margin-top:4px">
-          <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#34d399"></div>Низкий</div>
-          <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#fbbf24"></div>Средний</div>
-          <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><div style="width:8px;height:8px;border-radius:50%;background:#f87171"></div>Высокий</div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <div style="font-size:11px;color:#94a3b8">Готовность ОТ</div>
+          <div style="font-size:11px;font-weight:700;color:${scoreColor}">${realScore}%</div>
         </div>
       </div>
 
@@ -806,10 +766,33 @@ async function generateEFS1Memo(clientId) {
 
 // Точка контроля тарифа — пока всегда разрешено.
 // Когда внедрим лицензии, здесь будет проверка тарифа.
+// Кэш аддонов — загружается при открытии Центра готовности
+// чтобы не дёргать IPC при каждой проверке.
+let _addonCache = null;
+
+async function loadAddonCache() {
+  try {
+    const list = await window.api.addonStatus();
+    _addonCache = {};
+    list.forEach(a => { _addonCache[a.type] = a.active; });
+  } catch(e) {
+    _addonCache = {};
+  }
+}
+
 function checkTariffAccess(feature) {
-  // feature: 'protocol', 'passport', 'simulator' и т.д.
-  // TODO: интеграция с системой лицензий
-  return true;
+  // feature: 'training_self' | 'fleet' | 'pasf' | 'protocol' | 'passport' | 'simulator'
+  // В dev-режиме (start.bat) всё открыто — app.isPackaged === false,
+  // но мы не имеем доступа к app здесь, поэтому фолбэк — разрешить если кэш пуст.
+  if (!_addonCache) return true;
+  const ADDON_FEATURES = {
+    training_self: 'TRAINING',
+    fleet:         'FLEET',
+    pasf:          'PASF',
+  };
+  const addonType = ADDON_FEATURES[feature];
+  if (!addonType) return true; // protocol, passport, simulator — не аддоны, всегда доступны
+  return !!_addonCache[addonType];
 }
 
 // Определение категории предприятия по числу сотрудников (ФЗ-209)

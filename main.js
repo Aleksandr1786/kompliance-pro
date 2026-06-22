@@ -69,6 +69,7 @@ const MIGRATIONS = [
         if (e.vu_rank         === undefined) e.vu_rank         = '';
         if (e.vu_mobpredpisanie === undefined) e.vu_mobpredpisanie = 0;
         if (e.training        === undefined) e.training        = {};
+        if (e.commission_role === undefined) e.commission_role = null; // 'chairman' | 'member' | null
       }).write();
 
       // Добавляем недостающие поля задачам
@@ -173,6 +174,7 @@ function initDB() {
     tasks: [],
     npa_changes: [],
     divisions: [],
+    certifications: [], // реестр удостоверений Центра обучения
     settings: {
       user_name: '',
       user_position: '',
@@ -783,12 +785,18 @@ const NPA_WATCHLIST = [
   { module: 'ot', code: '782н',   label: 'Приказ Минтруда № 782н — работы на высоте',
     clientFilter: c => !!c.hazard_works,
     relatedDocs: ['Инструкция по охране труда при работах на высоте'] },
-  { module: 'pd', code: '152-ФЗ', label: 'ФЗ № 152-ФЗ — о персональных данных' },
-  { module: 'pd', code: '266-ФЗ', label: 'ФЗ № 266-ФЗ — поправки в 152-ФЗ' },
-  { module: 'pd', code: '1119',   label: 'ПП РФ № 1119 — защита ПДн в информационных системах' },
-  { module: 'pd', code: '178',    label: 'Приказ РКН № 178' },
-  { module: 'vu', code: '719',    label: 'ПП РФ № 719 — положение о воинском учёте' },
-  { module: 'vu', code: '53-ФЗ',  label: 'ФЗ № 53-ФЗ — о воинской обязанности и военной службе' },
+  { module: 'pd', code: '152-ФЗ', label: 'ФЗ № 152-ФЗ — о персональных данных',
+    relatedDocs: ['Приказ о назначении ответственного за ПД','Политика об обработке персональных данных','Положение о защите персональных данных работников','Согласие на обработку персональных данных'] },
+  { module: 'pd', code: '266-ФЗ', label: 'ФЗ № 266-ФЗ — поправки в 152-ФЗ',
+    relatedDocs: ['Приказ о назначении ответственного за ПД','Политика об обработке персональных данных'] },
+  { module: 'pd', code: '1119',   label: 'ПП РФ № 1119 — защита ПДн в информационных системах',
+    relatedDocs: ['Приказ о назначении ответственного за безопасность ПД','Приказ о создании комиссии по уровню защищённости','Акт определения уровня защищённости ИСПДн','Инструкция пользователя ИСПДн'] },
+  { module: 'pd', code: '178',    label: 'Приказ РКН № 178',
+    relatedDocs: ['Акт оценки вреда субъектам ПДн','Памятка подачи уведомления в РКН'] },
+  { module: 'vu', code: '719',    label: 'ПП РФ № 719 — положение о воинском учёте',
+    relatedDocs: ['ВУ-01 Приказ о назначении ответственного за воинский учёт','ВУ-04 Карточка учёта организации (Форма №18)','ВУ-07 Уведомление в военкомат о приёме военнообязанного','ВУ-08 Уведомление в военкомат об увольнении военнообязанного'] },
+  { module: 'vu', code: '53-ФЗ',  label: 'ФЗ № 53-ФЗ — о воинской обязанности и военной службе',
+    relatedDocs: ['ВУ-01 Приказ о назначении ответственного за воинский учёт','ВУ-02 Функциональные обязанности ответственного за воинский учёт','ВУ-03 План работы по осуществлению воинского учёта'] },
 ];
 
 // Сигнальные слова — если ИИ-объяснение находки содержит одно из них,
@@ -1577,6 +1585,145 @@ ipcMain.handle('ai:request', async (_, { prompt, system }) => {
   return callAI(prompt, system);
 });
 // ─── ОБУЧЕНИЕ СОТРУДНИКОВ ────────────────────────────────
+// ─── ЦЕНТР ОБУЧЕНИЯ — реестр удостоверений ──────────────
+// Каждая запись: {id, client_id, employee_id, program, center, cert_number, date_from, date_to, created_at}
+// employee_id может быть null если сотрудник не заведён в системе (записи «задним числом»)
+
+ipcMain.handle('certs:list', (_, clientId) => {
+  const certs = db.get('certifications').filter({ client_id: clientId }).value();
+  const employees = db.get('employees').value();
+  return certs.map(c => ({
+    ...c,
+    employee_name: employees.find(e => e.id === c.employee_id)?.full_name || c.employee_name_manual || '—',
+  }));
+});
+
+ipcMain.handle('certs:add', (_, data) => {
+  const id = nextId('certifications');
+  const cert = { ...data, id, created_at: now() };
+  db.get('certifications').push(cert).write();
+  return { ok: true, id };
+});
+
+ipcMain.handle('certs:update', (_, id, data) => {
+  db.get('certifications').find({ id }).assign({ ...data }).write();
+  return { ok: true };
+});
+
+ipcMain.handle('certs:delete', (_, id) => {
+  db.get('certifications').remove({ id }).write();
+  return { ok: true };
+});
+
+// ─── КОМИССИЯ ПО ПРОВЕРКЕ ЗНАНИЙ ─────────────────────────
+// Возвращает членов комиссии с их удостоверениями из внешнего центра.
+// Используется в трекере самообучения и при генерации протокола/приказа.
+ipcMain.handle('commission:get', (_, clientId) => {
+  const employees     = db.get('employees').filter({ client_id: clientId }).value();
+  const certifications= db.get('certifications').filter({ client_id: clientId }).value();
+  const today         = new Date();
+
+  return employees
+    .filter(e => e.commission_role)
+    .map(e => {
+      // Ищем актуальное удостоверение по Программе А (или любое последнее)
+      const empCerts = certifications
+        .filter(c => c.employee_id === e.id)
+        .sort((a, b) => new Date(b.date_from||0) - new Date(a.date_from||0));
+
+      const progACert = empCerts.find(c =>
+        c.program && c.program.toLowerCase().includes('прогр. а') ||
+        c.program && c.program.toLowerCase().includes('программа а')
+      ) || empCerts[0] || null;
+
+      const certExpired = progACert?.date_to
+        ? new Date(progACert.date_to) < today
+        : false;
+
+      const daysLeft = progACert?.date_to
+        ? Math.ceil((new Date(progACert.date_to) - today) / 86400000)
+        : null;
+
+      return {
+        id:             e.id,
+        full_name:      e.full_name,
+        name_gen:       e.name_gen   || e.full_name,
+        name_dat:       e.name_dat   || e.full_name,
+        name_acc:       e.name_acc   || e.full_name,
+        position:       e.position   || '',
+        commission_role:e.commission_role,
+        cert:           progACert,
+        cert_expired:   certExpired,
+        cert_days_left: daysLeft,
+      };
+    })
+    .sort((a, b) => {
+      // Председатель всегда первый
+      if (a.commission_role === 'chairman') return -1;
+      if (b.commission_role === 'chairman') return 1;
+      return 0;
+    });
+});
+
+// ─── АДДОНЫ ─────────────────────────────────────────────────────────
+// Аддон-ключ: KP-ADDON-[TYPE]-[SHA256(SECRET+ADDON+TYPE+EXPIRE+MACHINE)[:20]]
+// Формула совпадает с keygen-tool.html — не менять в одном месте без другого.
+// Текущие аддоны: TRAINING (самообучение), FLEET (флот), PASF (Профессиональное аварийно-спасательное формирование, 151-ФЗ).
+// Чтобы добавить новый — достаточно добавить его сюда и в keygen-tool.html.
+const KNOWN_ADDONS = ['TRAINING', 'FLEET', 'PASF'];
+
+function generateAddonKey(addonType, expireDate, machineId) {
+  const crypto = require('crypto');
+  const raw = LICENSE_SECRET + ':ADDON:' + addonType + ':' + expireDate + ':' + machineId;
+  return 'KP-ADDON-' + addonType + '-' + crypto.createHash('sha256').update(raw).digest('hex').substring(0, 20).toUpperCase();
+}
+
+function hasAddon(addonType) {
+  const settings = db.get('settings').value();
+  const addons = settings.license_addons || [];
+  const addonExpires = settings.addon_expires || {};
+  if (!addons.includes(addonType)) return false;
+  // Проверяем срок аддона
+  const exp = addonExpires[addonType];
+  if (!exp) return true;
+  return new Date(exp) > new Date();
+}
+
+ipcMain.handle('addon:activate', (_, key, expireDate, addonType) => {
+  if (!key || !expireDate || !addonType) return { ok: false, error: 'Заполните все поля' };
+  if (!KNOWN_ADDONS.includes(addonType)) return { ok: false, error: 'Неизвестный аддон: ' + addonType };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expireDate)) return { ok: false, error: 'Неверный формат даты' };
+
+  const machineId = getMachineId();
+  const expected = generateAddonKey(addonType, expireDate, machineId);
+
+  // DEV-MODE: любой аддон активируется командой 'DEV-ADDON-KP2026'
+  if (key.trim() !== 'DEV-ADDON-KP2026' && key.trim().toUpperCase() !== expected) {
+    return { ok: false, error: 'Ключ аддона недействителен или не соответствует устройству' };
+  }
+
+  const settings   = db.get('settings').value();
+  const addons     = settings.license_addons || [];
+  const addonExpires = settings.addon_expires || {};
+
+  if (!addons.includes(addonType)) addons.push(addonType);
+  addonExpires[addonType] = expireDate;
+
+  db.get('settings').assign({ license_addons: addons, addon_expires: addonExpires }).write();
+  return { ok: true, addon: addonType, expires: expireDate };
+});
+
+ipcMain.handle('addon:status', () => {
+  const settings = db.get('settings').value();
+  const addons = settings.license_addons || [];
+  const addonExpires = settings.addon_expires || {};
+  return KNOWN_ADDONS.map(type => ({
+    type,
+    active: hasAddon(type),
+    expires: addonExpires[type] || null,
+  }));
+});
+
 ipcMain.handle('training:get', (_, employeeId) => {
   const emp = db.get('employees').find({ id: employeeId }).value();
   return emp?.training || {};

@@ -68,6 +68,15 @@ async function submitAddClient() {
   }
   const mods = [...document.querySelectorAll('.module-pill.checked')].map(p => p.dataset.module).join(',');
   const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const otName = document.getElementById('c-ot-name')?.value?.trim() || '';
+  const otPos  = document.getElementById('c-ot-position')?.value?.trim() || '';
+  // Склоняем ФИО и должность ответственного за ОТ через ИИ — нужны для
+  // фраз вида "Назначить (кого?) [должность] [ФИО]" (винительный падеж).
+  // Делаем только если поля реально заполнены — иначе нечего склонять.
+  let nameDecl = null, posDecl = null;
+  if ((otName || otPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
+  if (otName && window.api.aiRequest) nameDecl = await declineFIO(otName);
+  if (otPos  && window.api.aiRequest) posDecl  = await declinePosition(otPos);
   const data = {
     name,
     inn:    document.getElementById('c-inn')?.value?.trim() || '',
@@ -86,8 +95,10 @@ async function submitAddClient() {
     modules:          mods || 'OT',
     manager_name:     document.getElementById('c-manager-name')?.value?.trim() || '',
     manager_position: document.getElementById('c-manager-position')?.value || 'Руководитель',
-    ot_name:          document.getElementById('c-ot-name')?.value?.trim() || '',
-    ot_position:      document.getElementById('c-ot-position')?.value?.trim() || '',
+    ot_name:          otName,
+    ot_position:      otPos,
+    ot_name_acc:      nameDecl?.acc || '',
+    ot_position_acc:  posDecl?.acc  || '',
     soat_class:       document.getElementById('c-soat-class')?.value || '2',
     hazard_works:     document.getElementById('c-hazard-works')?.checked ? 1 : 0,
     medcheck_required:document.getElementById('c-medcheck-required')?.checked ? 1 : 0,
@@ -327,6 +338,19 @@ async function submitEditClient(clientId) {
   const okved = document.getElementById('e-okved').value.trim();
   if (!name) { showToast('Введите название', 'var(--red)'); return; }
 
+  const otName = document.getElementById('e-ot-name').value.trim();
+  const otPos  = document.getElementById('e-ot-position').value.trim();
+  // Раньше тут была проверка "изменилось ли значение" (чтобы не дёргать ИИ
+  // зря) — но сравнение шло после .trim(), и если пользователь правил поле
+  // не меняя текста по сути (пробелы и т.п.), проверка решала, что ничего
+  // не изменилось, и склонение оставалось старым/пустым. Проще и надёжнее
+  // всегда пересчитывать при сохранении, если поля заполнены — лишний
+  // ИИ-запрос раз в правку карточки клиента не критичен.
+  let nameAcc = '', posAcc = '';
+  if ((otName || otPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
+  if (otName && window.api.aiRequest) { const d = await declineFIO(otName); nameAcc = d?.acc || ''; }
+  if (otPos  && window.api.aiRequest) { const d = await declinePosition(otPos); posAcc = d?.acc || ''; }
+
   const data = {
     name,
     inn:              document.getElementById('e-inn').value.trim(),
@@ -340,8 +364,10 @@ async function submitEditClient(clientId) {
     order_prefix:     parseInt(document.getElementById('e-order-prefix').value) || 1,
     manager_name:     document.getElementById('e-manager-name').value.trim(),
     manager_position: document.getElementById('e-manager-position').value,
-    ot_name:           document.getElementById('e-ot-name').value.trim(),
-    ot_position:       document.getElementById('e-ot-position').value.trim(),
+    ot_name:           otName,
+    ot_position:       otPos,
+    ot_name_acc:       nameAcc,
+    ot_position_acc:   posAcc,
     soat_class:        document.getElementById('e-soat-class')?.value || '2',
     hazard_works:      document.getElementById('e-hazard-works')?.checked ? 1 : 0,
     medcheck_required: document.getElementById('e-medcheck-required')?.checked ? 1 : 0,

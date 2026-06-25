@@ -35,7 +35,7 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon.ico",
+      "icon": "assets/icon.png",
       "publisherName": "ИП Свинцова Д.И.",
       "verifyUpdateCodeSignature": false
     },

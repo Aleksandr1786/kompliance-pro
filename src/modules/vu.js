@@ -401,7 +401,7 @@ async function renderClientVu(clientId) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>
           Коды для Формы №18
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           ${[
             { key:'ogrn',      label:'ОГРН',  ph:'1202300051755' },
             { key:'okato',     label:'ОКАТО', ph:'03420380000' },
@@ -590,7 +590,7 @@ function showVuReportModal(clientId) {
 
   modal.innerHTML = `
     <style>@keyframes ob-card-in{from{opacity:0;transform:scale(.96) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}</style>
-    <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:28px;width:460px;box-shadow:0 24px 60px rgba(0,0,0,0.7);animation:ob-card-in .3s cubic-bezier(.22,.68,0,1.1) both">
+    <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:28px;width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,0.7);animation:ob-card-in .3s cubic-bezier(.22,.68,0,1.1) both">
 
       <!-- Шапка -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">

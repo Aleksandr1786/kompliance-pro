@@ -47,6 +47,7 @@ const MIGRATIONS = [
         if (c.color       === undefined) c.color       = '#3b82f6';
         if (c.archived    === undefined) c.archived    = 0;
         if (c.okved_extra === undefined) c.okved_extra = '';
+        if (c.pd_checklist === undefined) c.pd_checklist = {};
         if (c.czn         === undefined) c.czn         = '';
         if (c.soat_class  === undefined) c.soat_class  = '2';
         if (c.hazard_works      === undefined) c.hazard_works      = 0;

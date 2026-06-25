@@ -42,8 +42,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
+      "installerIcon": "assets/icon.png",
+      "uninstallerIcon": "assets/icon.png",
       "language": "1049",
       "artifactName": "KomplainsPro-Setup.exe",
       "createDesktopShortcut": true,

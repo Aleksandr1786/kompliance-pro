@@ -66,17 +66,20 @@ async function renderPd() {
   ];
 
   const checklist = [
-    'Получены письменные согласия от всех сотрудников',
-    'Составлена и утверждена Политика обработки ПД',
-    'Назначен ответственный за ПД (есть приказ)',
-    'РКН уведомлена об ИСПДн',
-    'Проведено обучение ответственного',
-    'Проведён внутренний аудит ИСПДн',
-    'Ведётся журнал учёта обращений субъектов ПД',
-    'Разработан регламент обработки ПД',
-    'Определены и задокументированы меры защиты',
-    'Установлены и соблюдаются сроки хранения ПД',
+    { key:'consents',    label:'Получены письменные согласия от всех сотрудников' },
+    { key:'policy',      label:'Составлена и утверждена Политика обработки ПД' },
+    { key:'responsible', label:'Назначен ответственный за ПД (есть приказ)' },
+    { key:'rkn',         label:'РКН уведомлена об ИСПДн' },
+    { key:'training',    label:'Проведено обучение ответственного' },
+    { key:'audit',       label:'Проведён внутренний аудит ИСПДн' },
+    { key:'journal',     label:'Ведётся журнал учёта обращений субъектов ПД' },
+    { key:'regulation',  label:'Разработан регламент обработки ПД' },
+    { key:'protection',  label:'Определены и задокументированы меры защиты' },
+    { key:'retention',   label:'Установлены и соблюдаются сроки хранения ПД' },
   ];
+
+  // Загружаем сохранённое состояние чек-листа из данных клиента
+  const savedChecklist = client.pd_checklist || {};
 
   content.innerHTML = `
     <div style="display:grid;gap:16px;max-width:960px">
@@ -227,16 +230,27 @@ async function renderPd() {
 
       <!-- ЧЕК-ЛИСТ -->
       <div style="background:var(--s2);border:1px solid var(--border);border-radius:14px;padding:20px">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:8px">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           Чек-лист готовности к 152-ФЗ
+          <span id="pd-checklist-counter" style="margin-left:auto;font-size:11px;font-weight:600;color:#94a3b8">${checklist.filter(i=>savedChecklist[i.key]).length} / ${checklist.length}</span>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-          ${checklist.map(item => `
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:8px;font-size:12px;color:#64748b">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2" style="flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>
-              ${item}
-            </div>`).join('')}
+        <div style="font-size:11px;color:#475569;margin-bottom:12px">Отмечайте выполненные пункты — прогресс сохраняется автоматически</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px" id="pd-checklist-grid">
+          ${checklist.map(item => {
+            const checked = !!savedChecklist[item.key];
+            return `
+            <div onclick="togglePdChecklist(${clientId},'${item.key}',this)"
+              data-key="${item.key}"
+              style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${checked?'rgba(52,211,153,0.06)':'rgba(255,255,255,0.02)'};border:1px solid ${checked?'rgba(52,211,153,0.25)':'rgba(255,255,255,0.05)'};border-radius:8px;font-size:12px;color:${checked?'#e2e8f0':'#64748b'};cursor:pointer;transition:all .15s;user-select:none"
+              onmouseover="this.style.borderColor='${checked?'rgba(52,211,153,0.4)':'rgba(255,255,255,0.12)'}'"
+              onmouseout="this.style.borderColor='${checked?'rgba(52,211,153,0.25)':'rgba(255,255,255,0.05)'}'">
+              <div style="width:18px;height:18px;border-radius:5px;border:2px solid ${checked?'#34d399':'#334155'};background:${checked?'#34d399':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s">
+                ${checked?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>':''}
+              </div>
+              ${item.label}
+            </div>`;
+          }).join('')}
         </div>
       </div>
 
@@ -261,6 +275,44 @@ async function savePdData(clientId) {
   });
   showToast('ПДн-данные сохранены ✓', 'var(--green)');
   await navigate('client', clientId);
+}
+
+// ── ПДн: интерактивный чек-лист ──────────────────────────
+async function togglePdChecklist(clientId, key, el) {
+  // Получаем актуальный клиент
+  const client = await window.api.clientGet(clientId);
+  const current = client.pd_checklist || {};
+  const newVal = !current[key];
+  const updated = { ...current, [key]: newVal };
+
+  // Сохраняем в БД
+  await window.api.clientUpdate(clientId, { pd_checklist: updated });
+
+  // Обновляем визуал без перерендера страницы
+  el.style.background = newVal ? 'rgba(52,211,153,0.06)' : 'rgba(255,255,255,0.02)';
+  el.style.borderColor = newVal ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.05)';
+  el.style.color = newVal ? '#e2e8f0' : '#64748b';
+
+  const box = el.querySelector('div');
+  if (box) {
+    box.style.borderColor = newVal ? '#34d399' : '#334155';
+    box.style.background  = newVal ? '#34d399' : 'transparent';
+    box.innerHTML = newVal
+      ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+      : '';
+  }
+
+  // Обновляем счётчик
+  const grid = document.getElementById('pd-checklist-grid');
+  if (grid) {
+    const total   = grid.querySelectorAll('[data-key]').length;
+    const checked = grid.querySelectorAll('[data-key]').length
+      - [...grid.querySelectorAll('[data-key]')].filter(e => e.style.background.includes('0.02')).length;
+    // Пересчитываем через актуальный updated
+    const doneCount = Object.values(updated).filter(Boolean).length;
+    const counter = document.getElementById('pd-checklist-counter');
+    if (counter) counter.textContent = doneCount + ' / ' + total;
+  }
 }
 
 // ── ПДн: добавить ИСПДн ──────────────────────────────────

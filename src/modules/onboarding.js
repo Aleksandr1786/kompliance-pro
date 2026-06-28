@@ -292,6 +292,47 @@ async function showMorningDigest() {
   typeLines(secretaryLines, document.getElementById('dg-secretary'), '#94a3b8', 400);
 }
 
+// ─── ПЕРЕКЛЮЧАТЕЛЬ РОЛИ НА ОНБОРДИНГЕ ────────────────────
+function obSetRole(role) {
+  window._obRole = role;
+  const isOutsourcer = role === 'outsourcer';
+
+  // Подсветка активной карточки
+  const elOut = document.getElementById('ob-role-outsourcer');
+  const elStf = document.getElementById('ob-role-staff');
+  if (elOut) {
+    elOut.style.background = isOutsourcer ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)';
+    elOut.style.borderColor = isOutsourcer ? 'rgba(59,130,246,0.6)' : 'rgba(255,255,255,0.08)';
+    elOut.querySelector('div').style.color = isOutsourcer ? '#93c5fd' : '#94a3b8';
+  }
+  if (elStf) {
+    elStf.style.background = !isOutsourcer ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)';
+    elStf.style.borderColor = !isOutsourcer ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.08)';
+    elStf.querySelector('div').style.color = !isOutsourcer ? '#a5b4fc' : '#94a3b8';
+  }
+
+  // Меняем плейсхолдеры и подсказки
+  const posInput = document.getElementById('ob-position');
+  const posHint  = document.getElementById('ob-pos-hint');
+  const posLabel = document.getElementById('ob-pos-label');
+  const compInput = document.getElementById('ob-company');
+  const compLabel = document.getElementById('ob-company-label');
+
+  if (isOutsourcer) {
+    if (posInput)  posInput.placeholder  = 'ИП / Директор / Генеральный директор';
+    if (posLabel)  posLabel.textContent  = 'Ваша должность / статус';
+    if (posHint)   posHint.textContent   = 'Указывается в договорах с клиентами и актах выполненных работ.';
+    if (compInput) compInput.placeholder = 'ИП Иванов А.В.';
+    if (compLabel) compLabel.textContent = 'Ваша компания / ИП';
+  } else {
+    if (posInput)  posInput.placeholder  = 'Специалист по охране труда / Инженер по ОТ';
+    if (posLabel)  posLabel.textContent  = 'Ваша должность';
+    if (posHint)   posHint.textContent   = 'Должность по штатному расписанию — указывается в служебных документах.';
+    if (compInput) compInput.placeholder = 'ООО Название организации';
+    if (compLabel) compLabel.textContent = 'Ваша организация';
+  }
+}
+
 function showOnboarding() {
   let step = 0; // 0 = Welcome+EULA, 1 = Профиль, 2 = Готово
   const modal = document.createElement('div');
@@ -385,7 +426,7 @@ function showOnboarding() {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                 </div>
                 <div>
-                  <div style="font-size:13px;font-weight:700;color:#e2e8f0">36+ документов</div>
+                  <div style="font-size:13px;font-weight:700;color:#e2e8f0">80+ документов</div>
                   <div style="font-size:11px;color:#475569;margin-top:2px">Охрана труда и ПДн за 30 секунд</div>
                 </div>
               </div>
@@ -444,11 +485,33 @@ function showOnboarding() {
             </div>
 
             <!-- Аватар live-preview -->
-            <div style="display:flex;align-items:center;gap:18px;margin-bottom:28px">
+            <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px">
               <div id="ob-avatar" style="width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#2563eb22,#7c3aed22);border:2px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#818cf8;flex-shrink:0;transition:all .2s">—</div>
               <div>
                 <div style="font-size:17px;font-weight:700;color:#f1f5f9">Расскажите о себе</div>
-                <div style="font-size:12px;color:#475569;margin-top:3px">Эти данные попадут в реквизиты документов</div>
+                <div style="font-size:12px;color:#475569;margin-top:3px">Ваши реквизиты для договоров и актов с клиентами</div>
+              </div>
+            </div>
+
+            <!-- Переключатель роли -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+              <div id="ob-role-outsourcer" onclick="obSetRole('outsourcer')" style="
+                cursor:pointer;padding:10px 12px;border-radius:10px;text-align:center;transition:all .2s;
+                background:rgba(59,130,246,0.15);border:1.5px solid rgba(59,130,246,0.6)">
+                <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:700;color:#93c5fd">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Аутсорсер ОТ
+                </div>
+                <div style="font-size:10.5px;color:#475569;margin-top:2px">Веду несколько организаций</div>
+              </div>
+              <div id="ob-role-staff" onclick="obSetRole('staff')" style="
+                cursor:pointer;padding:10px 12px;border-radius:10px;text-align:center;transition:all .2s;
+                background:rgba(255,255,255,0.03);border:1.5px solid rgba(255,255,255,0.08)">
+                <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:700;color:#94a3b8">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+                  Штатный специалист
+                </div>
+                <div style="font-size:10.5px;color:#475569;margin-top:2px">Работаю в одной организации</div>
               </div>
             </div>
 
@@ -456,30 +519,31 @@ function showOnboarding() {
             <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px">
               <div>
                 <label style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Ваше имя *</label>
-                <input id="ob-name" value="${settings.user_name||''}" placeholder="Александр Свинцов"
+                <input id="ob-name" value="${settings.user_name||''}" placeholder="Иванов Иван Иванович"
                   oninput="const v=this.value.trim();const av=document.getElementById('ob-avatar');av.textContent=getInitials(v)||'—'"
                   style="width:100%;padding:11px 14px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;transition:border-color .2s"
                   onfocus="this.style.borderColor='rgba(59,130,246,0.6)'"
                   onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
               </div>
               <div>
-                <label style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Должность</label>
-                <input id="ob-position" value="${settings.user_position||''}" placeholder="Специалист по охране труда"
+                <label id="ob-pos-label" style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Ваша должность / статус</label>
+                <input id="ob-position" value="${settings.user_position||''}" placeholder="ИП / Директор / Генеральный директор"
                   style="width:100%;padding:11px 14px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;transition:border-color .2s"
                   onfocus="this.style.borderColor='rgba(59,130,246,0.6)'"
                   onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
+                <div id="ob-pos-hint" style="font-size:10.5px;color:#334155;margin-top:4px">Указывается в договорах с клиентами и актах выполненных работ.</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                 <div>
-                  <label style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Компания</label>
-                  <input id="ob-company" value="${settings.company_name||''}" placeholder="ИП Свинцов А.В."
+                  <label id="ob-company-label" style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Компания / ИП</label>
+                  <input id="ob-company" value="${settings.company_name||''}" placeholder="ИП Иванов А.В."
                     style="width:100%;padding:11px 14px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;transition:border-color .2s"
                     onfocus="this.style.borderColor='rgba(59,130,246,0.6)'"
                     onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
                 </div>
                 <div>
                   <label style="font-size:11px;font-weight:600;color:#475569;letter-spacing:.4px;text-transform:uppercase;display:block;margin-bottom:6px">Телефон</label>
-                  <input id="ob-phone" value="${settings.user_phone||''}" placeholder="[скрыто]"
+                  <input id="ob-phone" value="${settings.user_phone||''}" placeholder="+7 900 000-00-00"
                     style="width:100%;padding:11px 14px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box;transition:border-color .2s"
                     onfocus="this.style.borderColor='rgba(59,130,246,0.6)'"
                     onblur="this.style.borderColor='rgba(255,255,255,0.1)'">
@@ -505,6 +569,9 @@ function showOnboarding() {
       // Запускаем live-аватар если имя уже заполнено
       const nm = document.getElementById('ob-name');
       if (nm?.value) nm.dispatchEvent(new Event('input'));
+
+      // Инициализируем роль по умолчанию
+      if (typeof obSetRole === 'function') obSetRole('outsourcer');
       return;
     }
 
@@ -665,5 +732,109 @@ function showOnboarding() {
 
   render();
   document.body.appendChild(modal);
+}
+
+// ─── ТУР ПО КАРТОЧКЕ КЛИЕНТА (первый клиент) ─────────────
+function showClientTour() {
+  const steps = [
+    {
+      title: 'Добро пожаловать в карточку клиента',
+      text: 'Здесь сосредоточена вся работа по организации. Сначала убедитесь, что профиль заполнен полностью — от этого зависит точность документов.',
+      highlight: null,
+      btnLabel: 'Далее →',
+    },
+    {
+      title: 'Заполните профиль клиента',
+      text: 'Вверху карточки вы видите индикатор заполненности. Нажмите «Редактировать» и внесите все данные: ОКВЭД, численность, руководителя, адрес. Чем полнее — тем точнее документы.',
+      highlight: 'topbarEdit',
+      btnLabel: 'Понятно →',
+    },
+    {
+      title: 'Сформируйте первый пакет документов',
+      text: 'Когда данные заполнены — перейдите на вкладку «Охрана труда» и нажмите «Сформировать пакет». КомплаенсПро подготовит все документы с учётом ОКВЭД, численности и условий труда.',
+      highlight: null,
+      btnLabel: 'Понятно →',
+    },
+    {
+      title: 'Мониторинг НПА работает автоматически',
+      text: 'КомплаенсПро отслеживает изменения в законодательстве. Когда выходит новый приказ или постановление — в задачах появится уведомление по нужным клиентам. Ничего настраивать не нужно.',
+      highlight: null,
+      btnLabel: 'Начать работу ✓',
+    },
+  ];
+
+  let step = 0;
+
+  function render() {
+    const s = steps[step];
+    let overlay = document.getElementById('client-tour-overlay');
+    if (overlay) overlay.remove();
+
+    overlay = document.createElement('div');
+    overlay.id = 'client-tour-overlay';
+    overlay.style.cssText = [
+      'position:fixed;inset:0;z-index:99990;',
+      'background:rgba(0,0,0,0.55);backdrop-filter:blur(2px);',
+      'display:flex;align-items:flex-end;justify-content:center;',
+      'padding-bottom:32px',
+    ].join('');
+
+    // Подсветка элемента если есть highlight
+    if (s.highlight) {
+      const highlightEl = document.getElementById(s.highlight);
+      if (highlightEl) {
+        const r = highlightEl.getBoundingClientRect();
+        const halo = document.createElement('div');
+        halo.style.cssText = [
+          'position:fixed;',
+          'top:' + (r.top - 4) + 'px;left:' + (r.left - 4) + 'px;',
+          'width:' + (r.width + 8) + 'px;height:' + (r.height + 8) + 'px;',
+          'border:2px solid #60a5fa;border-radius:10px;',
+          'box-shadow:0 0 0 4px rgba(96,165,250,0.2);',
+          'pointer-events:none;z-index:99991',
+        ].join('');
+        overlay.appendChild(halo);
+      }
+    }
+
+    const card = document.createElement('div');
+    card.style.cssText = [
+      'background:#111827;border:1px solid rgba(255,255,255,0.12);border-radius:18px;',
+      'padding:24px 28px;width:440px;box-shadow:0 24px 60px rgba(0,0,0,0.6);',
+      'position:relative;z-index:99992',
+    ].join('');
+
+    const dots = steps.map((_, i) =>
+      '<div style="flex:1;height:3px;border-radius:3px;background:' +
+      (i <= step ? '#60a5fa' : 'rgba(255,255,255,0.1)') + '"></div>'
+    ).join('');
+
+    card.innerHTML = [
+      '<div style="display:flex;gap:5px;margin-bottom:16px">' + dots + '</div>',
+      '<div style="font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:8px">' + s.title + '</div>',
+      '<div style="font-size:13px;color:#94a3b8;line-height:1.65;margin-bottom:20px">' + s.text + '</div>',
+      '<div style="display:flex;align-items:center;justify-content:space-between">',
+        '<button id="tour-skip-btn" style="background:none;border:none;color:#475569;font-size:12px;cursor:pointer;padding:4px 0">Пропустить тур</button>',
+        '<button id="tour-next-btn" style="padding:10px 22px;background:linear-gradient(135deg,#2563eb,#3b82f6);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,0.3)">' + s.btnLabel + '</button>',
+      '</div>',
+    ].join('');
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    document.getElementById('tour-next-btn').onclick = () => {
+      step++;
+      if (step >= steps.length) {
+        document.getElementById('client-tour-overlay')?.remove();
+      } else {
+        render();
+      }
+    };
+    document.getElementById('tour-skip-btn').onclick = () => {
+      document.getElementById('client-tour-overlay')?.remove();
+    };
+  }
+
+  render();
 }
 

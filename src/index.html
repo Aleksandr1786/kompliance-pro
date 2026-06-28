@@ -29,8 +29,8 @@
   </nav>
   <div class="sidebar-bottom">
     <div class="user-block">
-      <div class="user-avatar" id="userAvatar">АС</div>
-      <div><div class="user-name" id="userName">А. Свинцов</div><div class="user-role" id="userRole">Специалист по ОТ</div></div>
+      <div class="user-avatar" id="userAvatar">—</div>
+      <div><div class="user-name" id="userName">Пользователь</div><div class="user-role" id="userRole">Специалист по ОТ</div></div>
     </div>
   </div>
 </aside>
@@ -50,13 +50,17 @@
 <div class="modal-overlay" id="modalAddClient">
   <div class="modal" style="max-height:88vh;overflow-y:auto;padding-bottom:8px">
     <div class="modal-title" id="addClientTitle">🏢 Добавить клиента</div>
-    <div class="modal-sub">Система определит пакет документов по ОКВЭД автоматически</div>
+    <div class="modal-sub">Чем полнее данные — тем точнее сформированные документы</div>
+
+    <!-- Название -->
     <div class="form-row">
       <div class="form-group full">
         <div class="form-label">Название <span class="req">*</span></div>
         <input class="form-input" id="c-name" placeholder="ООО Название / ИП Фамилия И.О.">
       </div>
     </div>
+
+    <!-- ИНН + Форма -->
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">ИНН</div>
@@ -69,16 +73,22 @@
         </select>
       </div>
     </div>
+
+    <!-- ОКВЭД + Сотрудников -->
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">ОКВЭД <span class="req">*</span></div>
         <input class="form-input" id="c-okved" placeholder="26.20">
+        <div style="font-size:10.5px;color:#475569;margin-top:3px">⚡ Определяет отрасль — влияет на содержание инструктажей</div>
       </div>
       <div class="form-group">
         <div class="form-label">Сотрудников</div>
         <input class="form-input" id="c-staff" type="number" placeholder="25" min="1">
+        <div style="font-size:10.5px;color:#475569;margin-top:3px">⚡ Влияет на перечень обязательных документов</div>
       </div>
     </div>
+
+    <!-- Регион + Город -->
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">Регион</div>
@@ -94,12 +104,16 @@
         <input class="form-input" id="c-city" placeholder="Новороссийск">
       </div>
     </div>
+
+    <!-- Адрес -->
     <div class="form-row">
       <div class="form-group full">
         <div class="form-label">Юридический адрес</div>
         <input class="form-input" id="c-address" placeholder="г. Новороссийск, ул. Примерная, д. 1">
       </div>
     </div>
+
+    <!-- Телефон + № приказа -->
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">Телефон</div>
@@ -110,6 +124,8 @@
         <input class="form-input" id="c-order-prefix" type="number" placeholder="1" min="1" value="1">
       </div>
     </div>
+
+    <!-- Руководитель -->
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">Должность руководителя</div>
@@ -124,8 +140,11 @@
       <div class="form-group">
         <div class="form-label">ФИО руководителя</div>
         <input class="form-input" id="c-manager-name" placeholder="Иванов Иван Иванович">
+        <div style="font-size:10.5px;color:#475569;margin-top:3px">⚡ Указывается в приказах и инструкциях</div>
       </div>
     </div>
+
+    <!-- УСЛОВИЯ ТРУДА -->
     <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">УСЛОВИЯ ТРУДА</div>
     <div class="form-row">
       <div class="form-group">
@@ -139,21 +158,50 @@
           <option value="4">Класс 4 — Опасные</option>
           <option value="0">СОУТ не проводилась</option>
         </select>
+        <div style="font-size:10.5px;color:#475569;margin-top:3px">⚡ Определяет перечень СИЗ и медосмотров</div>
       </div>
       <div class="form-group">
         <div class="form-label">Особые условия</div>
         <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
-            <input type="checkbox" id="c-hazard-works" style="width:15px;height:15px">
-            ⚠️ Работы повышенной опасности
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+            <input type="checkbox" id="c-hazard-works" style="width:15px;height:15px;margin-top:1px;flex-shrink:0">
+            <div>
+              <div style="color:var(--text);font-weight:600">⚠️ Работы повышенной опасности</div>
+              <div style="color:#475569;font-size:11px;margin-top:2px">Включает проверку СИЗ в симуляторе ГИТ</div>
+            </div>
           </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
-            <input type="checkbox" id="c-medcheck-required" style="width:15px;height:15px">
-            🏥 Медосмотры обязательны
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:var(--muted2)">
+            <input type="checkbox" id="c-medcheck-required" style="width:15px;height:15px;margin-top:1px;flex-shrink:0">
+            <div>
+              <div style="color:var(--text);font-weight:600">🏥 Медосмотры обязательны</div>
+              <div style="color:#475569;font-size:11px;margin-top:2px">Включает проверку медосмотров в симуляторе ГИТ</div>
+            </div>
           </label>
         </div>
       </div>
     </div>
+
+    <!-- СОУТ ДЕТАЛИЗАЦИЯ -->
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">СОУТ — ДЕТАЛИЗАЦИЯ ДЛЯ ЕФС-1 (подраздел 2.3)</div>
+    <div style="font-size:11px;color:#334155;margin-bottom:10px">На 1 января отчётного года. Можно заполнить позже через редактирование.</div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Всего р/мест подлежащих СОУТ</div><input class="form-input" id="c-soat-total" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Проведена СОУТ (р/мест)</div><input class="form-input" id="c-soat-done" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Класс 1 (оптимальные)</div><input class="form-input" id="c-soat-c1" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Класс 2 (допустимые)</div><input class="form-input" id="c-soat-c2" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Класс 3.1</div><input class="form-input" id="c-soat-c31" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Класс 3.2</div><input class="form-input" id="c-soat-c32" type="number" min="0" placeholder="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><div class="form-label">Класс 3.3</div><input class="form-input" id="c-soat-c33" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Класс 3.4</div><input class="form-input" id="c-soat-c34" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Класс 4 (опасные)</div><input class="form-input" id="c-soat-c4" type="number" min="0" placeholder="0"></div>
+      <div class="form-group"><div class="form-label">Подлежат медосмотрам</div><input class="form-input" id="c-soat-med-req" type="number" min="0" placeholder="0"></div>
+    </div>
+
+    <!-- ОТВЕТСТВЕННЫЙ ЗА ОТ -->
     <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ОХРАНУ ТРУДА</div>
     <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Если отличается от руководителя — заполните. Иначе оставьте пустым.</div>
     <div class="form-row">
@@ -166,6 +214,31 @@
         <input class="form-input" id="c-ot-name" placeholder="Петров Пётр Петрович">
       </div>
     </div>
+
+    <!-- КЛЮЧЕВЫЕ ДАТЫ -->
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">КЛЮЧЕВЫЕ ДАТЫ</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">📅 Дата заключения договора</div>
+        <input class="form-input" id="c-contract-date" type="date">
+      </div>
+      <div class="form-group">
+        <div class="form-label">🔍 Последняя проверка ГИТ</div>
+        <input class="form-input" id="c-git-last-date" type="date">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">🔄 Следующий плановый обход</div>
+        <input class="form-input" id="c-next-visit-date" type="date">
+      </div>
+      <div class="form-group">
+        <div class="form-label">📋 Следующая проверка ГИТ (план)</div>
+        <input class="form-input" id="c-git-next-date" type="date">
+      </div>
+    </div>
+
+    <!-- МОДУЛИ -->
     <div class="form-group" style="margin-top:4px">
       <div class="form-label">Модули</div>
       <div class="modules-check">
@@ -173,7 +246,9 @@
         <div class="module-pill checked" data-module="PD" onclick="togglePill(this)">ПДн</div>
         <div class="module-pill" data-module="VU" onclick="togglePill(this)">Воинский учёт</div>
       </div>
+      <div style="font-size:10.5px;color:#475569;margin-top:5px">⚡ Выберите все направления, которые ведёте по этому клиенту</div>
     </div>
+
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modalAddClient')">Отмена</button>
       <button class="btn btn-primary" onclick="submitAddClient()">Добавить →</button>

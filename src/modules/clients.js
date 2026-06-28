@@ -61,6 +61,9 @@ async function submitAddClient() {
 
   // Проверяем лимит тарифа
   const currentClients = await getClients();
+  // Обновляем лицензию перед проверкой — важно при вызове из онбординга,
+  // когда sync ещё не завершился на момент первого запуска.
+  if (typeof syncLicenseFromBackend === 'function') await syncLicenseFromBackend();
   if (!checkClientLimit(currentClients.length)) {
     showClientLimitReached();
     closeModal('modalAddClient');
@@ -102,16 +105,41 @@ async function submitAddClient() {
     soat_class:       document.getElementById('c-soat-class')?.value || '2',
     hazard_works:     document.getElementById('c-hazard-works')?.checked ? 1 : 0,
     medcheck_required:document.getElementById('c-medcheck-required')?.checked ? 1 : 0,
+    contract_date:    document.getElementById('c-contract-date')?.value || '',
+    git_last_date:    document.getElementById('c-git-last-date')?.value || '',
+    next_visit_date:  document.getElementById('c-next-visit-date')?.value || '',
+    git_next_date:    document.getElementById('c-git-next-date')?.value || '',
+    soat_total:       parseInt(document.getElementById('c-soat-total')?.value) || 0,
+    soat_done:        parseInt(document.getElementById('c-soat-done')?.value) || 0,
+    soat_c1:          parseInt(document.getElementById('c-soat-c1')?.value) || 0,
+    soat_c2:          parseInt(document.getElementById('c-soat-c2')?.value) || 0,
+    soat_c31:         parseInt(document.getElementById('c-soat-c31')?.value) || 0,
+    soat_c32:         parseInt(document.getElementById('c-soat-c32')?.value) || 0,
+    soat_c33:         parseInt(document.getElementById('c-soat-c33')?.value) || 0,
+    soat_c34:         parseInt(document.getElementById('c-soat-c34')?.value) || 0,
+    soat_c4:          parseInt(document.getElementById('c-soat-c4')?.value) || 0,
+    soat_med_req:     parseInt(document.getElementById('c-soat-med-req')?.value) || 0,
     color,
     score: 0,
   };
+  const isFirstClient = currentClients.length === 0;
   const result = await window.api.clientAdd(data);
+  if (result?.error) { showToast('Ошибка: ' + result.error, 'var(--red)'); return; }
+  if (!result?.id) { showToast('Ошибка при добавлении клиента', 'var(--red)'); return; }
   closeModal('modalAddClient');
   showToast(`Клиент "${name}" добавлен`);
   // Сбрасываем форму
-  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-ot-name','c-ot-position'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; }); const op = document.getElementById('c-order-prefix'); if(op) op.value='1';
+  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-ot-name','c-ot-position',
+   'c-manager-name','c-contract-date','c-git-last-date','c-next-visit-date','c-git-next-date',
+   'c-soat-total','c-soat-done','c-soat-c1','c-soat-c2','c-soat-c31','c-soat-c32','c-soat-c33','c-soat-c34','c-soat-c4','c-soat-med-req'
+  ].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  const op = document.getElementById('c-order-prefix'); if(op) op.value='1';
   document.querySelectorAll('.module-pill').forEach(p => { p.classList.toggle('checked', p.dataset.module !== 'VU'); });
   await navigate('client', result.id);
+  // Показываем тур при добавлении первого клиента
+  if (isFirstClient && typeof showClientTour === 'function') {
+    setTimeout(() => showClientTour(), 700);
+  }
 }
 
 // ── COMING SOON ──────────────────────────────────────────

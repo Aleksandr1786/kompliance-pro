@@ -237,26 +237,45 @@ async function renderClientCard(id) {
     </div>
 
     ${(() => {
-      // «Следующий шаг» — одна точечная подсказка о самом важном незаполненном
-      // поле, а не полный список. Цель: тихо, но заметно подталкивать к 100%
-      // заполненности карточки, от которой зависит качество документов.
+      // Баннер заполненности профиля — показывает прогресс и подталкивает к 100%.
+      // Чем полнее данные клиента, тем точнее документы.
       const dataBlock = scoreBreakdown.find(s => s.label === 'Данные клиента');
-      const missingField = dataBlock?.missing?.[0];
+      const filled = dataBlock?.filled ?? 0;
+      const total  = dataBlock?.total  ?? 10;
+      const missing = dataBlock?.missing || [];
       const empNoPosition = emps.find(e => !e.position || !e.position.trim());
-      if (missingField) {
-        return `
+      const pct = Math.round(filled / total * 100);
+
+      // Баннер заполненности (показываем всегда пока не 100%)
+      let profileBanner = '';
+      if (filled < total) {
+        const barColor = pct < 40 ? '#f87171' : pct < 70 ? '#fbbf24' : '#34d399';
+        const missingList = missing.slice(0, 3).join(', ') + (missing.length > 3 ? ` и ещё ${missing.length - 3}` : '');
+        profileBanner = `
         <div onclick="openEditModal(${id})" style="
-          display:flex;align-items:center;gap:10px;cursor:pointer;
-          background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);
-          border-radius:10px;padding:10px 16px;margin-bottom:14px;transition:all .2s"
-          onmouseover="this.style.borderColor='rgba(251,191,36,0.4)'"
-          onmouseout="this.style.borderColor='rgba(251,191,36,0.2)'">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span style="font-size:12px;color:#e2e8f0">Не заполнено: <strong>${missingField}</strong> — нажмите, чтобы указать</span>
+          cursor:pointer;
+          background:rgba(15,21,32,0.6);border:1px solid rgba(255,255,255,0.08);
+          border-radius:12px;padding:12px 16px;margin-bottom:14px;transition:all .2s"
+          onmouseover="this.style.borderColor='rgba(255,255,255,0.18)'"
+          onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${barColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span style="font-size:11.5px;font-weight:600;color:#cbd5e1">Профиль заполнен на ${pct}%</span>
+            </div>
+            <span style="font-size:10.5px;color:#475569">${filled} / ${total} полей · нажмите для заполнения</span>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .4s ease"></div>
+          </div>
+          ${missing.length ? `<div style="margin-top:7px;font-size:10.5px;color:#475569">Не заполнено: <span style="color:#94a3b8">${missingList}</span></div>` : ''}
         </div>`;
       }
+
+      // Подсказка по сотрудникам без должности
+      let empBanner = '';
       if (empNoPosition) {
-        return `
+        empBanner = `
         <div onclick="editEmployeePrompt(${empNoPosition.id})" style="
           display:flex;align-items:center;gap:10px;cursor:pointer;
           background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);
@@ -267,7 +286,8 @@ async function renderClientCard(id) {
           <span style="font-size:12px;color:#e2e8f0">У сотрудника <strong>${empNoPosition.full_name}</strong> не указана должность — нажмите, чтобы заполнить</span>
         </div>`;
       }
-      return '';
+
+      return profileBanner + empBanner;
     })()}
 
     <!-- ЦЕНТР ГОТОВНОСТИ — кнопка-баннер -->

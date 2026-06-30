@@ -51,6 +51,13 @@ const SECTIONS = {
     { id:'VU_REPORTS',   order:5, folder:'Раздел 5. Отчётность и сверки',     title:'Отчётность и сверки',    icon:'check' },
     { id:'VU_OTHER',     order:99, folder:'Прочее',                           title:'Прочее',                 icon:'folder' },
   ],
+  SOAUT: [
+    { id:'SOAUT_ORDERS', order:1, folder:'Приказы',             title:'Приказы',             icon:'clipboard' },
+    { id:'SOAUT_DOCS',   order:2, folder:'Основные документы',  title:'Основные документы',  icon:'doc' },
+    { id:'SOAUT_SHEETS', order:3, folder:'Проверочные листы',   title:'Проверочные листы',   icon:'list' },
+    { id:'SOAUT_DECL',   order:4, folder:'Декларация',          title:'Декларация',          icon:'check' },
+    { id:'SOAUT_OTHER',  order:99, folder:'Прочее',             title:'Прочее',              icon:'folder' },
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────

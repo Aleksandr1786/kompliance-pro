@@ -27,7 +27,8 @@ async function navigate(page, clientId = null) {
   const titles = {
     dashboard:'Дашборд', clients:term('clients'), tasks:'Задачи',
     ot:'Охрана труда', pd:'Персональные данные', vu:'Воинский учёт',
-    reporting:'Отчётность', settings:'Настройки', client:'Карточка ' + term('clientGen')
+    sout:'СОУТ', reporting:'Отчётность', settings:'Настройки',
+    client:'Карточка ' + term('clientGen')
   };
   document.getElementById('topbarTitle').textContent = titles[page] || page;
   await updateBadges();
@@ -42,6 +43,7 @@ async function navigate(page, clientId = null) {
   else if (page === 'pd') { checkAccess('PD') ? await renderPd() : showModuleLocked('Персональные данные (152-ФЗ)'); }
   else if (page === 'ot') { checkAccess('OT') ? await renderOt() : showModuleLocked('Охрана труда'); }
   else if (page === 'vu') { checkAccess('VU') ? await renderVu() : showModuleLocked('Воинский учёт'); }
+  else if (page === 'sout') { checkAccess('OT') ? await renderSout() : showModuleLocked('СОУТ'); }
   else renderComingSoon(titles[page] || page);
 }
 

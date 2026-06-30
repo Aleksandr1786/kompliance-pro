@@ -8,6 +8,9 @@
 async function renderPd() {
   const content = document.getElementById('content');
 
+  // Загружаем данные клиента если он выбран (нужны для чек-листа и полей ответственного)
+  const client = currentClientId ? (await window.api.clientGet(currentClientId).catch(() => null)) : null;
+
   const npaFeedFull = await window.api.npaList('pd');
   const npaFeedPd = npaFeedFull.slice(0, 20);
   const unseenPd = npaFeedFull.filter(n => !n.seen).length;
@@ -79,7 +82,7 @@ async function renderPd() {
   ];
 
   // Загружаем сохранённое состояние чек-листа из данных клиента
-  const savedChecklist = client.pd_checklist || {};
+  const savedChecklist = client?.pd_checklist || {};
 
   content.innerHTML = `
     <div style="display:grid;gap:16px;max-width:960px">
@@ -240,7 +243,7 @@ async function renderPd() {
           ${checklist.map(item => {
             const checked = !!savedChecklist[item.key];
             return `
-            <div onclick="togglePdChecklist(${clientId},'${item.key}',this)"
+            <div onclick="togglePdChecklist(${currentClientId},'${item.key}',this)"
               data-key="${item.key}"
               style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:${checked?'rgba(52,211,153,0.06)':'rgba(255,255,255,0.02)'};border:1px solid ${checked?'rgba(52,211,153,0.25)':'rgba(255,255,255,0.05)'};border-radius:8px;font-size:12px;color:${checked?'#e2e8f0':'#64748b'};cursor:pointer;transition:all .15s;user-select:none"
               onmouseover="this.style.borderColor='${checked?'rgba(52,211,153,0.4)':'rgba(255,255,255,0.12)'}'"
@@ -475,7 +478,7 @@ async function renderPdReadiness(clientId) {
             <div style="font-size:16px;font-weight:700;color:#f1f5f9">Что будет, если завтра придёт Роскомнадзор?</div>
             <div style="font-size:12px;color:#94a3b8;margin-top:2px">Симуляция проверки инспектора РКН по вашим реальным данным</div>
           </div>
-          <button onclick="runRknSimulator(${clientId})" id="rknSimBtn" style="padding:11px 22px;background:linear-gradient(90deg,#ef4444,#dc2626);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          <button onclick="runRknSimulator(${currentClientId})" id="rknSimBtn" style="padding:11px 22px;background:linear-gradient(90deg,#ef4444,#dc2626);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
             ▶ Запустить проверку
           </button>
         </div>
@@ -594,7 +597,7 @@ async function renderPdReadiness(clientId) {
             <div style="font-size:15px;font-weight:700;color:#f1f5f9">Отчёт о состоянии персональных данных</div>
             <div style="font-size:12px;color:#94a3b8;margin-top:2px">Документ для руководителя — готовность к 152-ФЗ, риски, рекомендации</div>
           </div>
-          <button onclick="generatePdReport(${clientId})" id="pdReportBtn" style="padding:10px 18px;background:linear-gradient(90deg,#059669,#34d399);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+          <button onclick="generatePdReport(${currentClientId})" id="pdReportBtn" style="padding:10px 18px;background:linear-gradient(90deg,#059669,#34d399);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
             ${ic('save',14)} Сохранить Word
           </button>
         </div>

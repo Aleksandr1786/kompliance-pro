@@ -1,11 +1,11 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
     "name": "ИП Свинцова Д.И.",
-    "email": "DIANASVINTSOVA@MAIL.RU"
+    "email": "kompliancepro@mail.ru"
   },
   "scripts": {
     "start": "electron .",
@@ -59,6 +59,8 @@
       "gen_p2.js",
       "gen_pd.js",
       "gen_vu.js",
+      "gen_instructage.js",
+      "gen_sout.js",
       "utils.js",
       "sections.js",
       "doc-meta.js",

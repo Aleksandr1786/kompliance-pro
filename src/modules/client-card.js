@@ -326,6 +326,7 @@ async function renderClientCard(id) {
         ${mods.includes('OT')?`<div class="tab" onclick="switchTab('ot')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Охрана труда</span></div>`:''}
         ${mods.includes('PD')?`<div class="tab" onclick="switchTab('pd')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ПДн</span></div>`:''}
         ${mods.includes('VU')?`<div class="tab" onclick="switchTab('vu');renderClientVu(${id})"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Воинский учёт</span></div>`:''}
+        ${mods.includes('OT')?`<div class="tab" onclick="switchTab('sout');renderSout()"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><circle cx="12" cy="12" r="10"/></svg> СОУТ</span></div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:2px;padding:0 4px;border-bottom:2px solid rgba(255,255,255,0.06)">
         <button onclick="switchTab('staff')" id="tool-btn-staff" title="Сотрудники" style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:none;border:1px solid transparent;border-radius:8px;color:#475569;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.color='#94a3b8';this.style.borderColor='rgba(255,255,255,0.1)'" onmouseout="if(!this.classList.contains('tool-active')){this.style.color='#475569';this.style.borderColor='transparent'}">
@@ -570,8 +571,11 @@ async function renderClientCard(id) {
       <div style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted2);font-size:13px">Загрузка...</div>
     </div>
 
+    <div class="tab-panel" id="tab-sout">
+      <div style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted2);font-size:13px">Загрузка...</div>
+    </div>
+
     
-        <div class="tab-panel" id="tab-staff">
       <!-- Подразделения переехали внутрь вкладки «Сотрудники» — они группировка
            сотрудников, а не отдельный модуль. Блок сворачиваемый: открыт по
            умолчанию если подразделения есть, закрыт если нет. -->

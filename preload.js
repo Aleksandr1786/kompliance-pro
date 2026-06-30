@@ -89,6 +89,11 @@ contextBridge.exposeInMainWorld('api', {
   commissionGet:             (clientId)                    => ipcRenderer.invoke('commission:get', clientId),
   generateCommissionOrder:   (clientId, orderNum, orderDate) => ipcRenderer.invoke('docs:generateCommissionOrder', clientId, orderNum, orderDate),
 
+  // СОУТ
+  soutGet:        (clientId)          => ipcRenderer.invoke('sout:get', clientId),
+  soutSave:       (clientId, data)    => ipcRenderer.invoke('sout:save', clientId, data),
+  soutGenerate:   (clientId, data)    => ipcRenderer.invoke('sout:generate', clientId, data),
+
   // Утилиты
   openExternal:   (url)       => ipcRenderer.invoke('open-external', url),
 

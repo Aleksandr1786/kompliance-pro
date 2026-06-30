@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { generatePackage } = require('./generator');
+const { generateSoutPackage } = require('./gen_sout');
 const path = require('path');
 const fs = require('fs');
 
@@ -33,7 +34,7 @@ function updateLog(msg) {
 // - Никогда не удаляй существующие миграции
 // - Нумерация строго последовательная: 1, 2, 3...
 
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const MIGRATIONS = [
   {
@@ -110,6 +111,18 @@ const MIGRATIONS = [
           license_machine: ''
         }).write();
       }
+    }
+  },
+
+  // ── v3: добавление поля sout_data для хранения данных СОУТ ──
+  {
+    version: 3,
+    description: 'Добавление sout_data в клиентов для хранения данных мастера СОУТ',
+    up(db) {
+      db.get('clients').each(c => {
+        if (c.sout_data === undefined) c.sout_data = null;
+        if (c.address_actual === undefined) c.address_actual = '';
+      }).write();
     }
   },
 
@@ -2171,6 +2184,43 @@ ipcMain.handle('license:activate', (_, key, expireDate, type) => {
 });
 
 // Сброс триала (только через admin-режим)
+// ─── СОУТ ────────────────────────────────────────────────
+ipcMain.handle('sout:get', (_, clientId) => {
+  const client = db.get('clients').find({ id: clientId }).value();
+  return client ? (client.sout_data || null) : null;
+});
+
+ipcMain.handle('sout:save', (_, clientId, data) => {
+  db.get('clients').find({ id: clientId }).assign({ sout_data: data }).write();
+  return { ok: true };
+});
+
+ipcMain.handle('sout:generate', async (_, clientId, soutData) => {
+  const client = db.get('clients').find({ id: clientId }).value();
+  if (!client) throw new Error('Клиент не найден');
+
+  // Базовая папка документов клиента
+  const clientDocDir = path.join(
+    app.getPath('appData'),
+    'КомплаенсПро',
+    'Документы',
+    (client.name || 'Клиент').replace(/[/\\?%*:|"<>]/g, '').trim()
+  );
+  if (!fs.existsSync(clientDocDir)) fs.mkdirSync(clientDocDir, { recursive: true });
+
+  // Добавляем сотрудников в объект клиента для генераторов
+  const employees = db.get('employees').filter({ client_id: clientId }).value() || [];
+  const clientWithEmps = { ...client, employees };
+
+  const result = await generateSoutPackage(clientWithEmps, soutData, clientDocDir);
+
+  if (result.errors && result.errors.length) {
+    console.warn('[SOUT] Ошибки при генерации:', result.errors);
+  }
+
+  return { folder: result.folder, count: result.results.length, errors: result.errors };
+});
+
 ipcMain.handle('trial:reset', () => {
   db.get('settings').assign({
     trial_start:     '',

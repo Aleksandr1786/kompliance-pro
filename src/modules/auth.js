@@ -215,8 +215,10 @@ function showUpdateBanner(version) {
         <div style="display:flex;gap:8px">
           <button id="update-now-btn"
             style="flex:1;padding:8px;background:linear-gradient(135deg,#2563eb,#7c3aed);
-            border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
-            ⬇️ Обновить
+            border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;gap:6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Обновить
           </button>
           <button id="update-later-btn"
             style="padding:8px 12px;background:transparent;border:1px solid rgba(255,255,255,0.1);
@@ -268,15 +270,30 @@ function showUpdateReadyBanner() {
         <button id="update-install-btn"
           style="width:100%;padding:8px;background:rgba(52,211,153,0.15);
           border:1px solid rgba(52,211,153,0.3);border-radius:8px;
-          color:#34d399;font-size:12px;font-weight:700;cursor:pointer">
-          🔄 Перезапустить сейчас
+          color:#34d399;font-size:12px;font-weight:700;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Перезапустить сейчас
         </button>
       </div>
     </div>
   `;
   document.body.appendChild(banner);
   document.getElementById('update-install-btn').onclick = async () => {
-    await window.api.updateInstall();
+    const btn = document.getElementById('update-install-btn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = 'Перезапуск…';
+    btn.style.opacity = '0.7';
+    btn.style.cursor = 'not-allowed';
+    try {
+      await window.api.updateInstall();
+    } catch(e) {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Перезапустить сейчас';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+    }
   };
 }
 

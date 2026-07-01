@@ -379,24 +379,6 @@ async function renderClientCard(id) {
         <div>${otDocs.length ? renderDocsBySection(otDocs, 'OT') : renderEmptyDocs('OT', id)}</div>
       </div>
 
-      <!-- СПРАВКА ДЛЯ БУХГАЛТЕРА (ЕФС-1) -->
-      <div class="panel">
-        <div class="panel-head">
-          ${ic("bar-chart", 18)}
-          <div class="panel-title">Справка для бухгалтера — ЕФС-1</div>
-          <div style="margin-left:auto">
-            <button class="btn btn-primary" style="padding:6px 14px;font-size:11px" onclick="generateEFS1Memo(${id})">
-              📝 Сформировать в Word
-            </button>
-          </div>
-        </div>
-        <div style="padding:10px 4px;font-size:12.5px;color:var(--muted);line-height:1.6">
-          Сведения для заполнения <b style="color:var(--text)">подраздела 2.3 ЕФС-1</b> (СОУТ, медосмотры, инвалиды).
-          Бухгалтер получает готовый Word-документ с данными по охране труда — остаётся только перенести в СФР.
-          Данные берутся из карточки клиента и сотрудников.
-        </div>
-      </div>
-
       <!-- ПРОТОКОЛ ПРОВЕРКИ ЗНАНИЙ -->
       <div class="panel">
         <div class="panel-head">

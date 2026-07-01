@@ -20,8 +20,8 @@ function getFederalReports(year) {
     { name:'ЕФС-1 Раздел 2 (взносы на травматизм)', period:'Полугодие', due:`${year}-07-25`, org:'СФР', freq:'Ежеквартально', note:'Нарастающим итогом.' },
     { name:'ЕФС-1 Раздел 2 (взносы на травматизм)', period:'9 месяцев', due:`${year}-10-27`, org:'СФР', freq:'Ежеквартально', note:'Нарастающим итогом.' },
     { name:'ЕФС-1 Раздел 2 (взносы на травматизм)', period:'Год', due:`${year+1}-01-26`, org:'СФР', freq:'Ежеквартально', note:'Итоговый за год.' },
-    { name:'Форма № 1-Т (условия труда)', period:'За год', due:`${year+1}-01-21`, org:'Росстат', freq:'Ежегодно', note:'Новая форма с 01.03.2026 (Приказ Росстата № 338).' },
-    { name:'Форма № 7-травматизм', period:'За год', due:`${year+1}-01-26`, org:'Росстат', freq:'Ежегодно', note:'Сведения о травматизме и профзаболеваниях.' },
+    { name:'Форма № 1-Т (условия труда)', period:'За год', due:`${year+1}-01-21`, org:'Росстат', freq:'Ежегодно', note:'Приказ Росстата №348 от 22.07.2025. Только для не-МСП (более 100 чел.).' },
+    { name:'Форма № 7-травматизм', period:'За год', due:`${year+1}-03-01`, org:'Росстат', freq:'Ежегодно', note:'Сведения о травматизме. Не для микропредприятий.' },
   ];
 }
 
@@ -51,7 +51,20 @@ const REGIONAL_MODULES = {
 // Построить список отчётов для конкретного клиента
 function buildClientReports(client, year) {
   const hasKrasnodar = client.region && client.region.includes('Краснодар');
-  let reports = getFederalReports(year).map(r => ({ ...r, scope:'federal' }));
+  const staff = parseInt(client.staff || 0);
+  const isMicro = staff <= 15;
+  const isMSP = staff <= 100; // МСП — до 100 человек
+
+  let reports = getFederalReports(year)
+    .filter(r => {
+      // Форма 1-Т — только для не-МСП (более 100 чел.)
+      if (r.name.includes('1-Т')) return !isMSP;
+      // Форма 7-травматизм — не для микропредприятий
+      if (r.name.includes('7-травматизм')) return !isMicro;
+      return true;
+    })
+    .map(r => ({ ...r, scope:'federal' }));
+
   if (hasKrasnodar) reports = reports.concat(getKrasnodarReports(year).map(r => ({ ...r, scope:'krasnodar' })));
   reports.forEach(r => {
     r.dueDate = shiftToWorkday(r.due);
@@ -278,7 +291,7 @@ async function renderReporting() {
 
       <!-- Правовое основание -->
       <div style="font-size:10px;color:#334155;margin-top:16px;padding:10px 14px;background:rgba(255,255,255,0.01);border-radius:8px;line-height:1.7">
-        ЕФС-1 — Приказ СФР № 1462 от 17.11.2025 · Форма 1-Т — Приказ Росстата № 338 от 01.03.2026
+        ЕФС-1 — Приказ СФР № 1462 от 17.11.2025 · Форма 1-Т — Приказ Росстата №348 от 22.07.2025
         ${clients.some(c => c.region && c.region.includes('Краснодар')) ? ' · Краснодарский край — Постановление губернатора № 1591 от 21.12.2012 (ред. 12.12.2023)' : ''}
         · Сроки с переносом на рабочий день
       </div>
@@ -443,6 +456,36 @@ async function renderClientReporting(clientId) {
   if (!panel) return;
   panel.innerHTML = `
     <div style="max-width:700px">
+
+      <!-- Кнопки быстрого доступа -->
+      <div style="display:flex;gap:10px;margin-bottom:18px">
+        <button onclick="renderEfs1Page(${clientId})" style="
+          flex:1;display:flex;align-items:center;gap:10px;padding:12px 16px;
+          background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);
+          border-radius:10px;cursor:pointer;transition:all .2s;text-align:left"
+          onmouseover="this.style.background='rgba(37,99,235,0.15)'"
+          onmouseout="this.style.background='rgba(37,99,235,0.08)'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#93c5fd">ЕФС-1 (СФР)</div>
+            <div style="font-size:10px;color:#475569">Справка бухгалтеру · Личный кабинет СФР</div>
+          </div>
+        </button>
+        ${hasKrasnodar ? `
+        <button onclick="renderCznPage(${clientId})" style="
+          flex:1;display:flex;align-items:center;gap:10px;padding:12px 16px;
+          background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.25);
+          border-radius:10px;cursor:pointer;transition:all .2s;text-align:left"
+          onmouseover="this.style.background='rgba(251,191,36,0.15)'"
+          onmouseout="this.style.background='rgba(251,191,36,0.07)'">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#fbbf24">Отчёт ЦЗН</div>
+            <div style="font-size:10px;color:#475569">Краснодарский край · Генератор + kubzan.ru</div>
+          </div>
+        </button>` : ''}
+      </div>
+
       <!-- Статистика -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px">
         ${[
@@ -501,7 +544,7 @@ async function renderClientReporting(clientId) {
       </div>` : ''}
 
       <div style="font-size:10px;color:#334155;margin-top:12px;line-height:1.7">
-        ЕФС-1 — Приказ СФР № 1462 от 17.11.2025 · Форма 1-Т — Приказ Росстата № 338 от 01.03.2026 · Сроки с переносом на рабочий день
+        ЕФС-1 — Приказ СФР № 1462 от 17.11.2025 · Форма 1-Т — Приказ Росстата №348 от 22.07.2025 · Сроки с переносом на рабочий день
       </div>
     </div>`;
 }
@@ -710,3 +753,355 @@ function showCalendarDay(dateKey) {
   popup.innerHTML = `<div style="font-weight:700;color:var(--muted2);font-size:10px;letter-spacing:.5px;margin-bottom:8px">${d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}).toUpperCase()}</div>${items.join('')}`;
   popup.style.display = 'block';
 }
+
+// ─── СТРАНИЦА ЕФС-1 ───────────────────────────────────────
+async function renderEfs1Page(clientId) {
+  const panel = document.getElementById('tab-reporting');
+  if (!panel) return;
+
+  const client = await window.api.clientGet(clientId);
+  const emps = await window.api.employeesList(clientId) || [];
+  if (!client) return;
+
+  const totalEmps = parseInt(client.staff || emps.length || 0);
+  const hazardEmps = emps.filter(e => e.is_hazard || client.hazard_works).length || 0;
+  const medEmps = parseInt(client.soat_med_req || 0);
+  const invalidEmps = emps.filter(e => e.is_invalid).length || 0;
+
+  panel.innerHTML = `
+    <div style="max-width:700px">
+      <!-- Шапка с кнопкой назад -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button onclick="renderClientReporting(${clientId})" style="
+          display:flex;align-items:center;gap:6px;padding:7px 14px;
+          background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+          border-radius:8px;color:#64748b;font-size:12px;cursor:pointer">
+          ← Назад
+        </button>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">ЕФС-1 — Раздел 2</div>
+          <div style="font-size:11px;color:#475569">Взносы на травматизм · ${safe(client.name)}</div>
+        </div>
+      </div>
+
+      <!-- Кнопка перехода на сайт СФР -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:16px 20px;background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.2);
+        border-radius:12px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#93c5fd">Подать ЕФС-1 онлайн</div>
+            <div style="font-size:11px;color:#475569">Личный кабинет страхователя СФР · Вход через Госуслуги</div>
+          </div>
+        </div>
+        <button onclick="window.api.openExternal('https://lk.sfr.gov.ru')" style="
+          padding:9px 18px;background:linear-gradient(135deg,#2563eb,#3b82f6);
+          border:none;border-radius:9px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;
+          white-space:nowrap">
+          Открыть lk.sfr.gov.ru
+        </button>
+      </div>
+
+      <!-- Справка для бухгалтера -->
+      <div style="background:rgba(15,21,32,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#f1f5f9">Справка для бухгалтера — подраздел 2.3 ЕФС-1</div>
+            <div style="font-size:11px;color:#475569;margin-top:2px">Данные по СОУТ, медосмотрам и инвалидам из карточки клиента</div>
+          </div>
+          <button onclick="generateEFS1Memo(${clientId})" style="
+            display:flex;align-items:center;gap:7px;padding:9px 16px;
+            background:linear-gradient(135deg,#2563eb,#7c3aed);border:none;
+            border-radius:9px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Сформировать в Word
+          </button>
+        </div>
+
+        <!-- Предпросмотр данных -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${[
+            ['Всего рабочих мест', String(client.soat_total || totalEmps || '—')],
+            ['Проведена СОУТ (р/мест)', String(client.soat_done || '—')],
+            ['Класс 1 (оптимальные)', String(client.soat_c1 || 0)],
+            ['Класс 2 (допустимые)', String(client.soat_c2 || 0)],
+            ['Класс 3.1', String(client.soat_c31 || 0)],
+            ['Класс 3.2', String(client.soat_c32 || 0)],
+            ['Класс 3.3', String(client.soat_c33 || 0)],
+            ['Класс 3.4', String(client.soat_c34 || 0)],
+            ['Класс 4 (опасные)', String(client.soat_c4 || 0)],
+            ['Подлежат медосмотрам', String(medEmps || '—')],
+            ['Работают во вредных условиях', String(hazardEmps || '—')],
+            ['Инвалиды', String(invalidEmps || '—')],
+          ].map(([label, val]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:8px 12px;background:rgba(255,255,255,0.02);border-radius:8px;
+              border:1px solid rgba(255,255,255,0.05)">
+              <span style="font-size:11px;color:#64748b">${label}</span>
+              <span style="font-size:13px;font-weight:700;color:#e2e8f0">${val}</span>
+            </div>`).join('')}
+        </div>
+
+        ${(!client.soat_total && !client.soat_done) ? `
+          <div style="margin-top:12px;padding:10px 14px;background:rgba(251,191,36,0.07);
+            border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:11px;color:#94a3b8">
+            Данные СОУТ не заполнены. Добавьте данные в карточке клиента (раздел «СОУТ — детализация для ЕФС-1») для формирования справки.
+          </div>` : ''}
+      </div>
+
+      <!-- Сроки сдачи -->
+      <div style="padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px">
+        <div style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Сроки сдачи ЕФС-1 Раздел 2 в 2026 году</div>
+        ${[
+          ['I квартал', 'до 25 апреля'],
+          ['Полугодие', 'до 25 июля'],
+          ['9 месяцев', 'до 27 октября'],
+          ['Год', 'до 26 января 2027'],
+        ].map(([period, deadline]) => `
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="font-size:12px;color:#64748b">${period}</span>
+            <span style="font-size:12px;font-weight:600;color:#e2e8f0">${deadline}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+// ─── СТРАНИЦА ОТЧЁТ ЦЗН ──────────────────────────────────
+async function renderCznPage(clientId) {
+  const panel = document.getElementById('tab-reporting');
+  if (!panel) return;
+
+  const client = await window.api.clientGet(clientId);
+  const emps = await window.api.employeesList(clientId) || [];
+  if (!client) return;
+
+  panel.innerHTML = `
+    <div style="max-width:700px">
+      <!-- Шапка с кнопкой назад -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button onclick="renderClientReporting(${clientId})" style="
+          display:flex;align-items:center;gap:6px;padding:7px 14px;
+          background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+          border-radius:8px;color:#64748b;font-size:12px;cursor:pointer">
+          ← Назад
+        </button>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">Отчёт в ЦЗН — Краснодарский край</div>
+          <div style="font-size:11px;color:#475569">Постановление №1591 от 21.12.2012 · ${safe(client.name)}</div>
+        </div>
+      </div>
+
+      <!-- Кнопка перехода на kubzan.ru -->
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:16px 20px;background:rgba(251,191,36,0.07);border:1px solid rgba(251,191,36,0.2);
+        border-radius:12px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fbbf24">Подать отчёт онлайн</div>
+            <div style="font-size:11px;color:#475569">Интерактивный портал органов труда и занятости Краснодарского края</div>
+          </div>
+        </div>
+        <button onclick="window.api.openExternal('https://kubzan.ru')" style="
+          padding:9px 18px;background:linear-gradient(135deg,#d97706,#fbbf24);
+          border:none;border-radius:9px;color:#1c1917;font-size:12px;font-weight:700;cursor:pointer;
+          white-space:nowrap">
+          Открыть kubzan.ru
+        </button>
+      </div>
+
+      <!-- Генератор отчёта -->
+      <div style="background:rgba(15,21,32,0.6);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:20px;margin-bottom:20px">
+        <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">Сформировать отчёт для заполнения</div>
+        <div style="font-size:11px;color:#475569;margin-bottom:16px">
+          КомплаенсПро заполнит все доступные поля из карточки клиента. Переменные данные (несчастные случаи, расходы) введите вручную.
+        </div>
+
+        <!-- Период -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Период отчёта</div>
+            <select id="czn-period" style="width:100%;padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none">
+              <option value="3">3 месяца (I квартал)</option>
+              <option value="6">6 месяцев (II квартал)</option>
+              <option value="9">9 месяцев (III квартал)</option>
+              <option value="12">12 месяцев (год)</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px">Год</div>
+            <input type="number" id="czn-year" value="${new Date().getFullYear()}" min="2020" max="2030"
+              style="width:100%;padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+        </div>
+
+        <!-- Переменные данные -->
+        <div style="padding:10px 14px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:8px;margin-bottom:12px">
+          <div style="font-size:11px;color:#60a5fa;font-weight:600;margin-bottom:3px">Данные запросите у бухгалтера</div>
+          <div style="font-size:10.5px;color:#475569">Среднесписочная численность и расходы на ОТ рассчитываются бухгалтерией за отчётный период нарастающим итогом.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">Среднесписочная численность (чел.) *</div>
+            <input type="number" id="czn-ssc" value="${parseInt(client.staff || emps.length || 0)}" min="1"
+              oninput="_cznUpdateCostPerPerson()"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(96,165,250,0.3);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            <div style="font-size:10px;color:#334155;margin-top:3px">от бухгалтера · подставлен текущий штат</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">В том числе женщин (чел.)</div>
+            <input type="number" id="czn-women" value="${emps.filter(e => e.gender === 'Ж' || e.gender === 'female').length}" min="0"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            <div style="font-size:10px;color:#334155;margin-top:3px">подставлено из карточки сотрудников</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">В том числе несовершеннолетних (чел.)</div>
+            <input type="number" id="czn-minors" value="${emps.filter(e => { if(!e.birth_date) return false; const age = (new Date() - new Date(e.birth_date)) / (365.25*24*3600*1000); return age < 18; }).length}" min="0"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            <div style="font-size:10px;color:#334155;margin-top:3px">по дате рождения из карточки</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">Расходы на ОТ (тыс. руб.) *</div>
+            <input type="number" id="czn-costs" value="0" min="0" step="0.01"
+              oninput="_cznUpdateCostPerPerson()"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(96,165,250,0.3);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            <div style="font-size:10px;color:#334155;margin-top:3px">пример: 540 000 руб. → вводите 540.00</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">Расходы на спорт (тыс. руб.)</div>
+            <input type="number" id="czn-sport" value="0" min="0" step="0.01"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">На 1 работника (руб.) — авто</div>
+            <div id="czn-cost-per-person" style="padding:8px 12px;background:rgba(52,211,153,0.05);border:1px solid rgba(52,211,153,0.2);border-radius:8px;color:#34d399;font-size:14px;font-weight:700;text-align:center">
+              0
+            </div>
+            <div style="font-size:10px;color:#334155;margin-top:3px">расходы × 1000 ÷ среднесписочная</div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">Несчастных случаев (чел.)</div>
+            <input type="number" id="czn-accidents" value="0" min="0"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600">Дней нетрудоспособности</div>
+            <input type="number" id="czn-days" value="0" min="0"
+              style="width:100%;padding:8px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+        </div>
+
+        <button onclick="generateCznReport(${clientId})" style="
+          width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+          padding:11px;background:linear-gradient(135deg,#d97706,#fbbf24);
+          border:none;border-radius:10px;color:#1c1917;font-size:13px;font-weight:700;cursor:pointer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Сформировать отчёт в Word
+        </button>
+      </div>
+
+      <!-- Сроки сдачи -->
+      <div style="padding:14px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px">
+        <div style="font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Сроки сдачи в ЦЗН в 2026 году</div>
+        ${[
+          ['I квартал (3 мес.)', 'до 5 апреля'],
+          ['II квартал (6 мес.)', 'до 5 июля'],
+          ['III квартал (9 мес.)', 'до 5 октября'],
+          ['IV квартал (год)', 'до 5 января 2027'],
+        ].map(([period, deadline]) => `
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <span style="font-size:12px;color:#64748b">${period}</span>
+            <span style="font-size:12px;font-weight:600;color:#e2e8f0">${deadline}</span>
+          </div>`).join('')}
+        <div style="margin-top:8px;font-size:10.5px;color:#334155">Подача через Личный кабинет на kubzan.ru или лично в ЦЗН по месту регистрации</div>
+      </div>
+    </div>`;
+}
+
+// ─── Автопересчёт стоимости на 1 работника ───────────────
+function _cznUpdateCostPerPerson() {
+  const ssc = parseFloat(document.getElementById('czn-ssc')?.value) || 0;
+  const costs = parseFloat(document.getElementById('czn-costs')?.value) || 0;
+  const perPerson = ssc > 0 ? Math.round(costs * 1000 / ssc) : 0;
+  const el = document.getElementById('czn-cost-per-person');
+  if (el) el.textContent = perPerson.toLocaleString('ru-RU') + ' руб.';
+}
+
+// ─── Генератор отчёта ЦЗН ────────────────────────────────
+async function generateCznReport(clientId) {
+  const client = await window.api.clientGet(clientId);
+  const emps = await window.api.employeesList(clientId) || [];
+  if (!client) return;
+
+  const period = document.getElementById('czn-period')?.value || '3';
+  const year = document.getElementById('czn-year')?.value || new Date().getFullYear();
+  const ssc = document.getElementById('czn-ssc')?.value || String(client.staff || emps.length || 0);
+  const women = document.getElementById('czn-women')?.value || '0';
+  const minors = document.getElementById('czn-minors')?.value || '0';
+  const accidents = document.getElementById('czn-accidents')?.value || '0';
+  const days = document.getElementById('czn-days')?.value || '0';
+  const costs = document.getElementById('czn-costs')?.value || '0';
+  const sport = document.getElementById('czn-sport')?.value || '0';
+  const costPerPerson = parseInt(ssc) > 0 ? Math.round(parseFloat(costs) * 1000 / parseInt(ssc)) : 0;
+
+  const periodLabels = { '3':'3', '6':'6', '9':'9', '12':'12' };
+  const periodText = periodLabels[period] || period;
+
+  const rows = [
+    { cells: [{ text: 'Раздел 1. О состоянии производственного травматизма и охраны труда', bold: true, colspan: 2, shading: 'EFF6FF', size: 22 }] },
+    { cells: [{ text: `За ${periodText} месяцев ${year} г. (до 5-го числа следующего месяца)`, colspan: 2, size: 18, shading: 'F8FAFC' }] },
+    { cells: [{ text: 'Показатель', bold: true, width: 6000, shading: 'F1F5F9', size: 20 }, { text: 'Значение', bold: true, width: 3072, shading: 'F1F5F9', center: true, size: 20 }] },
+    { cells: [{ text: '1. Среднесписочная численность работников, всего человек', width: 6000, size: 20 }, { text: ssc, width: 3072, center: true, size: 20 }] },
+    { cells: [{ text: '   в том числе женщин', size: 20 }, { text: women, center: true, size: 20 }] },
+    { cells: [{ text: '   несовершеннолетних', size: 20 }, { text: minors, center: true, size: 20 }] },
+    { cells: [{ text: '2. Численность пострадавших при несчастных случаях, всего человек', size: 20 }, { text: accidents, center: true, size: 20 }] },
+    { cells: [{ text: '   в том числе женщин', size: 20 }, { text: '0', center: true, size: 20 }] },
+    { cells: [{ text: '   несовершеннолетних', size: 20 }, { text: '0', center: true, size: 20 }] },
+    { cells: [{ text: '3. Из них с легкой степенью тяжести, всего человек', size: 20 }, { text: accidents !== '0' ? accidents : '0', center: true, size: 20 }] },
+    { cells: [{ text: '4. Из них с тяжелой степенью тяжести, всего человек', size: 20 }, { text: '0', center: true, size: 20 }] },
+    { cells: [{ text: '5. Из них со смертельным исходом, всего человек', size: 20 }, { text: '0', center: true, size: 20 }] },
+    { cells: [{ text: '6. Количество групповых несчастных случаев', size: 20 }, { text: '0', center: true, size: 20 }] },
+    { cells: [{ text: '7. Количество дней утраты трудоспособности (человеко-дней)', size: 20 }, { text: days, center: true, size: 20 }] },
+    { cells: [{ text: '8. Израсходовано средств на охрану труда за отчётный период, всего тыс. руб.', size: 20 }, { text: costs, center: true, size: 20 }] },
+    { cells: [{ text: '   из них на физкультуру и спорт, тыс. руб.', size: 20 }, { text: sport, center: true, size: 20 }] },
+    { cells: [{ text: '   в том числе на 1 работающего (без затрат на спорт), руб.', size: 20 }, { text: String(costPerPerson), center: true, size: 20 }] },
+    { cells: [{ text: 'Раздел 1.1. Сведения о СОУТ (за 6, 12 месяцев)', bold: true, colspan: 2, shading: 'EFF6FF', size: 22 }] },
+    { cells: [{ text: 'Всего рабочих мест', size: 20 }, { text: String(client.soat_total || totalEmps || '—'), center: true, size: 20 }] },
+    { cells: [{ text: 'Проведена СОУТ (рабочих мест)', size: 20 }, { text: String(client.soat_done || '—'), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 1 (оптимальные)', size: 20 }, { text: String(client.soat_c1 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 2 (допустимые)', size: 20 }, { text: String(client.soat_c2 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 3.1', size: 20 }, { text: String(client.soat_c31 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 3.2', size: 20 }, { text: String(client.soat_c32 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 3.3', size: 20 }, { text: String(client.soat_c33 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 3.4', size: 20 }, { text: String(client.soat_c34 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Класс 4 (опасные)', size: 20 }, { text: String(client.soat_c4 || 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Декларировано рабочих мест', size: 20 }, { text: String(client.soat_done || '—'), center: true, size: 20 }] },
+    { cells: [{ text: 'Раздел 2.1. Специалист по охране труда', bold: true, colspan: 2, shading: 'EFF6FF', size: 22 }] },
+    { cells: [{ text: 'Наличие договора на оказание услуг по охране труда', size: 20 }, { text: client.contract_date ? `Да, договор от ${new Date(client.contract_date).toLocaleDateString('ru-RU')}` : 'Нет', center: true, size: 20 }] },
+    { cells: [{ text: 'Специалист по ОТ', size: 20 }, { text: `${client.ot_name || '—'}, ${client.ot_position || '—'}`, size: 20 }] },
+    { cells: [{ text: 'Раздел 2.3. Сведения об обеспеченности СИЗ', bold: true, colspan: 2, shading: 'EFF6FF', size: 22 }] },
+    { cells: [{ text: 'Число работников, подлежащих обеспечению СИЗ', size: 20 }, { text: String(client.hazard_works ? totalEmps : 0), center: true, size: 20 }] },
+    { cells: [{ text: 'Число работников, обеспеченных СИЗ в полном объёме', size: 20 }, { text: String(client.hazard_works ? totalEmps : 0), center: true, size: 20 }] },
+  ];
+
+  const btn = document.querySelector('button[onclick="generateCznReport(' + clientId + ')"]');
+  if (btn) { btn.textContent = 'Формирую…'; btn.disabled = true; }
+
+  try {
+    await window.api.docxGenerate({
+      rows,
+      title: `Отчёт по охране труда за ${periodText} месяцев ${year} г.`,
+      subtitle: `${client.name} · ИНН: ${client.inn || '—'} · ОКВЭД: ${client.okved || '—'} · Краснодарский край`,
+      filename: `Отчёт_ЦЗН_${periodText}мес_${year}_${(client.name || '').replace(/[\\/:*?"<>|«»"]/g,'').trim().slice(0,30)}`,
+    });
+    showToast('Отчёт ЦЗН сформирован ✓');
+  } catch(e) {
+    showToast('Ошибка: ' + (e.message || e), 'var(--red)');
+  } finally {
+    if (btn) { btn.textContent = 'Сформировать отчёт в Word'; btn.disabled = false; }
+  }
+}
+
+function safe(v) { return String(v || ''); }

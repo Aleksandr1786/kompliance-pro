@@ -150,7 +150,7 @@ async function renderClientCard(id) {
     editBtn = document.createElement('button');
     editBtn.id = 'topbarEdit';
     editBtn.className = 'btn btn-ghost';
-    editBtn.textContent = '✏️ Редактировать';
+    editBtn.innerHTML = `${ic("edit",14)} Редактировать`;
     document.getElementById('topbarAction').after(editBtn);
   }
   editBtn.style.display = 'flex';
@@ -179,13 +179,14 @@ async function renderClientCard(id) {
           <div class="hero-tags">
             ${c.inn?`<span class="hero-tag">ИНН: ${c.inn}</span>`:''}
             ${c.okved?`<span class="hero-tag">ОКВЭД: ${c.okved}</span>`:''}
-            ${c.region?`<span class="hero-tag">📍 ${c.region}</span>`:''}
+            ${c.region?`<span class="hero-tag">${ic("map-pin",12)} ${c.region}</span>`:''}
             ${c.staff?`<span class="hero-tag">${emps.length || c.staff} сотр.</span>`:''}
             ${c.form?`<span class="hero-tag">${c.form}</span>`:''}
-            ${c.contract_date?`<span class="hero-tag" title="Дата договора">📝 с ${formatDate(c.contract_date)}</span>`:''}
-            ${c.git_last_date?`<span class="hero-tag" title="Последняя проверка ГИТ" style="color:var(--amber)">🔍 ГИТ: ${formatDate(c.git_last_date)}</span>`:''}
-            ${c.next_visit_date?`<span class="hero-tag" title="Следующий обход" style="color:var(--blue2)">🔄 Обход: ${formatDate(c.next_visit_date)}</span>`:''}
-            ${c.git_next_date?`<span class="hero-tag" title="Плановая проверка ГИТ" style="color:var(--red)">⚠️ Пл.ГИТ: ${formatDate(c.git_next_date)}</span>`:''}
+            ${c.contract_date?`<span class="hero-tag" title="Дата договора">${ic("file-text",12)} с ${formatDate(c.contract_date)}</span>`:''}
+            ${c.git_last_date?`<span class="hero-tag" title="Последняя проверка ГИТ" style="color:var(--amber)">${ic("search",12)} ГИТ: ${formatDate(c.git_last_date)}</span>`:''}
+            ${c.next_visit_date?`<span class="hero-tag" title="Следующий обход" style="color:var(--blue2)">${ic("refresh",12)} Обход: ${formatDate(c.next_visit_date)}</span>`:''}
+            ${c.git_next_date?`<span class="hero-tag" title="Плановая проверка ГИТ" style="color:var(--red)">${ic("alert-triangle",12)} Пл.ГИТ: ${formatDate(c.git_next_date)}</span>`:''}
+            ${c.address_actual && c.address_actual.trim() !== (c.address||'').trim() ? `<span class="hero-tag" title="Фактический адрес отличается от юридического">${ic("map-pin",12)} Факт.: ${c.address_actual}</span>`:''}
           </div>
         </div>
         <div class="hero-score" style="text-align:right;cursor:pointer;position:relative;display:flex;align-items:center;gap:14px" onclick="toggleScoreBreakdown()" title="Нажмите для деталей">
@@ -372,7 +373,7 @@ async function renderClientCard(id) {
           <div class="panel-title">Документы — Охрана труда</div>
           <div class="panel-count">${otDocs.length} шт.</div>
           <div style="margin-left:auto;display:flex;gap:8px">
-            ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="openClientFolder()">📁 Открыть папку</button>` : ''}
+            ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="openClientFolder()">${ic("folder",14)} Открыть папку</button>` : ''}
             <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id},'OT')">${ic("zap",14)} Сформировать пакет</button>
           </div>
         </div>
@@ -583,15 +584,15 @@ async function renderClientCard(id) {
               if (wt.psycho) tags.push(`<span style="font-size:10px;background:rgba(167,139,250,0.12);color:#a78bfa;padding:2px 7px;border-radius:10px">психо</span>`);
               if (wt.siz) tags.push(`<span style="font-size:10px;background:rgba(96,165,250,0.12);color:#60a5fa;padding:2px 7px;border-radius:10px">СИЗ</span>`);
               return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px">
-                <div style="font-size:18px;flex-shrink:0">${wt.icon}</div>
+                <div style="font-size:18px;flex-shrink:0">${ic(wt.icon,18)}</div>
                 <div style="flex:1;min-width:0">
                   <div style="font-size:13px;font-weight:600;color:var(--text)">${div.name}</div>
                   <div style="font-size:11px;color:var(--muted2);margin-top:2px">${wt.label} · СОУТ класс ${div.soat_class || wt.soatDefault} · ${empCount} сотр.</div>
                   ${tags.length ? `<div style="display:flex;gap:4px;margin-top:4px">${tags.join('')}</div>` : ''}
                 </div>
                 <div style="display:flex;gap:4px;flex-shrink:0">
-                  <button onclick="openDivisionModal(${id}, ${div.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">✏️</button>
-                  <button onclick="deleteDivision(${div.id}, ${id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">🗑</button>
+                  <button onclick="openDivisionModal(${id}, ${div.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">${ic("edit",13)}</button>
+                  <button onclick="deleteDivision(${div.id}, ${id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">${ic("trash",13)}</button>
                 </div>
               </div>`;
             }).join('')}
@@ -610,7 +611,7 @@ async function renderClientCard(id) {
           <div class="panel-count">${emps.length} чел.</div>
           <div class="panel-action" onclick="addEmployeePrompt(${id})">+ Добавить</div>
         </div>
-        <div>${emps.length ? emps.map(e=>renderEmpRow(e, divisions)).join('') : '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>'}</div>
+        <div>${emps.length ? emps.map(e=>renderEmpRow(e, divisions)).join('') : `<div class="empty-state"><div class="empty-icon">${ic("users",32)}</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>`}</div>
       </div>
     </div>
 
@@ -688,11 +689,11 @@ function switchTrainingTab(tab, clientId) {
 //   5. Реестр — передача сведений в реестр обученных лиц Минтруда
 // Типы обучения с периодичностью и маппингом на поля training сотрудника
 const TRAINING_TYPES_SELF = [
-  { key: 'prog_a',    label: 'Программа А (ОТ)',     years: 3, icon: '🛡️' },
-  { key: 'first_aid', label: 'Первая помощь',         years: 3, icon: '🏥' },
-  { key: 'fire',      label: 'Пожарный минимум',      years: 3, icon: '🔥' },
-  { key: 'siz',       label: 'Применение СИЗ',        years: 3, icon: '🦺' },
-  { key: 'repeat',    label: 'Повторный инструктаж',  months: 6, icon: '🔄' },
+  { key: 'prog_a',    label: 'Программа А (ОТ)',     years: 3, icon: 'shield' },
+  { key: 'first_aid', label: 'Первая помощь',         years: 3, icon: 'heart' },
+  { key: 'fire',      label: 'Пожарный минимум',      years: 3, icon: 'zap' },
+  { key: 'siz',       label: 'Применение СИЗ',        years: 3, icon: 'shield' },
+  { key: 'repeat',    label: 'Повторный инструктаж',  months: 6, icon: 'refresh' },
 ];
 
 // Вычисляем дней до следующего обучения по дате последнего
@@ -728,7 +729,7 @@ async function loadSelfTraining(clientId) {
   if (!addonActive) {
     pane.innerHTML = `
       <div style="text-align:center;padding:28px 20px">
-        <div style="font-size:32px;margin-bottom:12px">🎓</div>
+        <div style="margin-bottom:12px">${ic("graduation-cap",32)}</div>
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">Трекер обучения сотрудников</div>
         <div style="font-size:12.5px;color:var(--muted2);line-height:1.6;margin-bottom:16px">
           Контроль сроков переобучения, состав комиссии, статус по каждому типу программы.<br>
@@ -804,7 +805,7 @@ async function loadSelfTraining(clientId) {
           <!-- Заголовок группы — всегда виден -->
           <div onclick="toggleTrainingGroup('${clientId}','${g.tt.key}')"
             style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:rgba(255,255,255,0.01)">
-            <span style="font-size:16px;flex-shrink:0">${g.tt.icon}</span>
+            <span style="font-size:16px;flex-shrink:0">${ic(g.tt.icon,16)}</span>
             <div style="flex:1;min-width:0">
               <div style="font-size:13px;font-weight:600;color:var(--text)">${g.tt.label}</div>
               <!-- Прогресс-бар -->
@@ -859,7 +860,7 @@ async function loadSelfTraining(clientId) {
       <div style="border:1px solid rgba(255,255,255,0.07);border-radius:10px;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(255,255,255,0.01)">
           <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:15px">👥</span>
+            <span style="font-size:15px">${ic("users",15)}</span>
             <span style="font-size:13px;font-weight:600;color:var(--text)">Комиссия по проверке знаний</span>
             ${commission.length >= 3
               ? '<span style="font-size:10.5px;background:rgba(52,211,153,0.1);color:#34d399;padding:2px 8px;border-radius:6px;font-weight:600">Укомплектована</span>'
@@ -869,7 +870,7 @@ async function loadSelfTraining(clientId) {
             <span style="font-size:11px;color:var(--muted2)">${commission.length} / мин. 3</span>
             <button onclick="openCommissionOrderModal(${clientId})"
               style="padding:4px 12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);border-radius:7px;color:#a5b4fc;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap"
-              title="Сформировать приказ о создании комиссии">📄 Приказ</button>
+              title="Сформировать приказ о создании комиссии">${ic("file-text",14)} Приказ</button>
           </div>
         </div>
         ${commission.length ? `
@@ -903,7 +904,7 @@ async function openCommissionOrderModal(clientId) {
 
   modal.innerHTML = `
     <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.7);animation:ob-card-in .25s ease both">
-      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">📄 Приказ о создании комиссии</div>
+      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">${ic("file-text",14)} Приказ о создании комиссии</div>
       <div style="font-size:12px;color:#60a5fa;margin-bottom:20px">Укажите реквизиты приказа</div>
 
       <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Номер приказа</label>
@@ -972,7 +973,7 @@ async function submitCommissionOrder(clientId) {
       if (result.file) {
         window.api.docsOpenFile(result.file).catch(() => {});
       }
-      showToast('✅ Приказ сформирован');
+      showToast('Приказ сформирован');
     } else {
       errEl.textContent = result?.error || 'Ошибка формирования';
       errEl.style.display = 'block';
@@ -1007,7 +1008,7 @@ async function editTrainingDate(clientId, empId, trainingKey, trainingLabel, cur
 
   modal.innerHTML = `
     <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:24px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.7);animation:ob-card-in .25s ease both">
-      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">📅 Дата обучения</div>
+      <div style="font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:4px">${ic("calendar",14)} Дата обучения</div>
       <div style="font-size:12px;color:#60a5fa;margin-bottom:18px">${trainingLabel}</div>
       <label style="font-size:11px;color:#475569;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">Дата последнего обучения</label>
       <input id="td-date" type="date" value="${currentDate}"
@@ -1045,7 +1046,7 @@ async function saveTrainingDate(clientId, empId, trainingKey) {
 
   await window.api.trainingUpdate(empId, training);
   document.getElementById('modal-training-date')?.remove();
-  showToast('Дата сохранена ✅');
+  showToast('Дата сохранена');
   await loadSelfTraining(clientId); // обновляем трекер
 }
 
@@ -1252,7 +1253,7 @@ async function submitCert(clientId, certId) {
     showToast('Запись обновлена');
   } else {
     await window.api.certsAdd(data);
-    showToast('Запись добавлена ✅');
+    showToast('Запись добавлена');
   }
   document.getElementById('modal-cert')?.remove();
   await loadCerts(clientId);
@@ -1419,7 +1420,7 @@ function renderEmpRow(e, divisions = []) {
   const today = new Date();
   const division = divisions.find(d => d.id === e.division_id);
   const divBadge = division
-    ? `<span style="font-size:10px;background:rgba(96,165,250,0.12);color:#60a5fa;padding:1px 7px;border-radius:10px;margin-right:4px">${(DIVISION_WORK_TYPES[division.work_type]?.icon||'🏢')} ${division.name}</span>`
+    ? `<span style="font-size:10px;background:rgba(96,165,250,0.12);color:#60a5fa;padding:1px 7px;border-radius:10px;margin-right:4px">${ic(DIVISION_WORK_TYPES[division.work_type]?.icon||'building',10)} ${division.name}</span>`
     : '';
 
   // Считаем статус обучения
@@ -1465,7 +1466,7 @@ async function openDivisionModal(clientId, divisionId = null) {
 
   const workTypeOptions = Object.entries(DIVISION_WORK_TYPES).map(([key, wt]) =>
     `<option value="${key}" ${existing?.work_type === key ? 'selected' : key === 'standard' && !existing ? 'selected' : ''}>
-      ${wt.icon} ${wt.label}
+      ${wt.label}
     </option>`
   ).join('');
 
@@ -1478,7 +1479,7 @@ async function openDivisionModal(clientId, divisionId = null) {
   modal.innerHTML = `
     <div style="background:var(--s2);border:1px solid var(--border);border-radius:18px;padding:26px;width:500px;max-height:88vh;overflow-y:auto">
       <div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:18px">
-        ${existing ? '✏️ Редактировать подразделение' : '+ Добавить подразделение'}
+        ${existing ? ic("edit",16) + ' Редактировать подразделение' : '+ Добавить подразделение'}
       </div>
 
       <div class="form-group" style="margin-bottom:14px">
@@ -1539,9 +1540,9 @@ function updateDivisionPreview() {
   if (wt.siz) reqs.push(`<span style="color:#60a5fa">✓ Обучение применению СИЗ</span>`);
 
   preview.innerHTML = `
-    <div style="font-weight:700;color:var(--text);margin-bottom:8px">${wt.icon} ${wt.label}</div>
+    <div style="font-weight:700;color:var(--text);margin-bottom:8px">${ic(wt.icon,14)} ${wt.label}</div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">${reqs.join('')}</div>
-    ${wt.note ? `<div style="color:#475569;font-size:11px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">ℹ️ ${wt.note}</div>` : ''}`;
+    ${wt.note ? `<div style="color:#475569;font-size:11px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">${ic("info",12)} ${wt.note}</div>` : ''}`;
 }
 
 async function saveDivision(clientId, divisionId) {
@@ -1578,10 +1579,10 @@ async function saveDivision(clientId, divisionId) {
       warning.id = 'div-okved-warning';
       warning.style.cssText = 'background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px';
       warning.innerHTML = `
-        <div style="font-weight:700;color:#fbbf24;margin-bottom:6px">⚠️ ОКВЭД не совпадает с типом работ</div>
+        <div style="font-weight:700;color:#fbbf24;margin-bottom:6px">${ic("alert-triangle",14)} ОКВЭД не совпадает с типом работ</div>
         <div style="color:#d4d4d8;line-height:1.5">
           ОКВЭД организации: <b>${c.okved}</b><br>
-          Тип «${wt.icon} ${wt.label}» обычно применяется для: <b>${mapping.name}</b>
+          Тип «${ic(wt.icon,12)} ${wt.label}» обычно применяется для: <b>${mapping.name}</b>
         </div>
         <div style="color:#94a3b8;font-size:11px;margin-top:8px">Если это корректно — нажмите «Сохранить» ещё раз.</div>
         <button onclick="document.getElementById('div-okved-warning').remove()" 
@@ -1608,10 +1609,10 @@ async function saveDivision(clientId, divisionId) {
 
   if (divisionId) {
     await window.api.divisionsUpdate(divisionId, data);
-    showToast('✅ Подразделение обновлено');
+    showToast('Подразделение обновлено');
   } else {
     await window.api.divisionsAdd(data);
-    showToast('✅ Подразделение добавлено');
+    showToast('Подразделение добавлено');
   }
 
   document.getElementById('modalDivision')?.remove();
@@ -1646,7 +1647,7 @@ const TRAINING_TYPES_BASE = [
 const DIVISION_WORK_TYPES = {
   standard: {
     label: 'Обычные (офис, торговля, услуги)',
-    icon: '🏢',
+    icon: 'building',
     soatDefault: '2',
     medcheck: false,
     medcheck_714: false,
@@ -1657,7 +1658,7 @@ const DIVISION_WORK_TYPES = {
   },
   production: {
     label: 'Производство / склад / цех',
-    icon: '🏭',
+    icon: 'building',
     soatDefault: '31',
     medcheck: true,
     medcheck_714: false,
@@ -1668,7 +1669,7 @@ const DIVISION_WORK_TYPES = {
   },
   maritime: {
     label: 'Морской / плавсостав',
-    icon: '⚓',
+    icon: 'anchor',
     soatDefault: '32',
     medcheck: true,
     medcheck_714: true,
@@ -1679,7 +1680,7 @@ const DIVISION_WORK_TYPES = {
   },
   port: {
     label: 'Портовые рабочие / докеры / стивидоры',
-    icon: '🚢',
+    icon: 'anchor',
     soatDefault: '32',
     medcheck: true,
     medcheck_714: false,
@@ -1690,7 +1691,7 @@ const DIVISION_WORK_TYPES = {
   },
   pasf: {
     label: 'ПАСФ / спасатели / аварийные службы',
-    icon: '🚨',
+    icon: 'alert-triangle',
     soatDefault: '33',
     medcheck: true,
     medcheck_714: false,
@@ -1701,7 +1702,7 @@ const DIVISION_WORK_TYPES = {
   },
   diver: {
     label: 'Водолазные работы',
-    icon: '🤿',
+    icon: 'anchor',
     soatDefault: '33',
     medcheck: true,
     medcheck_714: false,
@@ -1712,7 +1713,7 @@ const DIVISION_WORK_TYPES = {
   },
   height: {
     label: 'Работы на высоте',
-    icon: '🏗️',
+    icon: 'hard-hat',
     soatDefault: '31',
     medcheck: true,
     medcheck_714: false,
@@ -1723,7 +1724,7 @@ const DIVISION_WORK_TYPES = {
   },
   hazardous: {
     label: 'Опасные / вредные производства',
-    icon: '⚠️',
+    icon: 'alert-triangle',
     soatDefault: '34',
     medcheck: true,
     medcheck_714: false,
@@ -1781,13 +1782,13 @@ function calcNextDate(dateStr, tt) {
 
 function trainingStatus(tt, t) {
   if (!t?.required) return { icon:'—', color:'var(--muted)', label:'Не требуется', days:null };
-  if (!t?.date)     return { icon:'❌', color:'var(--red)',   label:'Не пройдено',  days:null };
+  if (!t?.date)     return { icon:'x-circle', color:'var(--red)',   label:'Не пройдено',  days:null };
   const next = calcNextDate(t.date, tt);
   const days = Math.ceil((next - new Date()) / 86400000);
-  if (days < 0)   return { icon:'🔴', color:'var(--red)',   label:`Просрочено ${Math.abs(days)} дн.`, days };
-  if (days <= 14) return { icon:'🟠', color:'var(--amber)', label:`${days} дн.`,   days };
-  if (days <= 30) return { icon:'🟡', color:'var(--amber)', label:`${days} дн.`,   days };
-  return { icon:'✅', color:'var(--green)', label:formatDate(next.toISOString()), days };
+  if (days < 0)   return { icon:'circle', color:'var(--red)',   label:`Просрочено ${Math.abs(days)} дн.`, days };
+  if (days <= 14) return { icon:'circle', color:'var(--amber)', label:`${days} дн.`,   days };
+  if (days <= 30) return { icon:'circle', color:'var(--amber)', label:`${days} дн.`,   days };
+  return { icon:'check-circle', color:'var(--green)', label:formatDate(next.toISOString()), days };
 }
 
 async function openTraining(empId) {
@@ -1823,7 +1824,7 @@ async function openTraining(empId) {
           <input type="date" id="tr-date-${tt.key}" value="${t.date||''}" style="width:100%;padding:6px 8px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#f1f5f9;font-size:12px;outline:none" ${!t.required?'disabled':''}>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:13px">${st.icon}</span>
+          <span style="font-size:13px;color:${st.color}">${st.icon === '—' ? '—' : ic(st.icon,13)}</span>
           <span style="font-size:11px;font-weight:600;color:${st.color}">${st.label}</span>
         </div>
       </div>`;
@@ -1885,7 +1886,7 @@ async function saveTraining(empId) {
 
   await window.api.trainingUpdate(empId, training);
   document.getElementById('trainingModal')?.remove();
-  showToast('✅ Данные обучения сохранены');
+  showToast('Данные обучения сохранены');
   await navigate('client', currentClientId);
 }
 
@@ -1940,7 +1941,7 @@ async function addEmployeePrompt(clientId) {
   const divOptions = clientDivisions.length
     ? `<option value="">— Без подразделения —</option>` + clientDivisions.map(d => {
         const wt = DIVISION_WORK_TYPES[d.work_type] || DIVISION_WORK_TYPES.standard;
-        return `<option value="${d.id}">${wt.icon} ${d.name}</option>`;
+        return `<option value="${d.id}">${d.name}</option>`;
       }).join('')
     : `<option value="">— Подразделения не созданы —</option>`;
 
@@ -1948,7 +1949,7 @@ async function addEmployeePrompt(clientId) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
   modal.innerHTML = `
     <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
-      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">➕ Добавить сотрудника</div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">${ic("plus",16)} Добавить сотрудника</div>
       <div style="margin-bottom:14px">
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью <span style="color:#f87171">*</span></label>
         <input id="emp-name" placeholder="Иванов Иван Иванович" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
@@ -1959,7 +1960,7 @@ async function addEmployeePrompt(clientId) {
       </div>
       ${clientDivisions.length ? `
       <div style="margin-bottom:14px">
-        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">🏢 Подразделение</label>
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">${ic("building",12)} Подразделение</label>
         <select id="emp-division" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
           ${divOptions}
         </select>
@@ -1994,11 +1995,11 @@ async function addEmployeePrompt(clientId) {
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
           <input type="checkbox" id="emp-prog-b-exempt" style="width:16px;height:16px;cursor:pointer">
-          ${ic("clipboard-list",14)} Освобождён от Программы Б (только ПЭВМ/офис)
+          ${ic("clipboard-list",14)} Освобождён от первичного инструктажа на РМ (только ПЭВМ/офис)
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
           <input type="checkbox" id="emp-medcheck" style="width:16px;height:16px;cursor:pointer">
-          🏥 Требуется медосмотр
+          ${ic("heart",14)} Требуется медосмотр
         </label>
       </div>
 
@@ -2096,7 +2097,7 @@ async function addEmployeePrompt(clientId) {
       }
 
       const saveBtn = document.getElementById('emp-save');
-      saveBtn.textContent = '⏳ Обработка...';
+      saveBtn.innerHTML = `${ic("refresh",14)} Обработка...`;
       saveBtn.disabled = true;
 
       // Склоняем ФИО через AI
@@ -2131,9 +2132,9 @@ async function addEmployeePrompt(clientId) {
       });
 
       if (declension?.dat) {
-        showToast('✅ Сотрудник добавлен · ' + declension.short);
+        showToast('Сотрудник добавлен · ' + declension.short);
       } else {
-        showToast('✅ Сотрудник добавлен');
+        showToast('Сотрудник добавлен');
       }
       // Обновляем счётчик сотрудников в базе клиента
       const updatedEmps = await window.api.employeesList(clientId);
@@ -2158,7 +2159,7 @@ async function editEmployeePrompt(empId) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
   modal.innerHTML = `
     <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:420px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
-      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">✏️ Редактировать сотрудника</div>
+      <div style="font-size:16px;font-weight:700;color:#f1f5f9;margin-bottom:20px">${ic("edit",16)} Редактировать сотрудника</div>
       <div style="margin-bottom:14px">
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">ФИО полностью</label>
         <input id="edit-emp-name" value="${e.full_name||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
@@ -2178,11 +2179,11 @@ async function editEmployeePrompt(empId) {
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
           <input type="checkbox" id="edit-emp-prog-b-exempt" ${e.prog_b_exempt?'checked':''} style="width:16px;height:16px;cursor:pointer">
-          ${ic("clipboard-list",14)} Освобождён от Программы Б (только ПЭВМ/офис)
+          ${ic("clipboard-list",14)} Освобождён от первичного инструктажа на РМ (только ПЭВМ/офис)
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:#94a3b8">
           <input type="checkbox" id="edit-emp-medcheck" ${e.medcheck_required?'checked':''} style="width:16px;height:16px;cursor:pointer">
-          🏥 Требуется медосмотр
+          ${ic("heart",14)} Требуется медосмотр
         </label>
       </div>
 
@@ -2260,7 +2261,7 @@ async function editEmployeePrompt(empId) {
       if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
 
       const saveBtn2 = document.getElementById('edit-emp-save');
-      saveBtn2.textContent = '⏳ Обработка...';
+      saveBtn2.innerHTML = `${ic("refresh",14)} Обработка...`;
       saveBtn2.disabled = true;
 
       let declension = null;
@@ -2296,9 +2297,9 @@ async function editEmployeePrompt(empId) {
         return;
       }
       if (declension?.dat) {
-        showToast('✅ Сотрудник обновлён · ' + declension.short);
+        showToast('Сотрудник обновлён · ' + declension.short);
       } else {
-        showToast('✅ Сотрудник обновлён');
+        showToast('Сотрудник обновлён');
       }
       await navigate('client', currentClientId);
       resolve(true);

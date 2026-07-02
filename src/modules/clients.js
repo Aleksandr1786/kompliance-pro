@@ -91,6 +91,7 @@ async function submitAddClient() {
     region:           document.getElementById('c-region')?.value || 'Краснодарский край',
     city:             document.getElementById('c-city')?.value?.trim() || '',
     address:          document.getElementById('c-address')?.value?.trim() || '',
+    address_actual:   document.getElementById('c-address-actual')?.value?.trim() || '',
     czn:              'ФГКУ КК ЦЗН в г. Новороссийске',
     phone:            document.getElementById('c-phone')?.value?.trim() || '',
     order_prefix:     parseInt(document.getElementById('c-order-prefix')?.value) || 1,
@@ -129,7 +130,7 @@ async function submitAddClient() {
   closeModal('modalAddClient');
   showToast(`Клиент "${name}" добавлен`);
   // Сбрасываем форму
-  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-ot-name','c-ot-position',
+  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-address-actual','c-ot-name','c-ot-position',
    'c-manager-name','c-contract-date','c-git-last-date','c-next-visit-date','c-git-next-date',
    'c-soat-total','c-soat-done','c-soat-c1','c-soat-c2','c-soat-c31','c-soat-c32','c-soat-c33','c-soat-c34','c-soat-c4','c-soat-med-req'
   ].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -188,6 +189,9 @@ async function openEditModal(clientId) {
         </div>
         <div class="form-row">
           <div class="form-group full"><div class="form-label">Юридический адрес</div><input class="form-input" id="e-address" placeholder="г. Новороссийск, ул. Примерная, д. 1"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group full"><div class="form-label">Фактический адрес</div><input class="form-input" id="e-address-actual" placeholder="Если совпадает с юридическим — оставьте пустым"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><div class="form-label">Телефон</div><input class="form-input" id="e-phone"></div>
@@ -313,6 +317,7 @@ async function openEditModal(clientId) {
   document.getElementById('e-phone').value         = c.phone            || '';
   document.getElementById('e-city').value          = c.city             || '';
   document.getElementById('e-address').value       = c.address          || '';
+  document.getElementById('e-address-actual').value = c.address_actual   || '';
   document.getElementById('e-order-prefix').value  = c.order_prefix     || 1;
   document.getElementById('e-manager-name').value  = c.manager_name     || '';
   document.getElementById('e-ot-position').value   = c.ot_position      || '';
@@ -389,6 +394,7 @@ async function submitEditClient(clientId) {
     city:             document.getElementById('e-city').value.trim(),
     phone:            document.getElementById('e-phone').value.trim(),
     address:          document.getElementById('e-address').value.trim(),
+    address_actual:   document.getElementById('e-address-actual').value.trim(),
     order_prefix:     parseInt(document.getElementById('e-order-prefix').value) || 1,
     manager_name:     document.getElementById('e-manager-name').value.trim(),
     manager_position: document.getElementById('e-manager-position').value,

@@ -3,6 +3,8 @@ const { autoUpdater } = require('electron-updater');
 const { generatePackage } = require('./generator');
 const { generateSoutPackage } = require('./gen_sout');
 const path = require('path');
+// Загружаем .env из корня проекта (файл не попадает в git)
+try { require('dotenv').config({ path: path.join(__dirname, '.env') }); } catch(_) {}
 const fs = require('fs');
 
 // ─── База данных на JSON (не требует компиляции) ──────────
@@ -1512,9 +1514,9 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
 });
 
 // ─── AI ЗАПРОСЫ ──────────────────────────────────────────
-// Ключ по умолчанию — используется если пользователь не указал свой.
-// Хранится только в Node-процессе, недоступен из рендерера.
-const DEFAULT_AI_KEY = 'sk-58fb8332fb694765bdf29e7e9637fa31';
+// Ключ читается из .env файла (не попадает в репозиторий).
+// .env лежит в корне проекта и добавлен в .gitignore.
+const DEFAULT_AI_KEY = process.env.DEEPSEEK_API_KEY || '';
 const DEFAULT_AI_PROVIDER = 'deepseek';
 
 async function callAI(prompt, system) {

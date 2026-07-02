@@ -3,8 +3,6 @@ const { autoUpdater } = require('electron-updater');
 const { generatePackage } = require('./generator');
 const { generateSoutPackage } = require('./gen_sout');
 const path = require('path');
-// Загружаем .env из корня проекта (файл не попадает в git)
-try { require('dotenv').config({ path: path.join(__dirname, '.env') }); } catch(_) {}
 const fs = require('fs');
 
 // ─── База данных на JSON (не требует компиляции) ──────────
@@ -214,7 +212,7 @@ function initDB() {
       npa_last_check_date: '',
       autostart: '0',
       backup_path: '',
-      ai_provider: 'deepseek',
+      ai_provider: 'claude',
       ai_key: '',
       remind_weekends: '1',
       remind_escalate: '1',
@@ -1514,17 +1512,22 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
 });
 
 // ─── AI ЗАПРОСЫ ──────────────────────────────────────────
-// Ключ читается из .env файла (не попадает в репозиторий).
-// .env лежит в корне проекта и добавлен в .gitignore.
-const DEFAULT_AI_KEY = process.env.DEEPSEEK_API_KEY || '';
-const DEFAULT_AI_PROVIDER = 'deepseek';
+// Ключ DeepSeek хранится на сервере kompliancepro.ru/ai-proxy.php
+// В приложении ключ не хранится и в репозиторий не попадает
+const AI_PROXY_URL = 'https://kompliancepro.ru/ai-proxy.php';
 
 async function callAI(prompt, system) {
   const s = db.get('settings').value();
-  const provider = s.ai_provider || DEFAULT_AI_PROVIDER;
-  const apiKey   = s.ai_key || DEFAULT_AI_KEY;
+  const provider = s.ai_provider || 'deepseek';
+  const apiKey   = s.ai_key || '';
 
-  if (!apiKey) return { ok: false, error: 'API ключ не указан в настройках' };
+  // Если есть пользовательский ключ — используем напрямую
+  // Если нет — для DeepSeek используем прокси
+  const useProxy = !apiKey && provider !== 'claude';
+
+  if (!apiKey && provider === 'claude') {
+    return { ok: false, error: 'API ключ не указан в настройках' };
+  }
 
   try {
     let url, headers, body;
@@ -1543,11 +1546,11 @@ async function callAI(prompt, system) {
         messages:   [{ role: 'user', content: prompt }],
       });
     } else {
-      // DeepSeek — OpenAI-совместимый формат
-      url = 'https://api.deepseek.com/v1/chat/completions';
+      // DeepSeek — через прокси или напрямую с ключом пользователя
+      url = useProxy ? AI_PROXY_URL : 'https://api.deepseek.com/v1/chat/completions';
       headers = {
         'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + apiKey,
+        ...(!useProxy && { 'Authorization': 'Bearer ' + apiKey }),
       };
       body = JSON.stringify({
         model:       'deepseek-chat',

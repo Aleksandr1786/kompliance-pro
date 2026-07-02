@@ -609,6 +609,7 @@ async function renderClientCard(id) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <div class="panel-title">Сотрудники</div>
           <div class="panel-count">${emps.length} чел.</div>
+          <div class="panel-action" onclick="importEmployeesPrompt(${id})" style="margin-right:14px">${ic('upload',12)} Импорт из файла</div>
           <div class="panel-action" onclick="addEmployeePrompt(${id})">+ Добавить</div>
         </div>
         <div>${emps.length ? emps.map(e=>renderEmpRow(e, divisions)).join('') : `<div class="empty-state"><div class="empty-icon">${ic("users",32)}</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>`}</div>
@@ -1936,6 +1937,68 @@ async function declinePosition(positionText) {
   }
 }
 
+// Сворачиваемый блок «Паспортные данные» (СНИЛС + паспорт) — общий для форм
+// добавления и редактирования сотрудника. prefix различает id полей между
+// двумя формами (emp / edit-emp), e — существующий сотрудник при редактировании
+// (для добавления передаём null, тогда все поля пустые).
+function passportBlockHtml(prefix, e) {
+  const v = (key) => e?.[key] || '';
+  const hasData = e && (e.snils || e.passport_series || e.passport_number || e.passport_issued_by || e.passport_issued_date);
+  return `
+      <div class="panel" style="padding:0;margin-bottom:16px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;overflow:hidden">
+        <div onclick="togglePassportBlock('${prefix}')" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;user-select:none">
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:6px">
+            ${ic('id-card',13)} Паспортные данные ${hasData ? '' : '<span style="font-weight:400;text-transform:none;color:#475569">(необязательно)</span>'}
+          </div>
+          <svg id="${prefix}-passport-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;transition:transform .2s;${hasData ? 'transform:rotate(180deg)' : ''}"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="${prefix}-passport-body" style="display:${hasData ? 'block' : 'none'};padding:0 14px 14px">
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px">СНИЛС</label>
+            <input id="${prefix}-snils" value="${v('snils')}" placeholder="123-456-789 00" style="width:100%;padding:9px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+            <div>
+              <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px">Серия паспорта</label>
+              <input id="${prefix}-pass-series" value="${v('passport_series')}" placeholder="0000" style="width:100%;padding:9px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px">Номер паспорта</label>
+              <input id="${prefix}-pass-number" value="${v('passport_number')}" placeholder="000000" style="width:100%;padding:9px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+            </div>
+          </div>
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px">Кем выдан</label>
+            <input id="${prefix}-pass-issued-by" value="${v('passport_issued_by')}" placeholder="УМВД России по г. ..." style="width:100%;padding:9px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#475569;display:block;margin-bottom:5px">Дата выдачи</label>
+            <input id="${prefix}-pass-issued-date" type="date" value="${v('passport_issued_date')}" style="width:100%;padding:9px 10px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+          </div>
+        </div>
+      </div>`;
+}
+
+function togglePassportBlock(prefix) {
+  const body = document.getElementById(`${prefix}-passport-body`);
+  const chevron = document.getElementById(`${prefix}-passport-chevron`);
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  chevron.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+// Считывает значения блока «Паспортные данные» из формы по prefix — общая
+// логика для обработчиков сохранения в addEmployeePrompt и editEmployeePrompt.
+function readPassportBlock(prefix) {
+  return {
+    snils:                  document.getElementById(`${prefix}-snils`)?.value.trim() || '',
+    passport_series:        document.getElementById(`${prefix}-pass-series`)?.value.trim() || '',
+    passport_number:        document.getElementById(`${prefix}-pass-number`)?.value.trim() || '',
+    passport_issued_by:     document.getElementById(`${prefix}-pass-issued-by`)?.value.trim() || '',
+    passport_issued_date:   document.getElementById(`${prefix}-pass-issued-date`)?.value || '',
+  };
+}
+
 async function addEmployeePrompt(clientId) {
   const clientDivisions = await window.api.divisionsList(clientId);
   const divOptions = clientDivisions.length
@@ -2002,6 +2065,8 @@ async function addEmployeePrompt(clientId) {
           ${ic("heart",14)} Требуется медосмотр
         </label>
       </div>
+
+      ${passportBlockHtml('emp', null)}
 
       <!-- Воинский учёт -->
       <div style="padding:14px;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:10px;margin-bottom:16px">
@@ -2080,6 +2145,7 @@ async function addEmployeePrompt(clientId) {
       const vuCat     = document.getElementById('emp-vu-cat')?.value || '';
       const vuRank    = document.getElementById('emp-vu-rank')?.value || '';
       const vuMobpred = document.getElementById('emp-vu-mobpred')?.checked || false;
+      const passportData = readPassportBlock('emp');
 
       if (!name) {
         const el = document.getElementById('emp-name');
@@ -2129,6 +2195,7 @@ async function addEmployeePrompt(clientId) {
         vu_category:       vuCat,
         vu_rank:           vuRank,
         vu_mobpredpisanie: vuMobpred ? 1 : 0,
+        ...passportData,
       });
 
       if (declension?.dat) {
@@ -2186,6 +2253,8 @@ async function editEmployeePrompt(empId) {
           ${ic("heart",14)} Требуется медосмотр
         </label>
       </div>
+
+      ${passportBlockHtml('edit-emp', e)}
 
       <!-- Воинский учёт -->
       <div style="padding:14px;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.15);border-radius:10px;margin-bottom:16px">
@@ -2258,6 +2327,7 @@ async function editEmployeePrompt(empId) {
       const vuCat2     = document.getElementById('edit-emp-vu-cat')?.value || '';
       const vuRank2    = document.getElementById('edit-emp-vu-rank')?.value || '';
       const vuMobpred2 = document.getElementById('edit-emp-vu-mobpred')?.checked || false;
+      const passportData2 = readPassportBlock('edit-emp');
       if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
 
       const saveBtn2 = document.getElementById('edit-emp-save');
@@ -2289,6 +2359,7 @@ async function editEmployeePrompt(empId) {
         name_acc:          declension?.acc   || '',
         name_ins:          declension?.ins   || '',
         name_short:        declension?.short || '',
+        ...passportData2,
       });
       if (empResult?.error) {
         showToast(empResult.error, 'var(--red)');

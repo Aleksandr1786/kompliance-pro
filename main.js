@@ -34,7 +34,7 @@ function updateLog(msg) {
 // - Никогда не удаляй существующие миграции
 // - Нумерация строго последовательная: 1, 2, 3...
 
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const MIGRATIONS = [
   {
@@ -122,6 +122,28 @@ const MIGRATIONS = [
       db.get('clients').each(c => {
         if (c.sout_data === undefined) c.sout_data = null;
         if (c.address_actual === undefined) c.address_actual = '';
+      }).write();
+    }
+  },
+
+  // ── v4: СНИЛС/паспорт сотрудника + сохранённый маппинг импорта из 1С/Excel ──
+  {
+    version: 4,
+    description: 'Добавление snils/паспорта сотрудникам и import_mapping клиентам (импорт из 1С/Excel/CSV)',
+    up(db) {
+      db.get('employees').each(e => {
+        if (e.snils                  === undefined) e.snils                  = '';
+        if (e.passport_series        === undefined) e.passport_series        = '';
+        if (e.passport_number        === undefined) e.passport_number        = '';
+        if (e.passport_issued_by     === undefined) e.passport_issued_by     = '';
+        if (e.passport_issued_date   === undefined) e.passport_issued_date   = '';
+      }).write();
+
+      db.get('clients').each(c => {
+        // Маппинг колонок файла импорта → поля сотрудника, запоминается
+        // per-клиент, чтобы при повторном импорте (например, ежемесячная
+        // выгрузка из 1С) не настраивать соответствие заново.
+        if (c.import_mapping === undefined) c.import_mapping = null;
       }).write();
     }
   },
@@ -331,7 +353,24 @@ function validateEmployee(data, partial) {
   if ((!partial || 'position' in data) && !data.position?.trim()) {
     return { error: 'Должность обязательна' };
   }
+  // СНИЛС необязателен, но если указан — проверяем формат (11 цифр)
+  if ('snils' in data && data.snils) {
+    const digits = String(data.snils).replace(/\D/g, '');
+    if (digits.length !== 11) {
+      return { error: 'СНИЛС должен содержать 11 цифр' };
+    }
+  }
   return null;
+}
+
+/**
+ * Нормализует СНИЛС к виду "123-456-789 00" из произвольного ввода
+ * (1С часто выгружает либо чистые цифры, либо уже отформатированную строку).
+ */
+function normalizeSnils(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length !== 11) return String(raw || '').trim();
+  return `${digits.slice(0,3)}-${digits.slice(3,6)}-${digits.slice(6,9)} ${digits.slice(9)}`;
 }
 
 /**
@@ -479,6 +518,143 @@ ipcMain.handle('employees:update', (_, id, data) => {
 ipcMain.handle('employees:delete', (_, id) => {
   db.get('employees').remove({ id }).write();
   return { ok: true };
+});
+
+// ─── ИМПОРТ СОТРУДНИКОВ ИЗ ФАЙЛА (1С/Excel/CSV) ──────────
+//
+// rows — массив уже смэппленных объектов { full_name, position, ... } с
+// фронтенда (парсинг файла и мэппинг колонок делает employee-import.js).
+// resolutions — карта { [rowIndex]: 'update' | 'skip' | 'create' } для строк,
+// у которых нашлось совпадение по ФИО+СНИЛС с уже существующим сотрудником;
+// если для строки нет записи в resolutions — считаем, что дублей нет, и
+// создаём нового сотрудника.
+ipcMain.handle('employees:import', (_, clientId, rows, resolutions) => {
+  const result = { created: 0, updated: 0, skipped: 0, errors: [] };
+  const existing = db.get('employees').filter({ client_id: clientId }).value();
+
+  rows.forEach((row, idx) => {
+    const data = { ...row, client_id: clientId };
+    if (data.snils) data.snils = normalizeSnils(data.snils);
+
+    const resolution = resolutions?.[idx];
+    const match = existing.find(e =>
+      e.full_name?.trim().toLowerCase() === data.full_name?.trim().toLowerCase() &&
+      (!data.snils || !e.snils || e.snils === data.snils)
+    );
+
+    if (match && resolution === 'skip') {
+      result.skipped++;
+      return;
+    }
+
+    if (match && (resolution === 'update' || resolution === undefined)) {
+      const err = validateEmployee(data, true);
+      if (err) { result.errors.push({ row: idx, ...err }); return; }
+      db.get('employees').find({ id: match.id }).assign(data).write();
+      result.updated++;
+      return;
+    }
+
+    // Новый сотрудник (нет совпадения, либо пользователь явно выбрал "создать")
+    const err = validateEmployee(data, false);
+    if (err) { result.errors.push({ row: idx, ...err }); return; }
+    const id = nextId('employees');
+    db.get('employees').push({ ...data, id }).write();
+    result.created++;
+  });
+
+  return result;
+});
+
+// Сохранение/чтение маппинга колонок файла → полей сотрудника, per-клиент,
+// чтобы при повторном импорте (регулярная выгрузка из 1С) не настраивать
+// соответствие заново.
+ipcMain.handle('clients:get-import-mapping', (_, clientId) => {
+  return db.get('clients').find({ id: clientId }).value()?.import_mapping || null;
+});
+
+ipcMain.handle('clients:save-import-mapping', (_, clientId, mapping) => {
+  db.get('clients').find({ id: clientId }).assign({ import_mapping: mapping }).write();
+  return { ok: true };
+});
+
+// Открывает системный диалог выбора файла, отфильтрованный под Excel/CSV.
+// Возвращает путь к файлу или null, если пользователь отменил.
+ipcMain.handle('employees:pick-import-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Выберите файл со списком сотрудников',
+    filters: [
+      { name: 'Таблицы', extensions: ['xlsx', 'xls', 'csv'] },
+      { name: 'Все файлы', extensions: ['*'] },
+    ],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  return result.filePaths[0];
+});
+
+// Читает файл (xlsx/xls/csv) и возвращает "сырые" строки как массив массивов
+// (первая строка обычно — заголовки 1С). Парсинг через xlsx делаем в main-
+// процессе, т.к. Node-модуль 'xlsx' надёжнее читает файлы с диска, чем
+// FileReader в рендерере, и не тянет доступ к произвольным путям во фронтенд.
+// Простой парсер строки CSV с поддержкой кавычек (запятая/точка с запятой
+// внутри "поля в кавычках" не считается разделителем).
+function parseCsvLine(line, delimiter) {
+  const result = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        cur += ch;
+      }
+    } else {
+      if (ch === '"') inQuotes = true;
+      else if (ch === delimiter) { result.push(cur); cur = ''; }
+      else cur += ch;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+ipcMain.handle('employees:read-import-file', (_, filePath) => {
+  try {
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === '.csv') {
+      // Читаем как текст напрямую — библиотека xlsx у CSV нередко путает
+      // кодировку (двойное декодирование UTF-8) и не всегда угадывает
+      // разделитель ';', которым обычно выгружает 1С. Поэтому парсим сами.
+      let text = fs.readFileSync(filePath, 'utf8');
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // срезаем BOM
+
+      const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim() !== '');
+      if (!lines.length) return { rows: [] };
+
+      // Автоопределение разделителя по первой строке — считаем, каких
+      // разделителей больше вне кавычек: запятых или точек с запятой.
+      const semicolons = (lines[0].match(/;/g) || []).length;
+      const commas = (lines[0].match(/,/g) || []).length;
+      const delimiter = semicolons >= commas ? ';' : ',';
+
+      const rows = lines.map(l => parseCsvLine(l, delimiter));
+      return { rows };
+    }
+
+    // .xlsx / .xls — обычное бинарное чтение через библиотеку xlsx
+    const XLSX = require('xlsx');
+    const wb = XLSX.readFile(filePath);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+    return { rows };
+  } catch (e) {
+    return { error: 'Не удалось прочитать файл: ' + e.message };
+  }
 });
 
 // ─── ДОКУМЕНТЫ ───────────────────────────────────────────

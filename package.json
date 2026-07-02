@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.37",
+  "version": "1.0.38",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -16,7 +16,8 @@
     "docx": "^9.7.1",
     "dotenv": "^17.4.2",
     "electron-updater": "^6.1.7",
-    "lowdb": "1.0.0"
+    "lowdb": "1.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "electron": "^29.0.0",

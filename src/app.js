@@ -92,16 +92,16 @@ function applySettings() {
   document.getElementById('userRole').textContent = settings.user_position || 'Специалист по ОТ';
   applyNavTerms();
 
-  const hasKey = settings.ai_key && settings.ai_key.length > 10;
+  const hasKey = true; // Ключ DeepSeek встроен по умолчанию
   const dot = document.querySelector('.ai-dot');
   const txt = document.getElementById('aiStatusText');
 
   if (hasKey) {
     dot.classList.add('active');
-    // Admin видит название провайдера, пользователь — нейтральный текст
     if (IS_ADMIN) {
       const providerNames = { deepseek:'DeepSeek', claude:'Claude', yandex:'YandexGPT', giga:'GigaChat', ollama:'Ollama' };
-      txt.textContent = (providerNames[settings.ai_provider] || 'AI') + ' активен';
+      const provider = settings.ai_provider || 'deepseek';
+      txt.textContent = (providerNames[provider] || 'AI') + ' активен';
     } else {
       txt.textContent = '✨ Контроль активен';
     }

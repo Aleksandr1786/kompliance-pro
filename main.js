@@ -212,7 +212,7 @@ function initDB() {
       npa_last_check_date: '',
       autostart: '0',
       backup_path: '',
-      ai_provider: 'claude',
+      ai_provider: 'deepseek',
       ai_key: '',
       remind_weekends: '1',
       remind_escalate: '1',
@@ -1512,10 +1512,15 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
 });
 
 // ─── AI ЗАПРОСЫ ──────────────────────────────────────────
+// Ключ по умолчанию — используется если пользователь не указал свой.
+// Хранится только в Node-процессе, недоступен из рендерера.
+const DEFAULT_AI_KEY = 'sk-58fb8332fb694765bdf29e7e9637fa31';
+const DEFAULT_AI_PROVIDER = 'deepseek';
+
 async function callAI(prompt, system) {
   const s = db.get('settings').value();
-  const provider = s.ai_provider || 'deepseek';
-  const apiKey   = s.ai_key || '';
+  const provider = s.ai_provider || DEFAULT_AI_PROVIDER;
+  const apiKey   = s.ai_key || DEFAULT_AI_KEY;
 
   if (!apiKey) return { ok: false, error: 'API ключ не указан в настройках' };
 

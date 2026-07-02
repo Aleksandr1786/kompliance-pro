@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -14,8 +14,9 @@
   },
   "dependencies": {
     "docx": "^9.7.1",
-    "lowdb": "1.0.0",
-    "electron-updater": "^6.1.7"
+    "dotenv": "^17.4.2",
+    "electron-updater": "^6.1.7",
+    "lowdb": "1.0.0"
   },
   "devDependencies": {
     "electron": "^29.0.0",
@@ -32,7 +33,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",

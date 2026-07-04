@@ -558,7 +558,7 @@ async function renderClientCard(id) {
       <div style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted2);font-size:13px">Загрузка...</div>
     </div>
 
-    
+    <div class="tab-panel" id="tab-staff">
       <!-- Подразделения переехали внутрь вкладки «Сотрудники» — они группировка
            сотрудников, а не отдельный модуль. Блок сворачиваемый: открыт по
            умолчанию если подразделения есть, закрыт если нет. -->
@@ -577,23 +577,38 @@ async function renderClientCard(id) {
           <div style="display:flex;flex-direction:column;gap:8px">
             ${divisions.map(div => {
               const wt = DIVISION_WORK_TYPES[div.work_type] || DIVISION_WORK_TYPES.standard;
-              const empCount = emps.filter(e => e.division_id === div.id).length;
+              const divEmps = emps.filter(e => e.division_id === div.id);
+              const empCount = divEmps.length;
               const tags = [];
               if (wt.medcheck) tags.push(`<span style="font-size:10px;background:rgba(248,113,113,0.12);color:#f87171;padding:2px 7px;border-radius:10px">29н</span>`);
               if (wt.medcheck_714) tags.push(`<span style="font-size:10px;background:rgba(251,191,36,0.12);color:#fbbf24;padding:2px 7px;border-radius:10px">714н</span>`);
               if (wt.psycho) tags.push(`<span style="font-size:10px;background:rgba(167,139,250,0.12);color:#a78bfa;padding:2px 7px;border-radius:10px">психо</span>`);
               if (wt.siz) tags.push(`<span style="font-size:10px;background:rgba(96,165,250,0.12);color:#60a5fa;padding:2px 7px;border-radius:10px">СИЗ</span>`);
-              return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px">
-                <div style="font-size:18px;flex-shrink:0">${ic(wt.icon,18)}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;font-weight:600;color:var(--text)">${div.name}</div>
-                  <div style="font-size:11px;color:var(--muted2);margin-top:2px">${wt.label} · СОУТ класс ${div.soat_class || wt.soatDefault} · ${empCount} сотр.</div>
-                  ${tags.length ? `<div style="display:flex;gap:4px;margin-top:4px">${tags.join('')}</div>` : ''}
+              return `<div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                <div onclick="${empCount ? `toggleDivisionExpand(${div.id})` : ''}" style="display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:${empCount ? 'pointer' : 'default'};user-select:none">
+                  <div style="font-size:18px;flex-shrink:0">${ic(wt.icon,18)}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:600;color:var(--text)">${div.name}</div>
+                    <div style="font-size:11px;color:var(--muted2);margin-top:2px">${wt.label} · СОУТ класс ${div.soat_class || wt.soatDefault} · ${empCount} сотр.</div>
+                    ${tags.length ? `<div style="display:flex;gap:4px;margin-top:4px">${tags.join('')}</div>` : ''}
+                  </div>
+                  <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
+                    ${empCount ? `<svg id="div-chevron-${div.id}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;margin-right:4px"><polyline points="6 9 12 15 18 9"/></svg>` : ''}
+                    <button onclick="event.stopPropagation();openDivisionModal(${id}, ${div.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">${ic("edit",13)}</button>
+                    <button onclick="event.stopPropagation();deleteDivision(${div.id}, ${id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">${ic("trash",13)}</button>
+                  </div>
                 </div>
-                <div style="display:flex;gap:4px;flex-shrink:0">
-                  <button onclick="openDivisionModal(${id}, ${div.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">${ic("edit",13)}</button>
-                  <button onclick="deleteDivision(${div.id}, ${id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted2)'">${ic("trash",13)}</button>
-                </div>
+                ${empCount ? `
+                <div id="div-employees-${div.id}" style="display:none;border-top:1px solid var(--border);padding:6px 12px 10px">
+                  ${divEmps.map(e => `
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,0.03)">
+                      <div style="min-width:0">
+                        <div style="font-size:12px;color:var(--text)">${e.full_name}</div>
+                        <div style="font-size:10.5px;color:var(--muted2)">${e.position || '—'}${e.birth_date ? ' · ' + new Date(e.birth_date).getFullYear() + ' г.р.' : ''}</div>
+                      </div>
+                      <button onclick="event.stopPropagation();editEmployeePrompt(${e.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px;flex-shrink:0" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">${ic("edit",12)}</button>
+                    </div>`).join('')}
+                </div>` : ''}
               </div>`;
             }).join('')}
           </div>` : `
@@ -607,12 +622,29 @@ async function renderClientCard(id) {
       <div class="panel">
         <div class="panel-head">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <div class="panel-title">Сотрудники</div>
-          <div class="panel-count">${emps.length} чел.</div>
+          <div class="panel-title">${divisions.length ? 'Без подразделения' : 'Сотрудники'}</div>
+          <div class="panel-count">${(divisions.length ? emps.filter(e => !e.division_id) : emps).length} чел.</div>
+          <button onclick="showImportHelpModal()" title="Как это работает" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:2px 4px;margin-right:6px;display:inline-flex;align-items:center" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
+          <div class="panel-action" onclick="downloadEmployeeTemplate()" style="margin-right:14px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Шаблон</div>
           <div class="panel-action" onclick="importEmployeesPrompt(${id})" style="margin-right:14px">${ic('upload',12)} Импорт из файла</div>
           <div class="panel-action" onclick="addEmployeePrompt(${id})">+ Добавить</div>
         </div>
-        <div>${emps.length ? emps.map(e=>renderEmpRow(e, divisions)).join('') : `<div class="empty-state"><div class="empty-icon">${ic("users",32)}</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>`}</div>
+        ${(() => {
+          // Если у клиента есть подразделения — общий список схлопывается до
+          // сотрудников без подразделения (дубли с аккордеоном выше не нужны).
+          // Если подразделений нет вообще — список работает как раньше, без
+          // изменений, чтобы не усложнять простых клиентов.
+          const listEmps = divisions.length ? emps.filter(e => !e.division_id) : emps;
+          if (!emps.length) {
+            return `<div class="empty-state"><div class="empty-icon">${ic("users",32)}</div><div class="empty-title">Сотрудников нет</div><div class="empty-sub">Добавьте сотрудников для учёта обучений</div></div>`;
+          }
+          if (!listEmps.length) {
+            // Все сотрудники уже разложены по подразделениям — нечего показывать,
+            // но заголовок с кнопками добавления/импорта остаётся видимым.
+            return `<div style="padding:14px 0 4px;text-align:center;color:var(--muted2);font-size:12px">Все сотрудники распределены по подразделениям выше</div>`;
+          }
+          return `<div>${listEmps.map(e => renderEmpRow(e, divisions)).join('')}</div>`;
+        })()}
       </div>
     </div>
 
@@ -1999,6 +2031,16 @@ function readPassportBlock(prefix) {
   };
 }
 
+// Разворачивает/сворачивает список сотрудников внутри карточки подразделения
+function toggleDivisionExpand(divisionId) {
+  const body = document.getElementById(`div-employees-${divisionId}`);
+  const chevron = document.getElementById(`div-chevron-${divisionId}`);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)';
+}
+
 async function addEmployeePrompt(clientId) {
   const clientDivisions = await window.api.divisionsList(clientId);
   const divOptions = clientDivisions.length
@@ -2222,6 +2264,13 @@ async function editEmployeePrompt(empId) {
   const e = emps.find(x => x.id === empId);
   if (!e) return;
 
+  const editClientDivisions = await window.api.divisionsList(currentClientId);
+  const editDivOptions = editClientDivisions.length
+    ? `<option value="" ${!e.division_id ? 'selected' : ''}>— Без подразделения —</option>` + editClientDivisions.map(d =>
+        `<option value="${d.id}" ${e.division_id === d.id ? 'selected' : ''}>${d.name}</option>`
+      ).join('')
+    : '';
+
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
   modal.innerHTML = `
@@ -2235,6 +2284,13 @@ async function editEmployeePrompt(empId) {
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
         <input id="edit-emp-pos" value="${e.position||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
       </div>
+      ${editClientDivisions.length ? `
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">${ic("building",12)} Подразделение</label>
+        <select id="edit-emp-division" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          ${editDivOptions}
+        </select>
+      </div>` : ''}
       <div style="margin-bottom:14px">
         <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата рождения</label>
         <input id="edit-emp-birth" type="date" value="${e.birth_date||''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
@@ -2328,6 +2384,8 @@ async function editEmployeePrompt(empId) {
       const vuRank2    = document.getElementById('edit-emp-vu-rank')?.value || '';
       const vuMobpred2 = document.getElementById('edit-emp-vu-mobpred')?.checked || false;
       const passportData2 = readPassportBlock('edit-emp');
+      const divisionEl2 = document.getElementById('edit-emp-division');
+      const divisionId2 = divisionEl2 && divisionEl2.value ? parseInt(divisionEl2.value) : null;
       if (!name) { document.getElementById('edit-emp-name').style.border = '1px solid #f87171'; return; }
 
       const saveBtn2 = document.getElementById('edit-emp-save');
@@ -2354,6 +2412,7 @@ async function editEmployeePrompt(empId) {
         vu_rank:           vuRank2,
         vu_mobpredpisanie: vuMobpred2 ? 1 : 0,
         commission_role:   commissionRole || null,
+        division_id:       divisionId2,
         name_gen:          declension?.gen   || '',
         name_dat:          declension?.dat   || '',
         name_acc:          declension?.acc   || '',

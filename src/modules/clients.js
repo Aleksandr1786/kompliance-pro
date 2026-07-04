@@ -11,9 +11,19 @@ async function renderClients() {
   btn.style.display = 'flex';
   btn.onclick = () => openModal('modalAddClient');
 
+  // Массовый импорт по нескольким организациям имеет смысл только для
+  // аутсорсера (ведёт несколько клиентов сразу) — у штатного специалиста
+  // всегда ровно одна компания, распределять сотрудников по организациям
+  // физически нечего, кнопка была бы лишней и путающей.
+  const settings = await window.api.settingsGet();
+  const isOutsourcer = settings?.license_type !== 'SOLO';
+  const bulkImportBtn = isOutsourcer
+    ? `<div class="panel-action" onclick="importEmployeesBulkPrompt()" style="margin-left:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline;vertical-align:-2px;margin-right:3px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Массовый импорт сотрудников</div>`
+    : '';
+
   document.getElementById('content').innerHTML = `
     <div class="panel">
-      <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Все ${term('clients')}</div><div class="panel-count">${clients.length} организаций</div></div>
+      <div class="panel-head"><span style="display:flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><div class="panel-title">Все ${term('clients')}</div><div class="panel-count">${clients.length} организаций</div>${bulkImportBtn}</div>
       <div class="client-search"><input class="search-input" placeholder="🔍 Поиск по названию, ИНН, ОКВЭД..." oninput="filterClients(this.value)" id="clientSearch"></div>
       <div id="fullClientList">${renderClientRows(clients)}</div>
     </div>
@@ -83,7 +93,7 @@ async function submitAddClient() {
   const data = {
     name,
     inn:    document.getElementById('c-inn')?.value?.trim() || '',
-    ogrn:   '',
+    ogrn:   document.getElementById('c-ogrn')?.value?.trim() || '',
     okved,
     okved_extra: '',
     form:   document.getElementById('c-form')?.value || 'ООО',
@@ -95,7 +105,7 @@ async function submitAddClient() {
     czn:              'ФГКУ КК ЦЗН в г. Новороссийске',
     phone:            document.getElementById('c-phone')?.value?.trim() || '',
     order_prefix:     parseInt(document.getElementById('c-order-prefix')?.value) || 1,
-    email:            '',
+    email:            document.getElementById('c-email')?.value?.trim() || '',
     modules:          mods || 'OT',
     manager_name:     document.getElementById('c-manager-name')?.value?.trim() || '',
     manager_position: document.getElementById('c-manager-position')?.value || 'Руководитель',
@@ -130,7 +140,7 @@ async function submitAddClient() {
   closeModal('modalAddClient');
   showToast(`Клиент "${name}" добавлен`);
   // Сбрасываем форму
-  ['c-name','c-inn','c-okved','c-staff','c-phone','c-city','c-address','c-address-actual','c-ot-name','c-ot-position',
+  ['c-name','c-inn','c-ogrn','c-email','c-okved','c-staff','c-phone','c-city','c-address','c-address-actual','c-ot-name','c-ot-position',
    'c-manager-name','c-contract-date','c-git-last-date','c-next-visit-date','c-git-next-date',
    'c-soat-total','c-soat-done','c-soat-c1','c-soat-c2','c-soat-c31','c-soat-c32','c-soat-c33','c-soat-c34','c-soat-c4','c-soat-med-req'
   ].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -172,6 +182,10 @@ async function openEditModal(clientId) {
               <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
             </select>
           </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">ОГРН</div><input class="form-input" id="e-ogrn" placeholder="1027700000000"></div>
+          <div class="form-group"><div class="form-label">Email</div><input class="form-input" id="e-email" type="email" placeholder="info@company.ru"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><div class="form-label">ОКВЭД <span class="req">*</span></div><input class="form-input" id="e-okved"></div>
@@ -312,6 +326,8 @@ async function openEditModal(clientId) {
   // Заполняем форму текущими данными
   document.getElementById('e-name').value          = c.name             || '';
   document.getElementById('e-inn').value           = c.inn              || '';
+  document.getElementById('e-ogrn').value          = c.ogrn             || '';
+  document.getElementById('e-email').value         = c.email            || '';
   document.getElementById('e-okved').value         = c.okved            || '';
   document.getElementById('e-staff').value         = c.staff            || '';
   document.getElementById('e-phone').value         = c.phone            || '';
@@ -387,6 +403,8 @@ async function submitEditClient(clientId) {
   const data = {
     name,
     inn:              document.getElementById('e-inn').value.trim(),
+    ogrn:             document.getElementById('e-ogrn').value.trim(),
+    email:            document.getElementById('e-email').value.trim(),
     okved,
     staff:            parseInt(document.getElementById('e-staff').value) || 0,
     form:             document.getElementById('e-form').value,

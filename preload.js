@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('api', {
   employeesPickImportFile: ()          => ipcRenderer.invoke('employees:pick-import-file'),
   employeesReadImportFile: (filePath)  => ipcRenderer.invoke('employees:read-import-file', filePath),
   employeesImport:         (cid, rows, resolutions) => ipcRenderer.invoke('employees:import', cid, rows, resolutions),
+  employeesDownloadTemplate: ()        => ipcRenderer.invoke('employees:download-template'),
   clientGetImportMapping:  (cid)          => ipcRenderer.invoke('clients:get-import-mapping', cid),
   clientSaveImportMapping: (cid, mapping) => ipcRenderer.invoke('clients:save-import-mapping', cid, mapping),
   trainingGet:    (id)        => ipcRenderer.invoke('training:get', id),

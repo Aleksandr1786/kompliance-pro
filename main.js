@@ -34,7 +34,7 @@ function updateLog(msg) {
 // - Никогда не удаляй существующие миграции
 // - Нумерация строго последовательная: 1, 2, 3...
 
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const MIGRATIONS = [
   {
@@ -144,6 +144,19 @@ const MIGRATIONS = [
         // per-клиент, чтобы при повторном импорте (например, ежемесячная
         // выгрузка из 1С) не настраивать соответствие заново.
         if (c.import_mapping === undefined) c.import_mapping = null;
+      }).write();
+    }
+  },
+
+  // ── v5: ОГРН и контактный email — нужны для полной шапки формы отчёта ЦЗН
+  // (Постановление №1591 требует ОГРН и email отдельно от ИНН/телефона) ──
+  {
+    version: 5,
+    description: 'Добавление ogrn/email клиентам для шапки отчёта ЦЗН',
+    up(db) {
+      db.get('clients').each(c => {
+        if (c.ogrn  === undefined) c.ogrn  = '';
+        if (c.email === undefined) c.email = '';
       }).write();
     }
   },
@@ -447,6 +460,8 @@ ipcMain.handle('clients:delete', (_, id) => {
   db.get('documents').remove({ client_id: id }).write();
   db.get('events').remove({ client_id: id }).write();
   db.get('tasks').remove({ client_id: id }).write();
+  db.get('divisions').remove({ client_id: id }).write();
+  db.get('certifications').remove({ client_id: id }).write();
   return { ok: true };
 });
 
@@ -513,6 +528,41 @@ ipcMain.handle('employees:update', (_, id, data) => {
   if (err) return err;
   db.get('employees').find({ id }).assign(data).write();
   return { ok: true };
+});
+
+// Генерирует шаблон для импорта сотрудников (xlsx) с заголовками и примером
+// строки — чтобы клиент мог выгрузить из 1С в этом формате и импортировать
+// без ручного мэппинга колонок.
+ipcMain.handle('employees:download-template', async () => {
+  try {
+    const XLSX = require('xlsx');
+    const headers = [
+      'ФИО', 'Должность', 'Подразделение', 'Дата рождения', 'Дата приёма',
+      'Табельный номер', 'СНИЛС', 'Серия паспорта', 'Номер паспорта',
+      'Кем выдан', 'Дата выдачи паспорта',
+    ];
+    const example = [
+      'Иванов Иван Иванович', 'Водитель', 'Транспортный отдел', '1985-06-01', '2022-03-14',
+      '0001', '112-233-445 95', '0314', '556677',
+      'УМВД России по г. Новороссийску', '2015-04-20',
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, example]);
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 2, 16) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Сотрудники');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    const res = await dialog.showSaveDialog(mainWindow, {
+      title: 'Сохранить шаблон импорта',
+      defaultPath: path.join(app.getPath('desktop'), 'Шаблон_импорта_сотрудников.xlsx'),
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+    });
+    if (res.canceled) return { ok: false, canceled: true };
+    fs.writeFileSync(res.filePath, buffer);
+    return { ok: true, filePath: res.filePath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 ipcMain.handle('employees:delete', (_, id) => {
@@ -1690,7 +1740,11 @@ ipcMain.handle('docs:open-file', (_, filepath) => {
 // ─── AI ЗАПРОСЫ ──────────────────────────────────────────
 // Ключ DeepSeek хранится на сервере kompliancepro.ru/ai-proxy.php
 // В приложении ключ не хранится и в репозиторий не попадает
-const AI_PROXY_URL = 'https://kompliancepro.ru/ai-proxy.php';
+// Прокси переименован в ai-proxy-v2.php (04.07.2026) — на сервере обнаружился
+// кэш PHP-кода (OPcache без проверки времени изменения файла), из-за которого
+// правки в ai-proxy.php не подхватывались даже после сохранения. Кэш привязан
+// к имени файла, поэтому новое имя гарантированно выполняет свежий код.
+const AI_PROXY_URL = 'https://kompliancepro.ru/ai-proxy-v2.php';
 
 async function callAI(prompt, system) {
   const s = db.get('settings').value();
@@ -2045,40 +2099,75 @@ ipcMain.handle('training:alerts', () => {
 });
 
 // ─── ГЕНЕРАЦИЯ DOCX (справки, протоколы в Word) ──────────
-ipcMain.handle('docx:generate', async (_, { rows, title, subtitle, filename }) => {
+// Поддерживает два формата вызова:
+//  1) { rows, title, subtitle, filename } — старый формат, одна таблица
+//     (используется большинством генераторов справок/протоколов)
+//  2) { sections: [{ heading, note, rows }, ...], title, subtitle, filename }
+//     — новый формат, несколько отдельных таблиц с заголовками между ними
+//     (нужен для форм вроде отчёта ЦЗН, где в оригинале несколько разноструктурных
+//     таблиц подряд, а не одна большая)
+ipcMain.handle('docx:generate', async (_, { rows, sections, title, subtitle, filename }) => {
   try {
     const { Document, Packer, Paragraph, Table, TableRow, TableCell,
             TextRun, WidthType, BorderStyle, AlignmentType,
             HeadingLevel, VerticalAlign } = require('docx');
 
-    // Строим таблицу из строк { cells: [{text, bold, width, colspan}] }
-    const tableRows = rows.map(row =>
-      new TableRow({
-        children: row.cells.map(cell =>
-          new TableCell({
-            width: cell.width ? { size: cell.width, type: WidthType.DXA } : undefined,
-            columnSpan: cell.colspan || 1,
-            verticalAlign: VerticalAlign.CENTER,
-            borders: {
-              top:    { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
-              bottom: { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
-              left:   { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
-              right:  { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
-            },
-            shading: cell.shading ? { fill: cell.shading } : undefined,
-            children: [new Paragraph({
-              alignment: cell.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-              children: [new TextRun({
-                text: String(cell.text ?? ''),
-                bold: cell.bold || false,
-                size: cell.size || 20,
-                font: 'Times New Roman',
-              })],
-            })],
+    function buildTable(tableRows) {
+      return new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: tableRows.map(row =>
+          new TableRow({
+            children: row.cells.map(cell =>
+              new TableCell({
+                width: cell.width ? { size: cell.width, type: WidthType.DXA } : undefined,
+                columnSpan: cell.colspan || 1,
+                verticalAlign: VerticalAlign.CENTER,
+                borders: {
+                  top:    { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+                  bottom: { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+                  left:   { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+                  right:  { style: BorderStyle.SINGLE, size: 1, color: 'AAAAAA' },
+                },
+                shading: cell.shading ? { fill: cell.shading } : undefined,
+                children: [new Paragraph({
+                  alignment: cell.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+                  children: [new TextRun({
+                    text: String(cell.text ?? ''),
+                    bold: cell.bold || false,
+                    size: cell.size || 20,
+                    font: 'Times New Roman',
+                  })],
+                })],
+              })
+            ),
           })
         ),
-      })
-    );
+      });
+    }
+
+    // Нормализуем оба формата к единому списку секций.
+    const normalizedSections = sections && sections.length
+      ? sections
+      : [{ heading: null, note: null, rows }];
+
+    const bodyChildren = [];
+    normalizedSections.forEach((section, idx) => {
+      if (section.heading) {
+        bodyChildren.push(new Paragraph({
+          spacing: { before: idx === 0 ? 0 : 260, after: 100 },
+          children: [new TextRun({ text: section.heading, bold: true, size: 22, font: 'Times New Roman' })],
+        }));
+      }
+      if (section.note) {
+        bodyChildren.push(new Paragraph({
+          spacing: { after: 100 },
+          children: [new TextRun({ text: section.note, italics: true, size: 17, color: '666666', font: 'Times New Roman' })],
+        }));
+      }
+      if (section.rows && section.rows.length) {
+        bodyChildren.push(buildTable(section.rows));
+      }
+    });
 
     const doc = new Document({
       sections: [{
@@ -2097,10 +2186,7 @@ ipcMain.handle('docx:generate', async (_, { rows, title, subtitle, filename }) =
             spacing: { after: 200 },
             children: [new TextRun({ text: subtitle, size: 20, font: 'Times New Roman', color: '555555' })],
           })] : [new Paragraph({ spacing: { after: 200 }, children: [] })]),
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: tableRows,
-          }),
+          ...bodyChildren,
           new Paragraph({
             spacing: { before: 300 },
             children: [new TextRun({

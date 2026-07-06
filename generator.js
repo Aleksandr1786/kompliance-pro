@@ -6,6 +6,7 @@ const { safe, makeRunner } = require('./utils');
 const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW}=base;
 const {PageOrientation}=require('docx');
 const { gen_intro_briefing, gen_primary_briefing } = require('./gen_instructage');
+const { gen_chop_instructions, gen_chop_post_table, gen_chop_weapon_order } = require('./gen_chop');
 
 // ── РАЗДЕЛ 6 ───────────────────────────────────────────
 // Ширина контента альбомный A4 = 15398 DXA
@@ -705,6 +706,12 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   const genOT = scope === 'ALL' || scope === 'OT';
   const genPD = (scope === 'ALL' || scope === 'PD') && (client.modules || '').includes('PD');
   const genVU = (scope === 'ALL' || scope === 'VU') && (client.modules || '').includes('VU');
+  // ЧОП — надстройка над ОТ, а не отдельный модуль: нужны ОБА условия —
+  // клиент помечен модулем CHOP (это охранная организация) И аддон CHOP
+  // активен в лицензии (s.license_addons). Одного модуля недостаточно —
+  // иначе документы продолжат формироваться и после истечения/отключения
+  // аддона, что нарушит модель "аддон = платная подписка".
+  const genCHOP = genOT && (client.modules || '').includes('CHOP') && (s.license_addons || []).includes('CHOP');
 
   // Весь ОТ кладём в подпапку «Охрана труда» — единообразно с ПДн и ВУ
   const otDir = path.join(outputDir, 'Охрана труда');
@@ -724,6 +731,7 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
     d6:path.join(otDir,'Раздел 5. Журналы учёта'),
     d7:path.join(otDir,'Раздел 6. Программы обучения'),
     d8:path.join(otDir,'Раздел 7. Протоколы обучения'),
+    d9:path.join(otDir,'Раздел 8. ЧОП'),
   };
 
   // Временная папка для генерации
@@ -804,6 +812,19 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   // Раздел 7. Протоколы обучения (новое)
   await run(gen_08_01,dirs.d8); // Журнал противопожарных инструктажей
   await run(gen_08_02,dirs.d8); // Протокол проверки знания требований ОТ (микропредприятия)
+
+  // Раздел 8. ЧОП (аддон CHOP) — только если модуль клиента + аддон активны
+  if(genCHOP){
+    fs.mkdirSync(dirs.d9,{recursive:true});
+    await run(gen_chop_post_table, dirs.d9);   // Табель постов охраны — всегда, ключевой документ
+
+    const hasWeaponAccess = (c.employees||[]).some(e=>e.chop && e.chop.weapon_access);
+    if(hasWeaponAccess) await run(gen_chop_weapon_order, dirs.d9); // только если есть допущенные к оружию
+
+    // Инструкции охраннику по фактически используемым типам постов —
+    // цикл внутри самой функции (см. gen_chop.js), как и gen_05_employees
+    await run(gen_chop_instructions, dirs.d9);
+  }
 
   await run(gen_checklist,otDir);
 

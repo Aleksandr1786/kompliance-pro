@@ -34,6 +34,14 @@ async function renderClientCard(id) {
   const mods = (c.modules||'OT').split(',');
   const initials = getInitials(c.name);
 
+  // Активные аддоны — нужны, чтобы показывать в строке сотрудника
+  // ЧОП-специфичные действия только когда аддон подключён
+  let activeAddonTypes = [];
+  try {
+    const addons = await window.api.addonStatus();
+    activeAddonTypes = addons.filter(a => a.active).map(a => a.type);
+  } catch(_) {}
+
   // ── КОМПЛЕКСНЫЙ ПОДСЧЁТ ГОТОВНОСТИ (100 баллов) ──────────
   let scoreTotal = 0;
   const scoreBreakdown = [];
@@ -643,7 +651,7 @@ async function renderClientCard(id) {
             // но заголовок с кнопками добавления/импорта остаётся видимым.
             return `<div style="padding:14px 0 4px;text-align:center;color:var(--muted2);font-size:12px">Все сотрудники распределены по подразделениям выше</div>`;
           }
-          return `<div>${listEmps.map(e => renderEmpRow(e, divisions)).join('')}</div>`;
+          return `<div>${listEmps.map(e => renderEmpRow(e, divisions, c, activeAddonTypes)).join('')}</div>`;
         })()}
       </div>
     </div>
@@ -659,6 +667,12 @@ async function renderClientCard(id) {
 
 
 function switchTab(name) {
+  // Запоминаем последнюю активную вкладку — используется, чтобы после
+  // действий с сотрудником (удаление, сохранение обучения/допусков/ЧОП),
+  // которые перерисовывают всю карточку клиента заново, пользователя не
+  // выкидывало обратно на "Обзор" по умолчанию
+  window._clientActiveTab = name;
+
   // Сбрасываем активное состояние у модульных вкладок (верхний ряд)
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -964,7 +978,6 @@ async function openCommissionOrderModal(clientId) {
     </div>`;
 
   document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   setTimeout(() => document.getElementById('co-num')?.focus(), 50);
 }
 
@@ -1058,7 +1071,6 @@ async function editTrainingDate(clientId, empId, trainingKey, trainingLabel, cur
       </div>
     </div>`;
 
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
   setTimeout(() => document.getElementById('td-date')?.focus(), 80);
 }
@@ -1250,7 +1262,6 @@ async function openCertModal(clientId, certId = null) {
   modal.querySelector('#cert-employee').addEventListener('change', function() {
     modal.querySelector('#cert-employee-manual').style.display = this.value === 'manual' ? 'block' : 'none';
   });
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   document.body.appendChild(modal);
 }
 
@@ -1446,10 +1457,10 @@ function toggleSection(header) {
     : 'linear-gradient(135deg,rgba(255,255,255,0.1) 0%,rgba(255,255,255,0.04) 100%)';
 }
 
-function renderEmpRow(e, divisions = []) {
+function renderEmpRow(e, divisions = [], client = null, activeAddonTypes = []) {
   const birthYear = e.birth_date ? ' · ' + e.birth_date.slice(0,4) + ' г.р.' : '';
   const training  = e.training || {};
-  const TYPES = ['prog_a','first_aid','fire','siz','repeat','medcheck','medcheck_714','psycho'];
+  const TYPES = ['prog_a','first_aid','fire','siz','repeat'];
   const today = new Date();
   const division = divisions.find(d => d.id === e.division_id);
   const divBadge = division
@@ -1464,30 +1475,76 @@ function renderEmpRow(e, divisions = []) {
     const last = new Date(t.date);
     const next = new Date(last);
     if (key === 'repeat') next.setMonth(next.getMonth() + 6);
-    else if (key === 'medcheck' || key === 'medcheck_714') next.setFullYear(next.getFullYear() + 1);
-    else if (key === 'psycho') next.setFullYear(next.getFullYear() + 5);
     else next.setFullYear(next.getFullYear() + 3);
     const days = Math.ceil((next - today) / 86400000);
     if (days <= 30) alertCount++;
   });
 
-  const alertBadge = alertCount > 0
-    ? `<span style="background:${alertCount > 0 ? 'var(--red)' : 'var(--amber)'};color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin-right:4px">${alertCount}</span>`
+  // Считаем статус медицинских допусков (отдельно от обучения)
+  const clearances = e.medical_clearances || [];
+  let clearanceAlerts = 0;
+  ['periodic_29n', 'maritime_714n', 'psychiatric_392n'].forEach(type => {
+    if (!isClearanceRequired(type, client, e, division)) return;
+    const record = latestClearance(clearances, type);
+    if (!record) { clearanceAlerts++; return; }
+    const days = Math.ceil((new Date(record.valid_until) - today) / 86400000);
+    if (days <= 30) clearanceAlerts++;
+  });
+
+  // Один совокупный индикатор внимания на шапке строки — детали видны
+  // после разворота (не плодим бейджи на каждую отдельную кнопку)
+  const totalAlerts = alertCount + clearanceAlerts;
+  const alertBadge = totalAlerts > 0
+    ? `<span title="Требует внимания: обучение/допуски" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:8px;margin-right:2px;transition:transform .15s">${totalAlerts}</span>`
     : '';
 
-  return `<div class="client-row">
-    <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:11px;font-weight:700">${e.full_name.split(' ').map(w=>w[0]||'').join('').slice(0,2)}</div>
-    <div class="client-info">
-      <div class="client-name">${e.full_name}</div>
-      <div class="client-meta">${e.position||'—'}${birthYear}${e.is_military?' · '+ic('star',12):''}${divBadge ? ' · ' : ''}${divBadge}</div>
+  const rowId = 'emprow-' + e.id;
+
+  return `<div style="border-radius:10px;overflow:hidden;transition:background .15s" id="${rowId}-wrap">
+    <div class="client-row" onclick="toggleEmpRow(${e.id})" style="cursor:pointer;user-select:none"
+      onmouseover="this.style.background='rgba(255,255,255,0.02)'" onmouseout="this.style.background='transparent'">
+      <div class="client-avatar-sm" style="background:var(--s3);color:var(--muted2);font-size:11px;font-weight:700">${e.full_name.split(' ').map(w=>w[0]||'').join('').slice(0,2)}</div>
+      <div class="client-info">
+        <div class="client-name">${e.full_name}</div>
+        <div class="client-meta">${e.position||'—'}${birthYear}${e.is_military?' · '+ic('star',12):''}${divBadge ? ' · ' : ''}${divBadge}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${alertBadge}
+        <svg id="${rowId}-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
-      ${alertBadge}
-      <button class="btn btn-ghost" style="padding:4px 10px;display:flex;align-items:center;gap:5px;font-size:11px" onclick="openTraining(${e.id})" title="Обучение">${ic('graduation-cap',14)}</button>
-      <button class="btn btn-ghost" style="padding:4px 10px;display:flex;align-items:center;gap:5px;font-size:11px" onclick="editEmployeePrompt(${e.id})" title="Редактировать">${ic('edit',14)}</button>
-      <button class="btn btn-ghost" style="padding:4px 10px;display:flex;align-items:center;gap:5px;font-size:11px;color:var(--red)" onclick="deleteEmployee(${e.id})" title="Удалить">${ic('trash',14)}</button>
+    <div id="${rowId}-body" style="max-height:0;overflow:hidden;transition:max-height .25s ease">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding:2px 4px 12px 52px" onclick="event.stopPropagation()">
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openTraining(${e.id})">${ic('graduation-cap',14)} Обучение${alertCount ? ` <span style="color:var(--red);font-weight:700">${alertCount}</span>` : ''}</button>
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openMedicalClearances(${e.id})">${ic('heart',14)} Мед. допуски${clearanceAlerts ? ` <span style="color:var(--red);font-weight:700">${clearanceAlerts}</span>` : ''}</button>
+        ${activeAddonTypes.includes('CHOP') && (client?.modules || '').includes('CHOP') ? `<button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openChopData(${e.id})">${ic('shield',14)} ЧОП</button>` : ''}
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="editEmployeePrompt(${e.id})">${ic('edit',14)} Редактировать</button>
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--red);transition:background .15s" onclick="deleteEmployee(${e.id})">${ic('trash',14)} Удалить</button>
+      </div>
     </div>
   </div>`;
+}
+
+// Плавно разворачивает/сворачивает панель действий сотрудника. Закрывает
+// остальные открытые строки — чтобы список не растягивался бесконечно
+// при большом штате (актуально для ЧОП на 40+ человек).
+function toggleEmpRow(empId) {
+  const rowId = 'emprow-' + empId;
+  const body = document.getElementById(rowId + '-body');
+  const chevron = document.getElementById(rowId + '-chevron');
+  if (!body) return;
+  const isOpen = body.style.maxHeight !== '0px' && body.style.maxHeight !== '';
+
+  // Закрываем все остальные открытые строки сотрудников
+  document.querySelectorAll('[id^="emprow-"][id$="-body"]').forEach(el => {
+    if (el !== body) el.style.maxHeight = '0px';
+  });
+  document.querySelectorAll('[id^="emprow-"][id$="-chevron"]').forEach(el => {
+    if (el !== chevron) el.style.transform = '';
+  });
+
+  body.style.maxHeight = isOpen ? '0px' : body.scrollHeight + 'px';
+  if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1554,7 +1611,6 @@ async function openDivisionModal(clientId, divisionId = null) {
     </div>`;
 
   document.body.appendChild(modal);
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   updateDivisionPreview();
 }
 
@@ -1650,6 +1706,7 @@ async function saveDivision(clientId, divisionId) {
 
   document.getElementById('modalDivision')?.remove();
   await navigate('client', clientId);
+  switchTab(window._clientActiveTab || 'overview');
 }
 
 async function deleteDivision(divisionId, clientId) {
@@ -1658,6 +1715,7 @@ async function deleteDivision(divisionId, clientId) {
   document.getElementById('modalDivision')?.remove();
   showToast('Подразделение удалено');
   await navigate('client', clientId);
+  switchTab(window._clientActiveTab || 'overview');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1671,10 +1729,12 @@ const TRAINING_TYPES_BASE = [
   { key:'fire',      label:'Пожарно-технический минимум',              period:'3 года',  years:3,   who:'Руководитель, отв. за ПБ',        alwaysRequired: true  },
   { key:'siz',       label:'Применение СИЗ',                          period:'3 года',  years:3,   who:'Работники применяющие СИЗ',       alwaysRequired: false },
   { key:'repeat',    label:'Повторный инструктаж на р.м.',             period:'6 мес.',  months:6,  who:'Все (кроме освобождённых)',       alwaysRequired: true  },
-  { key:'medcheck',  label:'Медицинский осмотр (Приказ 29н)',          period:'1 год',   years:1,   who:'При наличии оснований',           alwaysRequired: false },
-  { key:'medcheck_714', label:'Медосмотр плавсостава (Приказ 714н)',   period:'2 года',  years:2,   who:'Моряки, плавсостав',              alwaysRequired: false },
-  { key:'psycho',    label:'Психиатрическое освидетельствование',      period:'5 лет',   years:5,   who:'ПАСФ, спасатели, высотники',      alwaysRequired: false },
 ];
+// Медосмотры (29н/714н) и психосвидетельствование (392н) с v1.0.40 живут
+// отдельно в medical_clearances[] — см. CLEARANCE_TYPES ниже. Это разные
+// по природе вещи: обучение проводит учебный центр, допуск выдаёт
+// медкомиссия. Раньше жили здесь как training.medcheck/medcheck_714/psycho —
+// перенесены миграцией v7 (main.js).
 
 // Типы работ подразделения и их требования
 const DIVISION_WORK_TYPES = {
@@ -1775,9 +1835,6 @@ function getRequiredTraining(client, employee, existingTraining, division) {
   const divWorkType = division?.work_type ? DIVISION_WORK_TYPES[division.work_type] : null;
   const soatClass   = parseInt(division?.soat_class || client?.soat_class || '2');
   const hazardWorks = divWorkType?.hazard || !!client?.hazard_works;
-  const medRequired = divWorkType?.medcheck || !!client?.medcheck_required || !!employee?.medcheck_required;
-  const med714      = divWorkType?.medcheck_714 || false;
-  const psycho      = divWorkType?.psycho || false;
   const needSiz     = divWorkType?.siz || soatClass >= 31 || hazardWorks;
   const isOffice    = soatClass <= 2 && !hazardWorks;
   const progBExempt = !!employee?.prog_b_exempt;
@@ -1794,9 +1851,6 @@ function getRequiredTraining(client, employee, existingTraining, division) {
       if (tt.key === 'fire')         required = true;
       if (tt.key === 'siz')          required = needSiz;
       if (tt.key === 'repeat')       required = true;
-      if (tt.key === 'medcheck')     required = medRequired;
-      if (tt.key === 'medcheck_714') required = med714;
-      if (tt.key === 'psycho')       required = psycho;
     }
 
     return { ...tt, required };
@@ -1822,6 +1876,79 @@ function trainingStatus(tt, t) {
   if (days <= 14) return { icon:'circle', color:'var(--amber)', label:`${days} дн.`,   days };
   if (days <= 30) return { icon:'circle', color:'var(--amber)', label:`${days} дн.`,   days };
   return { icon:'check-circle', color:'var(--green)', label:formatDate(next.toISOString()), days };
+}
+
+// ═══════════════════════════════════════════════════════
+//  МЕДИЦИНСКИЕ ДОПУСКИ (medical_clearances)
+// ═══════════════════════════════════════════════════════
+//
+// Отдельная от обучения сущность: допуск выдаёт медкомиссия, а не
+// учебный центр, и хранится историей записей на сотрудника (массив),
+// а не одной перезаписываемой датой. Базовый (core) реестр содержит
+// только общий медосмотр 29н — он нужен независимо от аддонов. Типы,
+// специфичные для конкретного аддона (ФЛОТ, ЧОП, ПАСФ), регистрируются
+// через getClearanceAddonTypes() и показываются в UI только если аддон
+// активен — так ядро не разрастается новыми if'ами под каждый аддон.
+
+const CLEARANCE_TYPES_CORE = {
+  periodic_29n: { label: 'Медицинский осмотр (Приказ 29н)', years: 1 },
+};
+
+// Типы, добавляемые аддонами. Ключ addonType соответствует значению
+// type в window.api.addonStatus(). Пока ФЛОТ/ЧОП/ПАСФ не активированы —
+// эти типы просто не показываются в модалке допусков.
+const CLEARANCE_TYPES_BY_ADDON = {
+  FLEET: {
+    maritime_714n: { label: 'Медосмотр плавсостава (Приказ 714н)', years: 2 },
+  },
+  CHOP: {
+    guard_cert_1252n: { label: 'Справка охранника (002-ЧО/у, Приказ 1252н)', years: 1 },
+    psychiatric_392n: { label: 'Психиатрическое освидетельствование (Приказ 342н, с изм. 392н)', years: 5 },
+  },
+  PASF: {
+    psychiatric_392n: { label: 'Психиатрическое освидетельствование (Приказ 342н, с изм. 392н)', years: 5 },
+  },
+};
+
+// Собираем полный реестр типов допусков с учётом активных аддонов.
+// activeAddonTypes — массив значений type из addonStatus() (например ['CHOP']).
+function getClearanceTypesRegistry(activeAddonTypes = []) {
+  const registry = { ...CLEARANCE_TYPES_CORE };
+  activeAddonTypes.forEach(addonType => {
+    Object.assign(registry, CLEARANCE_TYPES_BY_ADDON[addonType] || {});
+  });
+  return registry;
+}
+
+// Требуется ли допуск конкретного типа сотруднику — по флагам подразделения
+// (те же DIVISION_WORK_TYPES.medcheck/medcheck_714/psycho, что раньше
+// управляли training) плюс старому client/employee.medcheck_required —
+// сохраняем обратную совместимость с данными, введёнными до v1.0.40.
+function isClearanceRequired(type, client, employee, division) {
+  const wt = division?.work_type ? DIVISION_WORK_TYPES[division.work_type] : null;
+  if (type === 'periodic_29n') {
+    return !!(wt?.medcheck || client?.medcheck_required || employee?.medcheck_required);
+  }
+  if (type === 'maritime_714n')    return !!wt?.medcheck_714;
+  if (type === 'psychiatric_392n') return !!wt?.psycho;
+  if (type === 'guard_cert_1252n') return false; // включается вручную в карточке ЧОП-сотрудника (шаг 3)
+  return false;
+}
+
+// Последняя (по дате выдачи) запись сотрудника данного типа допуска —
+// именно её показываем/редактируем в модалке, но не удаляем историю
+function latestClearance(clearances, type) {
+  return (clearances || [])
+    .filter(c => c.type === type)
+    .sort((a, b) => new Date(b.issued_date) - new Date(a.issued_date))[0] || null;
+}
+
+function clearanceStatus(record) {
+  if (!record?.valid_until) return { color: 'var(--muted)', label: 'Нет данных', days: null };
+  const days = Math.ceil((new Date(record.valid_until) - new Date()) / 86400000);
+  if (days < 0)   return { color: 'var(--red)',   label: `Просрочено ${Math.abs(days)} дн.`, days };
+  if (days <= 30) return { color: 'var(--amber)', label: `${days} дн.`, days };
+  return { color: 'var(--green)', label: formatDate(record.valid_until), days };
 }
 
 async function openTraining(empId) {
@@ -1890,7 +2017,6 @@ async function openTraining(empId) {
     </div>`;
 
   document.body.appendChild(modal);
-  modal.addEventListener('click', ev => { if (ev.target === modal) modal.remove(); });
 
   // Сохраняем текущий training в window для обновления
   window._currentTraining = JSON.parse(JSON.stringify(training));
@@ -1921,7 +2047,208 @@ async function saveTraining(empId) {
   document.getElementById('trainingModal')?.remove();
   showToast('Данные обучения сохранены');
   await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
 }
+
+// ─── МЕДИЦИНСКИЕ ДОПУСКИ — модалка (по образцу openTraining) ───────
+async function openMedicalClearances(empId) {
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  const client        = await window.api.clientGet(currentClientId);
+  const allDivisions  = await window.api.divisionsList(currentClientId);
+  const division      = allDivisions.find(d => d.id === e.division_id) || null;
+  const clearances    = e.medical_clearances || [];
+
+  let addons = [];
+  try { addons = await window.api.addonStatus(); } catch(_) {}
+  const activeAddonTypes = addons.filter(a => a.active).map(a => a.type);
+
+  // CHOP — это надстройка над конкретным типом клиента (ЧОП-организация),
+  // а не сквозная фича аутсорсера (как TRAINING/PASF). Поэтому даже при
+  // активном аддоне CHOP-специфичные типы допусков показываем только у
+  // клиентов, помеченных модулем CHOP — иначе они появятся у всех клиентов
+  // разом, включая тех, где это не нужно.
+  const clientAddonTypes = activeAddonTypes.filter(type => {
+    if (type === 'CHOP') return (client?.modules || '').includes('CHOP');
+    return true;
+  });
+
+  const registry = getClearanceTypesRegistry(clientAddonTypes);
+  const typeKeys = Object.keys(registry);
+
+  const modal = document.createElement('div');
+  modal.id = 'clearancesModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  const rows = typeKeys.map(type => {
+    const ct       = registry[type];
+    const record   = latestClearance(clearances, type);
+    const required = isClearanceRequired(type, client, e, division);
+    const st       = clearanceStatus(record);
+    return `
+      <div style="display:grid;grid-template-columns:1fr 130px 160px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#f1f5f9">${ct.label}</div>
+          <div style="font-size:10px;color:#64748b">${required ? 'Требуется · ' : 'Не обязательно · '}каждые ${ct.years} г.</div>
+        </div>
+        <div>
+          <input type="date" id="mc-date-${type}" value="${record?.issued_date || ''}" style="width:100%;padding:6px 8px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:6px;color:#f1f5f9;font-size:12px;outline:none">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:11px;font-weight:600;color:${st.color}">${st.label}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('heart', 14)} Медицинские допуски</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">${e.full_name} · ${e.position||''}</div>
+        </div>
+        <button onclick="document.getElementById('clearancesModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 130px 160px;gap:8px;padding-bottom:8px;border-bottom:2px solid rgba(255,255,255,0.08);margin-bottom:4px">
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">ВИД ДОПУСКА</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">ДАТА ВЫДАЧИ</div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;letter-spacing:.5px">СТАТУС</div>
+      </div>
+      ${rows}
+      <div style="font-size:11px;color:#64748b;margin-top:12px;line-height:1.5">
+        При изменении даты создаётся новая запись в истории допуска — прошлые записи не удаляются.
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button onclick="saveMedicalClearances(${empId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">${ic("save",14)} Сохранить</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  window._currentClearances     = JSON.parse(JSON.stringify(clearances));
+  window._currentClearanceTypes = typeKeys;
+  window._currentClearanceReg   = registry;
+}
+
+async function saveMedicalClearances(empId) {
+  const clearances = window._currentClearances || [];
+  const typeKeys   = window._currentClearanceTypes || [];
+  const registry   = window._currentClearanceReg || {};
+
+  typeKeys.forEach(type => {
+    const dateEl = document.getElementById('mc-date-' + type);
+    const newDate = dateEl?.value || '';
+    if (!newDate) return;
+
+    const existing = latestClearance(clearances, type);
+    if (existing && existing.issued_date === newDate) return; // не изменилось — не дублируем запись
+
+    const ct     = registry[type];
+    const issued = new Date(newDate);
+    const until  = new Date(issued);
+    until.setFullYear(until.getFullYear() + (ct?.years || 1));
+
+    clearances.push({
+      id: 'mc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      type,
+      basis_order: '',
+      issued_date: newDate,
+      valid_until: until.toISOString().slice(0, 10),
+    });
+  });
+
+  await window.api.medicalClearancesSave(empId, clearances);
+  document.getElementById('clearancesModal')?.remove();
+  showToast('Медицинские допуски сохранены');
+  await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
+}
+
+// ─── ЧОП — данные сотрудника (аддон CHOP) ──────────────────────────
+// Разряд охранника (Закон №2487-1), допуск к оружию/спецсредствам,
+// тип поста и режим смен. Показывается только когда аддон активен.
+const CHOP_POST_TYPES = [
+  { value: 'patrol',     label: 'Патрулирование' },
+  { value: 'checkpoint', label: 'КПП' },
+  { value: 'monitor',    label: 'Пульт наблюдения' },
+  { value: 'duty',       label: 'Приём-сдача дежурства' },
+];
+
+async function openChopData(empId) {
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  let chop = {};
+  try { chop = (await window.api.chopGet(empId)) || {}; } catch(_) {}
+
+  const modal = document.createElement('div');
+  modal.id = 'chopModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  const postOptions = CHOP_POST_TYPES.map(pt =>
+    `<option value="${pt.value}" ${chop.post_type === pt.value ? 'selected' : ''}>${pt.label}</option>`
+  ).join('');
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:440px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('shield', 14)} Данные ЧОП</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">${e.full_name} · ${e.position||''}</div>
+        </div>
+        <button onclick="document.getElementById('chopModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Разряд охранника</label>
+      <select id="chop-razryad" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        <option value="">— Не указан —</option>
+        <option value="4" ${chop.razryad === '4' ? 'selected' : ''}>4 разряд</option>
+        <option value="5" ${chop.razryad === '5' ? 'selected' : ''}>5 разряд</option>
+        <option value="6" ${chop.razryad === '6' ? 'selected' : ''}>6 разряд</option>
+      </select>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Тип поста</label>
+      <select id="chop-post-type" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        <option value="">— Не указан —</option>
+        ${postOptions}
+      </select>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Режим смен</label>
+      <input id="chop-shift-mode" value="${chop.shift_mode || ''}" placeholder="например, сутки через трое" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+        <input type="checkbox" id="chop-weapon-access" ${chop.weapon_access ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
+        <label for="chop-weapon-access" style="font-size:13px;color:#f1f5f9;cursor:pointer">Допуск к оружию/спецсредствам</label>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button onclick="saveChopData(${empId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">${ic("save",14)} Сохранить</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function saveChopData(empId) {
+  const chop = {
+    razryad:       document.getElementById('chop-razryad')?.value || '',
+    post_type:     document.getElementById('chop-post-type')?.value || '',
+    shift_mode:    document.getElementById('chop-shift-mode')?.value || '',
+    weapon_access: document.getElementById('chop-weapon-access')?.checked ? 1 : 0,
+  };
+
+  await window.api.chopSave(empId, chop);
+  document.getElementById('chopModal')?.remove();
+  showToast('Данные ЧОП сохранены');
+  await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
+}
+
 
 
 
@@ -2170,7 +2497,6 @@ async function addEmployeePrompt(clientId) {
 
   await new Promise(resolve => {
     document.getElementById('emp-cancel').onclick = () => { modal.remove(); resolve(false); };
-    modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(false); } };
     document.getElementById('emp-save').onclick = async () => {
       const name   = document.getElementById('emp-name').value.trim();
       const pos    = document.getElementById('emp-pos').value.trim();
@@ -2249,6 +2575,7 @@ async function addEmployeePrompt(clientId) {
       const updatedEmps = await window.api.employeesList(clientId);
       await window.api.clientUpdate(clientId, { staff: updatedEmps.length });
       await navigate('client', clientId);
+      switchTab(window._clientActiveTab || 'overview');
       resolve(true);
     };
     modal.addEventListener('keydown', async (e) => {
@@ -2372,7 +2699,6 @@ async function editEmployeePrompt(empId) {
 
   await new Promise(resolve => {
     document.getElementById('edit-emp-cancel').onclick = () => { modal.remove(); resolve(false); };
-    modal.onclick = (ev) => { if (ev.target === modal) { modal.remove(); resolve(false); } };
     document.getElementById('edit-emp-save').onclick = async () => {
       const name  = document.getElementById('edit-emp-name').value.trim();
       const pos   = document.getElementById('edit-emp-pos').value.trim();
@@ -2423,6 +2749,7 @@ async function editEmployeePrompt(empId) {
       if (empResult?.error) {
         showToast(empResult.error, 'var(--red)');
         await navigate('client', currentClientId);
+        switchTab(window._clientActiveTab || 'overview');
         resolve(false);
         return;
       }
@@ -2432,6 +2759,7 @@ async function editEmployeePrompt(empId) {
         showToast('Сотрудник обновлён');
       }
       await navigate('client', currentClientId);
+      switchTab(window._clientActiveTab || 'overview');
       resolve(true);
     };
     modal.addEventListener('keydown', (ev) => {
@@ -2449,4 +2777,5 @@ async function deleteEmployee(id) {
   await window.api.clientUpdate(currentClientId, { staff: updatedEmps.length });
   showToast('Удалено');
   await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
 }

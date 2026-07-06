@@ -129,7 +129,6 @@ function renderComingSoon(title) {
 // ── УТИЛИТЫ ──────────────────────────────────────────────
 function openModal(id) {
   document.getElementById(id)?.classList.add('open');
-  document.getElementById(id)?.addEventListener('click', e => { if(e.target.id===id) closeModal(id); }, { once: true });
 }
 
 function closeModal(id) {

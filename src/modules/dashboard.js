@@ -342,6 +342,10 @@ function renderOutsourcerRows(clientStats) {
 async function renderDashboardSpecialist(clients, events, alerts, tasks) {
   const stats = await window.api.dashboardStats();
   const now   = new Date();
+  // Нужно для подписи под карточкой "Клиенты"/"Компания" — в режиме
+  // штатного специалиста фраза "на сопровождении" не подходит (это же
+  // его собственная организация, а не клиент на аутсорсе).
+  const isOutsourcerMode = typeof LICENSE !== 'undefined' && LICENSE.type === 'OUTSOURCE';
 
   const overdueTraining = alerts.filter(a => a.overdue).length;
   const overdueEvents   = events.filter(e => new Date(e.due_date) < now).length;
@@ -527,6 +531,63 @@ async function renderDashboardSpecialist(clients, events, alerts, tasks) {
     });
   }
 
+  // ЧОП — проверяем только если аддон реально активен и есть хотя бы
+  // один клиент с модулем CHOP, чтобы не тратить лишний IPC-запрос
+  // (employeesListAll) для подавляющего большинства НЕ-ЧОП специалистов.
+  try {
+    const chopClients = clients.filter(c => (c.modules || '').includes('CHOP'));
+    if (chopClients.length && recs.length < 3) {
+      const addons = await window.api.addonStatus();
+      const chopActive = addons.some(a => a.type === 'CHOP' && a.active);
+      if (chopActive) {
+        const allEmps = await window.api.employeesListAll();
+
+        // 1. Сотрудники без заполненных данных ЧОП (разряд/тип поста)
+        for (const cl of chopClients) {
+          if (recs.length >= 3) break;
+          const emps = allEmps.filter(e => e.client_id === cl.id);
+          const missing = emps.filter(e => !e.chop || !e.chop.post_type);
+          if (missing.length) {
+            recs.push({
+              svg: '<path d="M12 2 4 6v6c0 5.25 3.5 9.74 8 11 4.5-1.26 8-5.75 8-11V6z"/>',
+              color: '#60a5fa', bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.2)',
+              text: `Заполнить данные ЧОП — ${cl.name}`,
+              sub: `${missing.length} сотр. без разряда/поста`,
+              action: `navigate('client',${cl.id})`,
+            });
+          }
+        }
+
+        // 2. Допущенные к оружию, у которых нет действующего мед. допуска
+        // (медосмотр 29н, справка охранника 1252н, психосвидетельствование
+        // 392н) или он истекает в течение 30 дней — это прямой риск по
+        // ст. 11.1 Закона № 2487-1.
+        const CHOP_RELEVANT_CLEARANCES = ['periodic_29n', 'guard_cert_1252n', 'psychiatric_392n'];
+        for (const cl of chopClients) {
+          if (recs.length >= 3) break;
+          const emps = allEmps.filter(e => e.client_id === cl.id && e.chop && e.chop.weapon_access);
+          const atRisk = emps.filter(e => {
+            const clearances = (e.medical_clearances || []).filter(mc => CHOP_RELEVANT_CLEARANCES.includes(mc.type));
+            if (!clearances.length) return true; // допуска нет вообще
+            return clearances.some(mc => {
+              const days = Math.ceil((new Date(mc.valid_until) - now) / 86400000);
+              return days <= 30; // просрочен или истекает
+            });
+          });
+          if (atRisk.length) {
+            recs.push({
+              svg: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+              color: '#f87171', bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.2)',
+              text: `Проверить допуски к оружию — ${cl.name}`,
+              sub: `${atRisk.length} сотр. с истекающим/отсутствующим мед. допуском`,
+              action: `navigate('client',${cl.id})`,
+            });
+          }
+        }
+      }
+    }
+  } catch (_) {}
+
   const recsHtml = recs.length
     ? recs.map(r => `
       <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;
@@ -550,7 +611,7 @@ async function renderDashboardSpecialist(clients, events, alerts, tasks) {
 
   document.getElementById('content').innerHTML = `
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">${ic('building', 14)} Клиенты</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">на сопровождении</div></div>
+      <div class="stat-card"><div class="stat-label">${ic('building', 14)} ${term('clients')}</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">${isOutsourcerMode ? 'на сопровождении' : ''}</div></div>
       <div class="stat-card"><div class="stat-label">${ic('clipboard-list', 14)} Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent > 0 ? stats.urgent + ' срочных' : 'нет срочных'}</div></div>
       <div class="stat-card"><div class="stat-label">${ic('graduation-cap', 14)} Обучение</div><div class="stat-value" style="color:${alerts.length ? 'var(--amber)' : 'var(--green)'}">${alerts.length}</div><div class="stat-sub">истекает в течение 30 дн.</div></div>
       <div class="stat-card"><div class="stat-label">${ic('alert-triangle', 14)} Просрочено</div><div class="stat-value" style="color:${totalOverdue ? 'var(--red)' : 'var(--green)'}">${totalOverdue}</div><div class="stat-sub">требуют действий</div></div>

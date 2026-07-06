@@ -30,6 +30,15 @@ contextBridge.exposeInMainWorld('api', {
   trainingUpdate: (id, data)  => ipcRenderer.invoke('training:save', id, data),
   trainingAlerts: ()          => ipcRenderer.invoke('training:alerts'),
 
+  // Медицинские допуски (общая подсистема — ЧОП/ФЛОТ и др. аддоны
+  // регистрируют свои типы допусков поверх этого хранилища)
+  medicalClearancesGet:  (id)       => ipcRenderer.invoke('medical-clearances:get', id),
+  medicalClearancesSave: (id, list) => ipcRenderer.invoke('medical-clearances:save', id, list),
+
+  // ЧОП — данные сотрудника (аддон CHOP): разряд, оружие, пост, смены
+  chopGet:  (id)       => ipcRenderer.invoke('chop:get', id),
+  chopSave: (id, data) => ipcRenderer.invoke('chop:save', id, data),
+
   // Документы
   documentsList:  (cid)       => ipcRenderer.invoke('documents:list', cid),
   documentsListAll: ()        => ipcRenderer.invoke('documents:list-all'),

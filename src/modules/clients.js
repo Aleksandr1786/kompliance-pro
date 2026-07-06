@@ -45,7 +45,34 @@ async function filterClients(q) {
 // ── ДОБАВЛЕНИЕ КЛИЕНТА ───────────────────────────────────
 function togglePill(el) {
   el.classList.toggle('checked');
+  el.dataset.userTouched = '1';
 }
+
+// ── АВТОПОДСКАЗКА МОДУЛЯ ЧОП ПО ОКВЭД ─────────────────────
+// ОКВЭД 80.10 «Деятельность частных охранных служб» — специфичный код,
+// не зависящий от того, как называется юрлицо (ЧОП, ООО «Охрана» и т.п.),
+// поэтому надёжнее самоназвания. Но это МЯГКАЯ подсказка, не жёсткая
+// привязка: ОКВЭД мог быть введён неверно, охрана может быть доп. видом
+// деятельности, поэтому пользователь всегда может снять галку сам —
+// после чего dataset.userTouched больше не даст автоподсказке её вернуть.
+function suggestChopByOkved(okved, pillsContainerId) {
+  const clean = (okved || '').replace(/\./g, '');
+  if (!clean.startsWith('8010')) return;
+  const container = document.getElementById(pillsContainerId);
+  if (!container) return;
+  const chopPill = container.querySelector('[data-module="CHOP"]');
+  if (chopPill && !chopPill.classList.contains('checked') && !chopPill.dataset.userTouched) {
+    chopPill.classList.add('checked');
+    showToast('ОКВЭД 80.10 — похоже на охранную деятельность. Отметил модуль «ЧОП», при необходимости снимите галку', 'var(--blue)');
+  }
+}
+
+// Слушаем ввод ОКВЭД глобально (делегирование) — работает независимо
+// от того, когда именно открыта модалка добавления/редактирования клиента
+document.addEventListener('input', (ev) => {
+  if (ev.target?.id === 'c-okved') suggestChopByOkved(ev.target.value, 'c-modules-pills');
+  if (ev.target?.id === 'e-okved') suggestChopByOkved(ev.target.value, 'e-modules-pills');
+});
 
 function _fieldError(id, msg) {
   const el = document.getElementById(id);
@@ -79,7 +106,7 @@ async function submitAddClient() {
     closeModal('modalAddClient');
     return;
   }
-  const mods = [...document.querySelectorAll('.module-pill.checked')].map(p => p.dataset.module).join(',');
+  const mods = [...document.querySelectorAll('#c-modules-pills .module-pill.checked')].map(p => p.dataset.module).join(',');
   const color = COLORS[Math.floor(Math.random() * COLORS.length)];
   const otName = document.getElementById('c-ot-name')?.value?.trim() || '';
   const otPos  = document.getElementById('c-ot-position')?.value?.trim() || '';
@@ -145,7 +172,10 @@ async function submitAddClient() {
    'c-soat-total','c-soat-done','c-soat-c1','c-soat-c2','c-soat-c31','c-soat-c32','c-soat-c33','c-soat-c34','c-soat-c4','c-soat-med-req'
   ].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   const op = document.getElementById('c-order-prefix'); if(op) op.value='1';
-  document.querySelectorAll('.module-pill').forEach(p => { p.classList.toggle('checked', p.dataset.module !== 'VU'); });
+  document.querySelectorAll('#c-modules-pills .module-pill').forEach(p => {
+    p.classList.toggle('checked', p.dataset.module !== 'VU' && p.dataset.module !== 'CHOP');
+    delete p.dataset.userTouched;
+  });
   await navigate('client', result.id);
   // Показываем тур при добавлении первого клиента
   if (isFirstClient && typeof showClientTour === 'function') {
@@ -308,6 +338,7 @@ async function openEditModal(clientId) {
           <div class="module-pill" data-module="OT" onclick="togglePill(this)">Охрана труда</div>
           <div class="module-pill" data-module="PD" onclick="togglePill(this)">ПДн</div>
           <div class="module-pill" data-module="VU" onclick="togglePill(this)">Воинский учёт</div>
+          <div class="module-pill" data-module="CHOP" onclick="togglePill(this)" title="Требует активного аддона CHOP для доступа к разряду/оружию/постам сотрудников">ЧОП (частная охрана)</div>
         </div>
 
         <div class="modal-actions">
@@ -317,7 +348,6 @@ async function openEditModal(clientId) {
         </div>
       </div>`;
     document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) closeModal('modalEditClient'); });
   }
 
   // Сохраняем ID клиента глобально (нужно для кнопок внутри модала)

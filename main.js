@@ -34,7 +34,7 @@ function updateLog(msg) {
 // - Никогда не удаляй существующие миграции
 // - Нумерация строго последовательная: 1, 2, 3...
 
-const DB_VERSION = 5;
+const DB_VERSION = 8;
 
 const MIGRATIONS = [
   {
@@ -157,6 +157,88 @@ const MIGRATIONS = [
       db.get('clients').each(c => {
         if (c.ogrn  === undefined) c.ogrn  = '';
         if (c.email === undefined) c.email = '';
+      }).write();
+    }
+  },
+
+  // ── v6: медицинские допуски сотрудника — общая подсистема вместо
+  // единого чекбокса medcheck_required. Нужна для ЧОП (медосмотр 29н +
+  // справка охранника 1252н + психиатрическое освидетельствование 392н —
+  // три НЕЗАВИСИМЫХ допуска одновременно) и будущего ФЛОТа (29н + 714н).
+  // Каждый аддон декларирует свои типы допусков отдельно, ядро БД просто
+  // хранит массив записей на сотрудника. Старое medcheck_required не
+  // трогаем — оставлено для обратной совместимости ──
+  {
+    version: 6,
+    description: 'Добавление medical_clearances[] сотрудникам — независимые медицинские допуски',
+    up(db) {
+      db.get('employees').each(e => {
+        if (e.medical_clearances === undefined) e.medical_clearances = [];
+      }).write();
+    }
+  },
+
+  // ── v7: медосмотр (29н), медосмотр плавсостава (714н) и психосвиде-
+  // тельствование (392н) жили как под-объекты training.medcheck/
+  // medcheck_714/psycho — единственное место, где они использовались,
+  // это модалка «Обучение» в client-card.js, ни один генератор документов
+  // их не читал. Это создавало риск трёх параллельных источников правды
+  // про медосмотры (training.*, medcheck_required, medical_clearances).
+  // Переносим существующие даты в medical_clearances[] и убираем из
+  // training — обучение и медицинские допуски теперь чётко разделены ──
+  {
+    version: 7,
+    description: 'Перенос training.medcheck/medcheck_714/psycho в medical_clearances[], разделение обучения и мед. допусков',
+    up(db) {
+      const MOVE_MAP = [
+        { trKey: 'medcheck',     type: 'periodic_29n',     years: 1 },
+        { trKey: 'medcheck_714', type: 'maritime_714n',    years: 2 },
+        { trKey: 'psycho',       type: 'psychiatric_392n', years: 5 },
+      ];
+
+      db.get('employees').each(e => {
+        const training   = e.training || {};
+        const clearances = e.medical_clearances || [];
+
+        MOVE_MAP.forEach(m => {
+          const t = training[m.trKey];
+          if (t && t.date) {
+            const alreadyMoved = clearances.some(c => c.type === m.type && c.issued_date === t.date);
+            if (!alreadyMoved) {
+              const issued = new Date(t.date);
+              const until  = new Date(issued);
+              until.setFullYear(until.getFullYear() + m.years);
+              clearances.push({
+                id: 'mc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+                type: m.type,
+                basis_order: '',
+                issued_date: t.date,
+                valid_until: until.toISOString().slice(0, 10),
+              });
+            }
+          }
+          // Удаляем из training — единственный источник правды теперь medical_clearances
+          delete training[m.trKey];
+        });
+
+        e.training           = training;
+        e.medical_clearances = clearances;
+      }).write();
+    }
+  },
+
+  // ── v8: поле chop{} у сотрудника для данных, специфичных для аддона
+  // ЧОП (разряд охранника 4/5/6, допуск к оружию, тип поста, режим
+  // смен) — Закон №2487-1. Хранится в отдельном пространстве имён, а не
+  // плоскими полями employee.*, чтобы не засорять схему сотрудника
+  // данными, которые видны и заполняются только при активном аддоне.
+  // null, пока аддон не используется/поля не заполнены ──
+  {
+    version: 8,
+    description: 'Добавление chop{} сотрудникам — данные для аддона ЧОП (разряд, оружие, пост, смены)',
+    up(db) {
+      db.get('employees').each(e => {
+        if (e.chop === undefined) e.chop = null;
       }).write();
     }
   },
@@ -935,7 +1017,7 @@ function startTelegramScheduler() {
 // Если акт меняется повторно — создаём новую задачу, не объединяем со старой
 // (решение от 19.06.2026): так нагляднее видно историю изменений по клиенту.
 function createNpaTasksForClients(watch, item, aiSummary) {
-  const MODULE_LABELS = { ot: 'охране труда', pd: 'персональным данным', vu: 'воинскому учёту' };
+  const MODULE_LABELS = { ot: 'охране труда', pd: 'персональным данным', vu: 'воинскому учёту', chop: 'частной охранной деятельности' };
   const moduleCode = (watch.module || 'ot').toUpperCase(); // 'OT' | 'PD' | 'VU' — как хранится в client.modules
   const moduleLabel = MODULE_LABELS[watch.module] || watch.module;
 
@@ -1037,6 +1119,19 @@ const NPA_WATCHLIST = [
     relatedDocs: ['ВУ-01 Приказ о назначении ответственного за воинский учёт','ВУ-04 Карточка учёта организации (Форма №18)','ВУ-07 Уведомление в военкомат о приёме военнообязанного','ВУ-08 Уведомление в военкомат об увольнении военнообязанного'] },
   { module: 'vu', code: '53-ФЗ',  label: 'ФЗ № 53-ФЗ — о воинской обязанности и военной службе',
     relatedDocs: ['ВУ-01 Приказ о назначении ответственного за воинский учёт','ВУ-02 Функциональные обязанности ответственного за воинский учёт','ВУ-03 План работы по осуществлению воинского учёта'] },
+
+  // ───────── ЧОП (аддон CHOP) ─────────
+  // module:'chop' → moduleCode='CHOP' (см. createNpaTasksForClients) — задачи
+  // создаются только клиентам с модулем CHOP, дополнительный clientFilter
+  // не нужен, сама принадлежность к модулю уже фильтрует нужных клиентов.
+  { module: 'chop', code: '2487-1', label: 'Закон РФ № 2487-1 — о частной детективной и охранной деятельности',
+    relatedDocs: ['Приказ об утверждении табеля постов охраны','Приказ о допуске к оружию и специальным средствам','Инструкция охраннику поста'] },
+  { module: 'chop', code: '1252н',  label: 'Приказ Минздрава № 1252н — медицинское освидетельствование частных охранников (002-ЧО/у, 002-О/у)',
+    relatedDocs: ['Приказ о допуске к оружию и специальным средствам'] },
+  { module: 'chop', code: '342н',   label: 'Приказ Минздрава № 342н — психиатрическое освидетельствование работников (базовый акт)',
+    relatedDocs: ['Приказ о допуске к оружию и специальным средствам'] },
+  { module: 'chop', code: '392н',   label: 'Приказ Минздрава № 392н — изменения в порядок психиатрического освидетельствования (с 01.03.2026)',
+    relatedDocs: ['Приказ о допуске к оружию и специальным средствам'] },
 ];
 
 // Сигнальные слова — если ИИ-объяснение находки содержит одно из них,
@@ -1497,6 +1592,10 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
     .update(JSON.stringify({ ...client, employees }))
     .digest('hex');
 
+  // Подтягиваем подразделения клиента — для ЧОП это объекты охраны
+  // (см. gen_chop.js: табель постов группирует сотрудников по division_id)
+  const divisions = db.get('divisions').filter({ client_id: clientId }).value();
+
   const clientWithEmployees = {
     ...client,
     // Нормализуем город — убираем лишний "г."
@@ -1509,6 +1608,7 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
     ot_name:           client.ot_name           || client.manager_name || '',
     ot_position:       client.ot_position       || client.manager_position || '',
     ot_name_full:      client.ot_name_full      || client.ot_name || client.manager_name || '',
+    divisions,
     employees: employees.map(e => ({
       full_name:    e.full_name    || '',
       position:     e.position    || '',
@@ -1523,6 +1623,10 @@ ipcMain.handle('docs:generate', async (_, clientId, scope = 'ALL') => {
       tab_number:   e.tab_number  || '',
       gender:       e.gender      || 'm',
       is_military:  e.is_military || 0,
+      // Для аддона ЧОП (gen_chop.js) — подразделение (объект охраны) и
+      // разряд/тип поста/режим смен/допуск к оружию
+      division_id:  e.division_id || null,
+      chop:         e.chop        || null,
     })),
   };
 
@@ -1982,9 +2086,9 @@ ipcMain.handle('docs:generateCommissionOrder', async (_, clientId, orderNum, ord
 // ─── АДДОНЫ ─────────────────────────────────────────────────────────
 // Аддон-ключ: KP-ADDON-[TYPE]-[SHA256(SECRET+ADDON+TYPE+EXPIRE+MACHINE)[:20]]
 // Формула совпадает с keygen-tool.html — не менять в одном месте без другого.
-// Текущие аддоны: TRAINING (самообучение), FLEET (флот), PASF (Профессиональное аварийно-спасательное формирование, 151-ФЗ).
+// Текущие аддоны: TRAINING (самообучение), FLEET (флот), PASF (Профессиональное аварийно-спасательное формирование, 151-ФЗ), CHOP (частные охранные организации, 2487-1).
 // Чтобы добавить новый — достаточно добавить его сюда и в keygen-tool.html.
-const KNOWN_ADDONS = ['TRAINING', 'FLEET', 'PASF'];
+const KNOWN_ADDONS = ['TRAINING', 'FLEET', 'PASF', 'CHOP'];
 
 function generateAddonKey(addonType, expireDate, machineId) {
   const crypto = require('crypto');
@@ -2011,8 +2115,12 @@ ipcMain.handle('addon:activate', (_, key, expireDate, addonType) => {
   const machineId = getMachineId();
   const expected = generateAddonKey(addonType, expireDate, machineId);
 
-  // DEV-MODE: любой аддон активируется командой 'DEV-ADDON-KP2026'
-  if (key.trim() !== 'DEV-ADDON-KP2026' && key.trim().toUpperCase() !== expected) {
+  // DEV-MODE: любой аддон активируется командой 'DEV-ADDON-KP2026' —
+  // ТОЛЬКО в режиме разработки (start.bat). В собранном .exe (app.isPackaged)
+  // эта команда не работает вообще — иначе любой пользователь релизной
+  // сборки мог бы бесплатно активировать любой аддон навсегда.
+  const isDevBypass = !app.isPackaged && key.trim() === 'DEV-ADDON-KP2026';
+  if (!isDevBypass && key.trim().toUpperCase() !== expected) {
     return { ok: false, error: 'Ключ аддона недействителен или не соответствует устройству' };
   }
 
@@ -2045,6 +2153,34 @@ ipcMain.handle('training:get', (_, employeeId) => {
 
 ipcMain.handle('training:save', (_, employeeId, data) => {
   db.get('employees').find({ id: employeeId }).assign({ training: data }).write();
+  return { ok: true };
+});
+
+// ─── МЕДИЦИНСКИЕ ДОПУСКИ (medical_clearances) ─────────────
+// Общая подсистема: сотрудник хранит массив независимых допусков
+// {id, type, basis_order, issued_date, valid_until}. Справочник типов
+// (label, срок действия по умолчанию) декларируется на стороне
+// конкретного аддона (например ЧОП, ФЛОТ) — main.js не знает про них.
+ipcMain.handle('medical-clearances:get', (_, employeeId) => {
+  const emp = db.get('employees').find({ id: employeeId }).value();
+  return emp?.medical_clearances || [];
+});
+
+ipcMain.handle('medical-clearances:save', (_, employeeId, list) => {
+  db.get('employees').find({ id: employeeId }).assign({ medical_clearances: list }).write();
+  return { ok: true };
+});
+
+// ─── ЧОП — данные сотрудника (аддон CHOP) ─────────────────
+// Разряд охранника, допуск к оружию, тип поста, режим смен.
+// Видны/редактируются в UI только когда аддон CHOP активен.
+ipcMain.handle('chop:get', (_, employeeId) => {
+  const emp = db.get('employees').find({ id: employeeId }).value();
+  return emp?.chop || null;
+});
+
+ipcMain.handle('chop:save', (_, employeeId, data) => {
+  db.get('employees').find({ id: employeeId }).assign({ chop: data }).write();
   return { ok: true };
 });
 
@@ -2418,8 +2554,10 @@ ipcMain.handle('license:activate', (_, key, expireDate, type) => {
 
   const machineId = getMachineId();
 
-  // DEV-MODE — для разработчика, без привязки к машине
-  if (key.trim() === 'DEV-MODE-KP2026') {
+  // DEV-MODE — для разработчика, без привязки к машине.
+  // ТОЛЬКО в !app.isPackaged — иначе в собранном .exe эта строка давала бы
+  // ЛЮБОМУ пользователю полную безлимитную лицензию бесплатно навсегда.
+  if (!app.isPackaged && key.trim() === 'DEV-MODE-KP2026') {
     db.get('settings').assign({
       license_key:     'DEV-MODE',
       license_expires: expireDate,

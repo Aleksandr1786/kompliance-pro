@@ -13,23 +13,23 @@ const IMPORT_FIELDS = [
   { key: 'full_name',            label: 'ФИО',                         required: true },
   { key: 'position',             label: 'Должность',                   required: true },
   { key: 'department',           label: 'Подразделение (текстом)',     required: false },
-  { key: 'birth_date',           label: 'Дата рождения',               required: false },
-  { key: 'hired_at',             label: 'Дата приёма',                 required: false },
+  { key: 'birth_date',           label: 'Дата рождения',               required: false, type: 'date' },
+  { key: 'hired_at',             label: 'Дата приёма',                 required: false, type: 'date' },
   { key: 'tab_number',           label: 'Табельный номер',             required: false },
   { key: 'snils',                label: 'СНИЛС',                       required: false },
   { key: 'passport_series',      label: 'Паспорт: серия',              required: false },
   { key: 'passport_number',      label: 'Паспорт: номер',              required: false },
   { key: 'passport_issued_by',   label: 'Паспорт: кем выдан',          required: false },
-  { key: 'passport_issued_date', label: 'Паспорт: дата выдачи',        required: false },
+  { key: 'passport_issued_date', label: 'Паспорт: дата выдачи',        required: false, type: 'date' },
 ];
 
 // Эвристика для автоподстановки маппинга по заголовку колонки — экономит
 // время при первом импорте, пока нет сохранённого маппинга для клиента.
 const HEADER_HINTS = {
-  full_name:            ['фио', 'фамилия имя отчество', 'ф.и.о'],
+  full_name:            ['фио', 'фамилия имя отчество', 'ф.и.о', 'сотрудник'],
   position:              ['должность'],
   department:            ['подразделение', 'отдел'],
-  birth_date:            ['дата рождения', 'рождения'],
+  birth_date:            ['дата рождения'],
   hired_at:              ['дата приема', 'дата приёма', 'принят'],
   tab_number:            ['табельный', 'таб. номер', 'таб номер'],
   snils:                 ['снилс'],
@@ -47,6 +47,148 @@ function guessFieldForHeader(header) {
     if (hints.some(hint => h.includes(hint))) return field.key;
   }
   return '';
+}
+
+// ─── НОРМАЛИЗАЦИЯ ДАТ ─────────────────────────────────────────────
+//
+// <input type="date"> в HTML требует значение строго в формате YYYY-MM-DD.
+// 1С/Excel обычно отдают дату как "ДД.ММ.ГГГГ" (например "01.04.1988") —
+// при прямой записи такой строки в поле-дату браузер её молча не
+// показывает (поле выглядит пустым), хотя в базе сохраняется мусор.
+// Раньше даты писались в БД как есть (rawRow.toString().trim()) без
+// какой-либо нормализации — отсюда "дата рождения и дата выдачи не
+// перенеслись в карточку" при том, что текстовые поля переносились.
+function normalizeDateForInput(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+
+  // Уже ISO (YYYY-MM-DD), в т.ч. с временем — берём только дату
+  let m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (m) return m[1];
+
+  // Настоящие Excel-даты (числовой формат, а не текст) при чтении через
+  // xlsx/SheetJS форматируются встроенным форматом Excel "m/d/yy" —
+  // американский порядок МЕСЯЦ/ДЕНЬ/год, обычно с двузначным годом
+  // (например "4/1/88" для 01.04.1988). Отличаем по разделителю "/":
+  // это признак того, что дата пришла из настоящей Excel-ячейки даты,
+  // а не из текстового поля 1С.
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    const [, mo, d, yRaw] = m;
+    const year = yRaw.length === 2
+      ? (Number(yRaw) <= 30 ? '20' + yRaw : '19' + yRaw) // 00-30 → 2000-2030, иначе 1900-е
+      : yRaw;
+    return `${year}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // Текстовые поля 1С (не настоящие Excel-даты) обычно уже в привычном
+  // российском формате ДД.ММ.ГГГГ — разделитель точка, день первым
+  m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // Excel иногда отдаёт дату как "серийное число" (дней с 30.12.1899) —
+  // подстраховка на случай, если raw:false в читалке файла не сработал
+  const num = Number(s);
+  if (/^\d+$/.test(s) && num > 20000 && num < 60000) {
+    const epoch = Date.UTC(1899, 11, 30);
+    return new Date(epoch + num * 86400000).toISOString().slice(0, 10);
+  }
+
+  // Не удалось распознать формат — не подставляем мусор в поле даты,
+  // пользователь увидит пустое поле и сможет ввести дату вручную
+  return '';
+}
+
+// ─── АВТООПРЕДЕЛЕНИЕ СТРОКИ ЗАГОЛОВКОВ ─────────────────────────────
+//
+// Выгрузки 1С почти всегда начинаются со служебной шапки отчёта — «Отбор:»,
+// «Организация: ...», «Количество: ...» — и только через 5-10 строк идёт
+// настоящая строка заголовков колонок. Раньше бралась жёстко allRows[0],
+// из-за чего вся эта шапка принималась за заголовки, а реальные названия
+// колонок терялись (все колонки уходили в "(без названия)").
+//
+// Ищем среди первых 20 строк ту, где больше всего ячеек похожи на
+// заголовки полей (совпадают с HEADER_HINTS) — это и есть строка заголовков.
+// Если ни одна строка не набрала совпадений (нестандартный файл без
+// узнаваемых названий) — откатываемся к старому поведению (первая строка),
+// чтобы не сломать уже работающие сценарии импорта.
+function detectHeaderRowIndex(allRows) {
+  const SEARCH_LIMIT = Math.min(allRows.length, 20);
+  let bestIndex = 0;
+  let bestScore = 0;
+
+  for (let i = 0; i < SEARCH_LIMIT; i++) {
+    const row = allRows[i];
+    const score = row.reduce((acc, cell) => acc + (guessFieldForHeader(cell) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+
+  // Требуем минимум 2 узнанных поля — одно случайное совпадение
+  // (например, ячейка "Отдел кадров" в служебной шапке) не должно сбивать
+  return bestScore >= 2 ? bestIndex : 0;
+}
+
+// Похоже ли значение на ФИО ("Фамилия Имя Отчество", 2-3 слова с большой
+// буквы)? Нужно, чтобы отличить настоящую строку данных от второй строки
+// двухуровневого заголовка (например "Вид"/"Серия"/"Номер" под общей
+// группой "Удостоверение личности") — короткие подписи колонок на это
+// не похожи, а реальное ФИО сотрудника — похоже.
+function looksLikeFullName(v) {
+  const s = String(v || '').trim();
+  if (!s) return false;
+  const parts = s.split(/\s+/);
+  if (parts.length < 2 || parts.length > 4) return false;
+  return parts.every(p => /^[А-ЯЁ][а-яёA-Za-z\-]+$/.test(p));
+}
+
+// ─── ДВУХУРОВНЕВЫЕ ЗАГОЛОВКИ (объединённые ячейки Excel) ───────────
+//
+// 1С нередко выгружает "составные" заголовки: группа на одной строке
+// (например "Удостоверение личности"), а конкретные подполя (Вид/Серия/
+// Номер/Дата выдачи/Кем выдано) — строкой ниже. При чтении через
+// sheet_to_json такая объединённая ячейка отдаёт текст только в верхней
+// левой ячейке диапазона — соседние клетки приходят пустыми. Если этого
+// не учесть, вторая строка заголовков будет ошибочно принята за первую
+// строку ДАННЫХ сотрудника.
+//
+// Определяем: если строка сразу после найденной строки заголовков не
+// похожа на данные (нет ФИО-подобного значения в колонке ФИО) и при
+// этом сама содержит узнаваемые названия полей — считаем её второй
+// строкой заголовков и объединяем обе в одну плоскую шапку.
+function detectHeaderBlock(allRows) {
+  const primaryIndex = detectHeaderRowIndex(allRows);
+  const rowA = allRows[primaryIndex] || [];
+  const rowB = allRows[primaryIndex + 1] || null;
+
+  if (!rowB) return { primaryIndex, secondaryIndex: null };
+
+  const fullNameCol = rowA.findIndex(h => guessFieldForHeader(h) === 'full_name');
+  const nextLooksLikeData = fullNameCol >= 0 && looksLikeFullName(rowB[fullNameCol]);
+  const nextScore = rowB.reduce((acc, cell) => acc + (guessFieldForHeader(cell) ? 1 : 0), 0);
+
+  const secondaryIndex = (!nextLooksLikeData && nextScore >= 1) ? primaryIndex + 1 : null;
+  return { primaryIndex, secondaryIndex };
+}
+
+// Объединяет две строки заголовков в одну: если в нижней строке (более
+// конкретное подполе, например "Вид") есть значение — берём его, иначе
+// берём значение из верхней строки (например "Должность", у которой нет
+// подполей и объединение идёт просто по вертикали).
+function mergeHeaderRows(rowA, rowB) {
+  const len = Math.max(rowA.length, rowB ? rowB.length : 0);
+  const merged = [];
+  for (let i = 0; i < len; i++) {
+    const b = rowB ? String(rowB[i] || '').trim() : '';
+    const a = String(rowA[i] || '').trim();
+    merged.push(b || a);
+  }
+  return merged;
 }
 
 // Короткая справка «зачем нужен шаблон и как работает импорт» — вызывается
@@ -112,8 +254,36 @@ async function importEmployeesPrompt(clientId) {
     return;
   }
 
-  const headers = allRows[0];
-  const dataRows = allRows.slice(1);
+  const { primaryIndex, secondaryIndex } = detectHeaderBlock(allRows);
+  const lastHeaderIndex = secondaryIndex !== null ? secondaryIndex : primaryIndex;
+  let headers = secondaryIndex !== null
+    ? mergeHeaderRows(allRows[primaryIndex], allRows[secondaryIndex])
+    : allRows[primaryIndex];
+  let dataRows = allRows.slice(lastHeaderIndex + 1);
+
+  if (primaryIndex > 0) {
+    showToast(`Пропущено ${primaryIndex} служебных строк перед заголовками (стандартная шапка отчёта 1С)`);
+  }
+  if (secondaryIndex !== null) {
+    showToast('Обнаружена двухуровневая шапка (например «Удостоверение личности» → Вид/Серия/Номер) — объединил в одну строку заголовков');
+  }
+
+  // 1С часто выгружает технические колонки-разделители для визуальной
+  // группировки (видны как узкие пустые столбцы в Excel) — у них нет ни
+  // заголовка, ни данных ни в одной строке. Незачем показывать их на экране
+  // сопоставления — только путают счётом "35 колонок" и местом на экране.
+  const keepIdx = [];
+  for (let i = 0; i < headers.length; i++) {
+    const hasHeader = String(headers[i] || '').trim() !== '';
+    const hasData = dataRows.some(row => String(row[i] || '').trim() !== '');
+    if (hasHeader || hasData) keepIdx.push(i);
+  }
+  const removedCount = headers.length - keepIdx.length;
+  if (removedCount > 0) {
+    headers = keepIdx.map(i => headers[i]);
+    dataRows = dataRows.map(row => keepIdx.map(i => row[i]));
+    showToast(`Скрыто ${removedCount} пустых технических колонок (без заголовка и без данных)`);
+  }
 
   const savedMapping = await window.api.clientGetImportMapping(clientId);
 
@@ -222,15 +392,26 @@ function showMappingModal(clientId, headers, dataRows, savedMapping) {
           <button id="ai-suggest-btn" style="flex-shrink:0;padding:7px 12px;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.4);border-radius:7px;color:#c4b5fd;cursor:pointer;font-size:11.5px;font-weight:600;white-space:nowrap">КомплаенсПро порекомендует сопоставление</button>
         </div>` : ''}
         <div id="mapping-rows" style="display:flex;flex-direction:column;gap:8px">
-          ${headers.map((h, colIdx) => `
+          ${headers.map((h, colIdx) => {
+            const hasHeader = String(h || '').trim() !== '';
+            let sample = '';
+            if (!hasHeader) {
+              const row = dataRows.find(r => String(r[colIdx] || '').trim() !== '');
+              sample = row ? String(row[colIdx]).trim() : '';
+            }
+            return `
             <div style="display:flex;align-items:center;gap:10px">
-              <div style="flex:1;min-width:0;font-size:12px;color:#e2e8f0;background:#0f1520;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(h||'').toString()}">${h || '(без названия)'}</div>
+              <div style="flex:1;min-width:0;font-size:12px;color:#e2e8f0;background:#0f1520;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(h||'').toString()}">
+                ${h || '(без названия)'}
+                ${sample ? `<div style="font-size:10.5px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">например: «${sample}»</div>` : ''}
+              </div>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" style="flex-shrink:0"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               <select data-col="${colIdx}" class="mapping-select" style="flex:1;padding:8px 10px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
                 <option value="">— Пропустить —</option>
                 ${IMPORT_FIELDS.map(f => `<option value="${f.key}" ${initialMapping[colIdx] === f.key ? 'selected' : ''}>${f.label}${f.required ? ' *' : ''}</option>`).join('')}
               </select>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>
         <div style="display:flex;gap:10px;margin-top:20px">
           <button id="mapping-cancel" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
@@ -270,11 +451,34 @@ function showMappingModal(clientId, headers, dataRows, savedMapping) {
 
       const rows = dataRows.map(rawRow => {
         const obj = {};
+        let unparsedDates = 0;
         mapping.forEach((key, colIdx) => {
-          if (key) obj[key] = (rawRow[colIdx] ?? '').toString().trim();
+          if (!key) return;
+          // Если две колонки файла случайно сопоставлены с одним и тем же
+          // полем (например "Дата рождения" и "День рождения" — с виду
+          // похожие заголовки, но по сути разные вещи) — первое непустое
+          // значение побеждает, вторая колонка его не затирает молча
+          if (obj[key]) return;
+
+          const raw = (rawRow[colIdx] ?? '').toString().trim();
+          const field = IMPORT_FIELDS.find(f => f.key === key);
+          if (field?.type === 'date') {
+            const normalized = normalizeDateForInput(raw);
+            if (raw && !normalized) unparsedDates++;
+            if (normalized) obj[key] = normalized;
+          } else if (raw) {
+            obj[key] = raw;
+          }
         });
+        if (unparsedDates > 0) obj._unparsedDates = unparsedDates;
         return obj;
       }).filter(obj => obj.full_name);
+
+      const totalUnparsedDates = rows.reduce((sum, r) => sum + (r._unparsedDates || 0), 0);
+      if (totalUnparsedDates > 0) {
+        showToast(`Не удалось распознать формат ${totalUnparsedDates} дат — эти поля оставлены пустыми, заполните вручную`);
+      }
+      rows.forEach(r => delete r._unparsedDates);
 
       // Если в файле есть колонка «Подразделение» — предлагаем сопоставить
       // текстовые значения с реальными подразделениями клиента (или создать

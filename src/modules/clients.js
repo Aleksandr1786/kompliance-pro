@@ -9,7 +9,18 @@ async function renderClients() {
   const btn = document.getElementById('topbarAction');
   btn.textContent = '+ ' + term('addClient');
   btn.style.display = 'flex';
-  btn.onclick = () => openModal('modalAddClient');
+  btn.onclick = () => {
+    // Сброс пилюль модулей и флага userTouched при каждом открытии — иначе
+    // если пользователь отменил предыдущее добавление клиента (не дошёл
+    // до "Сохранить"), флаг userTouched на пилюле ЧОП остаётся навсегда
+    // до перезапуска приложения и блокирует автоподсказку по ОКВЭД для
+    // ВСЕХ последующих клиентов в этой сессии. Найдено 11.07.2026.
+    document.querySelectorAll('#c-modules-pills .module-pill').forEach(p => {
+      p.classList.toggle('checked', p.dataset.module !== 'VU' && p.dataset.module !== 'CHOP');
+      delete p.dataset.userTouched;
+    });
+    openModal('modalAddClient');
+  };
 
   // Массовый импорт по нескольким организациям имеет смысл только для
   // аутсорсера (ведёт несколько клиентов сразу) — у штатного специалиста
@@ -43,9 +54,56 @@ async function filterClients(q) {
 // ── КАРТОЧКА КЛИЕНТА ─────────────────────────────────────
 
 // ── ДОБАВЛЕНИЕ КЛИЕНТА ───────────────────────────────────
-function togglePill(el) {
+// ── АВТОПОДСКАЗКА ДОЛЖНОСТИ РУКОВОДИТЕЛЯ ПО ФОРМЕ ЮРЛИЦА ──────
+// Раньше "Индивидуальный предприниматель" стоял первым в списке опций —
+// браузер показывает первую опцию по умолчанию, если явно не выбрано
+// другое. Из-за этого при создании клиента-ООО без осознанного выбора
+// в поле «Должность руководителя» тихо сохранялось "Индивидуальный
+// предприниматель". Теперь первой стоит нейтральная "Генеральный
+// директор", а эта функция при выборе формы юрлица предлагает более
+// точный вариант — но не переопределяет то, что пользователь уже
+// выбрал сам (dataset.userTouched, тот же принцип, что и с ЧОП-пилюлей).
+function syncManagerPositionWithForm(formSelect) {
+  const prefix = formSelect.id.startsWith('c-') ? 'c-' : 'e-';
+  const posSelect = document.getElementById(prefix + 'manager-position');
+  if (!posSelect || posSelect.dataset.userTouched) return;
+
+  const isIP = formSelect.value === 'ИП';
+  const target = isIP ? 'Индивидуальный предприниматель' : 'Генеральный директор';
+  for (const opt of posSelect.options) {
+    if (opt.text === target) { opt.selected = true; break; }
+  }
+}
+
+// Модули, требующие оплаченного дополнительного модуля (аддона) поверх
+// базовой подписки — их нет в списке, значит документооборот не будет
+// формироваться, даже если пилюля отмечена. ОТ — базовый, всегда доступен.
+const ADDON_REQUIRED_LABELS = {
+  PD:   'Персональные данные',
+  VU:   'Воинский учёт',
+  CHOP: 'ЧОП (частная охрана)',
+};
+
+async function togglePill(el) {
   el.classList.toggle('checked');
   el.dataset.userTouched = '1';
+
+  const mod = el.dataset.module;
+  const label = ADDON_REQUIRED_LABELS[mod];
+  if (!label) return; // ОТ — базовый модуль, доп. модуль не нужен, сообщать не о чем
+  if (!el.classList.contains('checked')) return; // выключили галку — сообщать не о чем
+
+  try {
+    const addons = await window.api.addonStatus();
+    const active = addons.some(a => a.type === mod && a.active);
+    if (active) {
+      showToast(`✅ Дополнительный модуль «${label}» активен`, 'var(--green)', 3500);
+    } else {
+      showToast(`⚠️ Необходимо докупить дополнительный модуль «${label}» — без него документы формироваться не будут`, 'var(--amber)', 6000);
+    }
+  } catch (_) {
+    // Не удалось получить статус — не блокируем работу с формой, просто не показываем подсказку
+  }
 }
 
 // ── АВТОПОДСКАЗКА МОДУЛЯ ЧОП ПО ОКВЭД ─────────────────────
@@ -110,13 +168,18 @@ async function submitAddClient() {
   const color = COLORS[Math.floor(Math.random() * COLORS.length)];
   const otName = document.getElementById('c-ot-name')?.value?.trim() || '';
   const otPos  = document.getElementById('c-ot-position')?.value?.trim() || '';
-  // Склоняем ФИО и должность ответственного за ОТ через ИИ — нужны для
-  // фраз вида "Назначить (кого?) [должность] [ФИО]" (винительный падеж).
+  const instrName = document.getElementById('c-instr-name')?.value?.trim() || '';
+  const instrPos  = document.getElementById('c-instr-position')?.value?.trim() || '';
+  // Склоняем ФИО и должность ответственного за ОТ (и, отдельно, за
+  // инструктажи на рабочих местах) через ИИ — нужны для фраз вида
+  // "Назначить (кого?) [должность] [ФИО]" (винительный падеж).
   // Делаем только если поля реально заполнены — иначе нечего склонять.
-  let nameDecl = null, posDecl = null;
-  if ((otName || otPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
+  let nameDecl = null, posDecl = null, instrNameDecl = null, instrPosDecl = null;
+  if ((otName || otPos || instrName || instrPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
   if (otName && window.api.aiRequest) nameDecl = await declineFIO(otName);
   if (otPos  && window.api.aiRequest) posDecl  = await declinePosition(otPos);
+  if (instrName && window.api.aiRequest) instrNameDecl = await declineFIO(instrName);
+  if (instrPos  && window.api.aiRequest) instrPosDecl  = await declinePosition(instrPos);
   const data = {
     name,
     inn:    document.getElementById('c-inn')?.value?.trim() || '',
@@ -140,6 +203,10 @@ async function submitAddClient() {
     ot_position:      otPos,
     ot_name_acc:      nameDecl?.acc || '',
     ot_position_acc:  posDecl?.acc  || '',
+    instr_name:          instrName,
+    instr_position:      instrPos,
+    instr_name_acc:      instrNameDecl?.acc || '',
+    instr_position_acc:  instrPosDecl?.acc  || '',
     soat_class:       document.getElementById('c-soat-class')?.value || '2',
     hazard_works:     document.getElementById('c-hazard-works')?.checked ? 1 : 0,
     medcheck_required:document.getElementById('c-medcheck-required')?.checked ? 1 : 0,
@@ -167,7 +234,7 @@ async function submitAddClient() {
   closeModal('modalAddClient');
   showToast(`Клиент "${name}" добавлен`);
   // Сбрасываем форму
-  ['c-name','c-inn','c-ogrn','c-email','c-okved','c-staff','c-phone','c-city','c-address','c-address-actual','c-ot-name','c-ot-position',
+  ['c-name','c-inn','c-ogrn','c-email','c-okved','c-staff','c-phone','c-city','c-address','c-address-actual','c-ot-name','c-ot-position','c-instr-name','c-instr-position',
    'c-manager-name','c-contract-date','c-git-last-date','c-next-visit-date','c-git-next-date',
    'c-soat-total','c-soat-done','c-soat-c1','c-soat-c2','c-soat-c31','c-soat-c32','c-soat-c33','c-soat-c34','c-soat-c4','c-soat-med-req'
   ].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
@@ -208,7 +275,7 @@ async function openEditModal(clientId) {
         <div class="form-row">
           <div class="form-group"><div class="form-label">ИНН</div><input class="form-input" id="e-inn"></div>
           <div class="form-group"><div class="form-label">Форма</div>
-            <select class="form-select" id="e-form">
+            <select class="form-select" id="e-form" onchange="syncManagerPositionWithForm(this)">
               <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
             </select>
           </div>
@@ -243,10 +310,10 @@ async function openEditModal(clientId) {
         </div>
         <div class="form-row">
           <div class="form-group"><div class="form-label">Должность руководителя</div>
-            <select class="form-select" id="e-manager-position">
-              <option>Индивидуальный предприниматель</option>
+            <select class="form-select" id="e-manager-position" onchange="this.dataset.userTouched='1'">
               <option>Генеральный директор</option><option>Директор</option>
               <option>Исполнительный директор</option><option>Руководитель</option>
+              <option>Индивидуальный предприниматель</option>
             </select>
           </div>
           <div class="form-group"><div class="form-label">ФИО руководителя</div><input class="form-input" id="e-manager-name" placeholder="Иванов Иван Иванович"></div>
@@ -312,6 +379,12 @@ async function openEditModal(clientId) {
           <div class="form-group"><div class="form-label">Должность отв. за ОТ</div><input class="form-input" id="e-ot-position" placeholder="Специалист по ОТ"></div>
           <div class="form-group"><div class="form-label">ФИО отв. за ОТ</div><input class="form-input" id="e-ot-name" placeholder="Петров Пётр Петрович"></div>
         </div>
+        <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ИНСТРУКТАЖИ НА РАБОЧИХ МЕСТАХ</div>
+        <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Первичный/повторный/внеплановый/целевой. Если отличается от ответственного за ОТ — заполните. Иначе оставьте пустым.</div>
+        <div class="form-row">
+          <div class="form-group"><div class="form-label">Должность отв. за инструктажи</div><input class="form-input" id="e-instr-position" placeholder="Главный бухгалтер"></div>
+          <div class="form-group"><div class="form-label">ФИО отв. за инструктажи</div><input class="form-input" id="e-instr-name" placeholder="Петрова Ксения Юрьевна"></div>
+        </div>
         <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">КЛЮЧЕВЫЕ ДАТЫ</div>
         <div class="form-row">
           <div class="form-group">
@@ -336,9 +409,9 @@ async function openEditModal(clientId) {
         <div style="padding:10px 0 6px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">МОДУЛИ</div>
         <div class="modules-check" id="e-modules-pills">
           <div class="module-pill" data-module="OT" onclick="togglePill(this)">Охрана труда</div>
-          <div class="module-pill" data-module="PD" onclick="togglePill(this)">ПДн</div>
-          <div class="module-pill" data-module="VU" onclick="togglePill(this)">Воинский учёт</div>
-          <div class="module-pill" data-module="CHOP" onclick="togglePill(this)" title="Требует активного аддона CHOP для доступа к разряду/оружию/постам сотрудников">ЧОП (частная охрана)</div>
+          <div class="module-pill" data-module="PD" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «Персональные данные»">ПДн</div>
+          <div class="module-pill" data-module="VU" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «Воинский учёт»">Воинский учёт</div>
+          <div class="module-pill" data-module="CHOP" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «ЧОП» — доступ к разряду/оружию/постам сотрудников">ЧОП (частная охрана)</div>
         </div>
 
         <div class="modal-actions">
@@ -368,6 +441,8 @@ async function openEditModal(clientId) {
   document.getElementById('e-manager-name').value  = c.manager_name     || '';
   document.getElementById('e-ot-position').value   = c.ot_position      || '';
   document.getElementById('e-ot-name').value       = c.ot_name          || '';
+  document.getElementById('e-instr-position').value = c.instr_position   || '';
+  document.getElementById('e-instr-name').value     = c.instr_name       || '';
   document.getElementById('e-contract-date').value  = c.contract_date   || '';
   document.getElementById('e-git-last-date').value  = c.git_last_date   || '';
   document.getElementById('e-next-visit-date').value = c.next_visit_date || '';
@@ -382,6 +457,12 @@ async function openEditModal(clientId) {
     } else {
       pill.classList.remove('checked');
     }
+    // Сбрасываем userTouched при каждом открытии формы редактирования —
+    // это модальное окно переиспользуется между разными клиентами (DOM не
+    // пересоздаётся), поэтому клик по пилюле ЧОП у одного клиента иначе
+    // "залипает" и блокирует автоподсказку по ОКВЭД у всех последующих.
+    // Тот же баг, что и в форме добавления, найдено 11.07.2026.
+    delete pill.dataset.userTouched;
   });
   document.getElementById('e-soat-total')?.setAttribute('value', c.soat_total || '');
   document.getElementById('e-soat-done')?.setAttribute('value', c.soat_done || '');
@@ -407,7 +488,14 @@ async function openEditModal(clientId) {
   const regionSel = document.getElementById('e-region');
   for (let opt of regionSel.options) if (opt.value === c.region || opt.text === c.region) { opt.selected = true; break; }
   const posSel = document.getElementById('e-manager-position');
-  for (let opt of posSel.options) if (opt.value === c.manager_position || opt.text === c.manager_position) { opt.selected = true; break; }
+  let posMatched = false;
+  for (let opt of posSel.options) if (opt.value === c.manager_position || opt.text === c.manager_position) { opt.selected = true; posMatched = true; break; }
+  if (posMatched) {
+    posSel.dataset.userTouched = '1'; // уже осознанно сохранённое значение — не переопределять при смене формы
+  } else {
+    delete posSel.dataset.userTouched;
+    syncManagerPositionWithForm(formSel); // не задано — подставляем по форме юрлица, а не первую опцию списка
+  }
 
   openModal('modalEditClient');
 }
@@ -419,16 +507,20 @@ async function submitEditClient(clientId) {
 
   const otName = document.getElementById('e-ot-name').value.trim();
   const otPos  = document.getElementById('e-ot-position').value.trim();
+  const instrName = document.getElementById('e-instr-name').value.trim();
+  const instrPos  = document.getElementById('e-instr-position').value.trim();
   // Раньше тут была проверка "изменилось ли значение" (чтобы не дёргать ИИ
   // зря) — но сравнение шло после .trim(), и если пользователь правил поле
   // не меняя текста по сути (пробелы и т.п.), проверка решала, что ничего
   // не изменилось, и склонение оставалось старым/пустым. Проще и надёжнее
   // всегда пересчитывать при сохранении, если поля заполнены — лишний
   // ИИ-запрос раз в правку карточки клиента не критичен.
-  let nameAcc = '', posAcc = '';
-  if ((otName || otPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
+  let nameAcc = '', posAcc = '', instrNameAcc = '', instrPosAcc = '';
+  if ((otName || otPos || instrName || instrPos) && window.api.aiRequest) showToast('⏳ Согласование падежей...');
   if (otName && window.api.aiRequest) { const d = await declineFIO(otName); nameAcc = d?.acc || ''; }
   if (otPos  && window.api.aiRequest) { const d = await declinePosition(otPos); posAcc = d?.acc || ''; }
+  if (instrName && window.api.aiRequest) { const d = await declineFIO(instrName); instrNameAcc = d?.acc || ''; }
+  if (instrPos  && window.api.aiRequest) { const d = await declinePosition(instrPos); instrPosAcc = d?.acc || ''; }
 
   const data = {
     name,
@@ -450,6 +542,10 @@ async function submitEditClient(clientId) {
     ot_position:       otPos,
     ot_name_acc:       nameAcc,
     ot_position_acc:   posAcc,
+    instr_name:        instrName,
+    instr_position:    instrPos,
+    instr_name_acc:    instrNameAcc,
+    instr_position_acc:instrPosAcc,
     soat_class:        document.getElementById('e-soat-class')?.value || '2',
     hazard_works:      document.getElementById('e-hazard-works')?.checked ? 1 : 0,
     medcheck_required: document.getElementById('e-medcheck-required')?.checked ? 1 : 0,

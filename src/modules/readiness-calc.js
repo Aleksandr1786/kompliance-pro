@@ -86,6 +86,16 @@ function calcVuReadiness(c, emps, vuData) {
   return Math.round(Object.values(checks).filter(Boolean).length / Object.keys(checks).length * 100);
 }
 
+// ── ЧОП: доля документов пакета со статусом "ok" ──────────────────
+// Проще, чем ОТ/ПДн/ВУ (нет отдельных полей ответственного/обучения,
+// специфика ЧОП живёт на уровне сотрудника — допуски, разряд, посты,
+// см. openChopData в client-card.js), поэтому готовность — это просто
+// комплектность самого пакета документов организации.
+function calcChopReadiness(docsChop) {
+  if (!docsChop.length) return 0;
+  return Math.round(docsChop.filter(d => d.status === 'ok').length / docsChop.length * 100);
+}
+
 // ── Хелпер для дашборда: безопасный парс vu_data из settings ──
 function parseVuData(settings, clientId) {
   try { return JSON.parse(settings[`vu_data_${clientId}`] || '{}'); }

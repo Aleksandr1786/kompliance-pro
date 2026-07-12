@@ -23,6 +23,15 @@ async function renderDashboard() {
   // Режим А — Аутсорсер: используем глобальный LICENSE.type из auth.js
   const isOutsourcer = typeof LICENSE !== 'undefined' && LICENSE.type === 'OUTSOURCE';
 
+  // Режим В — ПАСФ (третий тип лицензии, введён 08.07.2026): отдельный
+  // полноэкранный дашборд аварийно-спасательного формирования. Переключается
+  // в настройках («Режим дашборда» → ПАСФ, setDashboardMode в auth.js)
+  // или ключом лицензии типа PASF. ПАСФ всегда штатный (term() → «Компания»).
+  if (typeof LICENSE !== 'undefined' && LICENSE.type === 'PASF') {
+    const allEmps = await window.api.employeesListAll();
+    return renderDashboardPasf(clients, allEmps);
+  }
+
   if (isOutsourcer && clients.length >= 1) {
     // Все документы и сотрудники всех клиентов одним запросом каждый,
     // плюс settings (для vu_data_* — чек-листы готовности ВУ). Нужны
@@ -33,7 +42,15 @@ async function renderDashboard() {
     const allDocs = await window.api.documentsListAll();
     const allEmps = await window.api.employeesListAll();
     const settings = await window.api.settingsGet();
-    renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings);
+    // Активные аддоны — нужны, чтобы приглушать сегменты ПДн/ВУ в кольце
+    // готовности, если аддон не оплачен (данные при этом не прячем —
+    // решение 11.07.2026, см. readiness.js checkTariffAccess).
+    let activeAddonTypes = [];
+    try {
+      const addons = await window.api.addonStatus();
+      activeAddonTypes = addons.filter(a => a.active).map(a => a.type);
+    } catch(_) {}
+    renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings, activeAddonTypes);
   } else {
     await renderDashboardSpecialist(clients, events, alerts, tasks);
   }
@@ -42,7 +59,7 @@ async function renderDashboard() {
 // ─────────────────────────────────────────────────────────────
 // РЕЖИМ А — АУТСОРСЕР
 // ─────────────────────────────────────────────────────────────
-function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings) {
+function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allEmps, settings, activeAddonTypes = []) {
   const now = new Date();
 
   // Считаем просрочки и «на неделе» по каждому клиенту
@@ -56,9 +73,10 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allE
   // «Индекс риска ГИТ» в Центре готовности честно учитывал просроченное
   // обучение сотрудников и не подключённые данные клиента).
   const MODULE_META = {
-    OT: { label: 'ОТ',  color: '#60a5fa' },
-    PD: { label: 'ПДн', color: '#a78bfa' },
-    VU: { label: 'ВУ',  color: '#fb923c' },
+    OT:   { label: 'ОТ',   color: '#60a5fa' },
+    PD:   { label: 'ПДн',  color: '#a78bfa' },
+    VU:   { label: 'ВУ',   color: '#fb923c' },
+    CHOP: { label: 'ЧОП',  color: '#34d399' },
   };
   function moduleReadiness(c, emps, moduleCode) {
     if (moduleCode === 'OT') {
@@ -77,6 +95,11 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allE
       const docsVu = allDocs.filter(d => String(d.client_id) === String(c.id) && d.module === 'VU');
       if (!docsVu.length && !Object.keys(vuData).length) return null;
       return calcVuReadiness(c, emps, vuData);
+    }
+    if (moduleCode === 'CHOP') {
+      const docsChop = allDocs.filter(d => String(d.client_id) === String(c.id) && d.module === 'CHOP');
+      if (!docsChop.length) return null;
+      return calcChopReadiness(docsChop);
     }
     return null;
   }
@@ -115,7 +138,11 @@ function renderDashboardOutsourcer(clients, events, alerts, tasks, allDocs, allE
       .filter(m => MODULE_META[m])
       .map(m => {
         const val = moduleReadiness(c, empsOfClient, m);
-        return { code: m, label: MODULE_META[m].label, color: MODULE_META[m].color, value: val };
+        // ОТ не аддон — всегда активен. ПДн/ВУ/ЧОП приглушаем, если
+        // аддон не оплачен, но само число не прячем (см. readiness.js).
+        const addonRequired = (m === 'PD' || m === 'VU' || m === 'CHOP');
+        const muted = addonRequired && !activeAddonTypes.includes(m);
+        return { code: m, label: MODULE_META[m].label, color: MODULE_META[m].color, value: val, muted };
       })
       .filter(s => s.value !== null); // модуль подключён, но данных по нему нет вовсе — не учитываем в кольце
 
@@ -273,7 +300,7 @@ function renderReadinessRing(segments, size = 76, stroke = 8) {
     const segLen = (c / segments.length) - (segments.length > 1 ? 3 : 0);
     const dash = `${(seg.value / 100) * segLen} ${c}`;
     const arc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${stroke}"
-      stroke-dasharray="${dash}" stroke-dashoffset="${-offset}" stroke-linecap="round"/>`;
+      stroke-dasharray="${dash}" stroke-dashoffset="${-offset}" stroke-linecap="round" ${seg.muted?'opacity="0.35"':''}><title>${seg.label}${seg.muted?' — аддон не активен':''}</title></circle>`;
     offset += c / segments.length;
     return arc;
   }).join('');
@@ -298,9 +325,9 @@ function renderOutsourcerRows(clientStats) {
     const initials = getInitials(c.name);
 
     const segsHtml = c.segments.length ? c.segments.map(s => `
-      <div class="oc-seg">
+      <div class="oc-seg" ${s.muted?'style="opacity:.5" title="Аддон не активен"':''}>
         <span class="oc-seg-dot" style="background:${s.color}"></span>
-        <span class="oc-seg-label">${s.label}</span>
+        <span class="oc-seg-label">${s.label}${s.muted?' 🔒':''}</span>
         <span class="oc-seg-val">${s.value}%</span>
       </div>`).join('') : `<div class="oc-seg"><span class="oc-seg-label">Пакеты ещё не формировались</span></div>`;
 
@@ -838,5 +865,323 @@ async function toggleTask(id, checkEl) {
     if (textEl) textEl.classList.remove('done');
     if (row) row.style.animation = '';
     checkEl.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;transition:border-color .2s" onmouseover="this.style.borderColor='rgba(0,200,83,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.15)'"></span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  Дашборд ПАСФ (аддон PASF) — только штатный специалист.
+//  Отдельный от renderDashboardOutsourcer/Specialist экран (не виджет,
+//  как у ЧОП) — аттестация формирования блокирует работу всей организации,
+//  ей нужно самое заметное место, а не строчка внутри общих рекомендаций.
+// ═══════════════════════════════════════════════════════
+// Погода для ознакомления диспетчера/начальника ПАСФ — НЕ официальный
+// источник штормовых предупреждений (это Росгидромет/УГМС), а быстрый
+// ориентир прямо на дашборде. Порог 15 м/с — из инструкций по работе на
+// высоте (782н) и постановке бонов, где превышение = прекращение работ.
+const PASF_WIND_THRESHOLD_MS = 15;
+
+async function fetchPasfWeather(lat, lon) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=wind_speed_10m,wind_gusts_10m,temperature_2m,weather_code&wind_speed_unit=ms`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.current || null;
+  } catch (e) {
+    return null; // нет сети/API недоступен — виджет просто не покажется, не критично
+  }
+}
+
+async function togglePasfTheme() {
+  try {
+    let s = {};
+    try { s = await window.api.settingsGet() || {}; } catch (e) {}
+    const next = (s.pasf_theme === 'light') ? 'dark' : 'light';
+    await window.api.settingsSave({ pasf_theme: next });
+
+    // Перерисовка напрямую, без зависимости от getClients() из app.js —
+    // берём клиентов через IPC сами, отфильтровав архивных, как getClients.
+    const all = await window.api.clientsList();
+    const clients = (all || []).filter(c => !c.archived);
+    const allEmps = await window.api.employeesListAll();
+    await renderDashboardPasf(clients, allEmps);
+  } catch (e) {
+    console.error('[PASF] Ошибка переключения темы:', e);
+    if (typeof showToast === 'function') showToast('Не удалось переключить тему: ' + e.message, 'var(--red)');
+  }
+}
+
+async function renderDashboardPasf(clients, allEmps) {
+  const pasfClients = clients.filter(c => (c.modules || '').includes('PASF'));
+  const now = new Date();
+  const DAY = 86400000;
+
+  // Тема дашборда ПАСФ — отдельная от общей темы приложения (своя визуальная
+  // система pf-*). По умолчанию тёмная, переключается кнопкой в шапке,
+  // хранится в settings.pasf_theme между запусками.
+  let pasfTheme = 'dark';
+  try { const s = await window.api.settingsGet(); pasfTheme = s?.pasf_theme || 'dark'; } catch (e) {}
+  const isLight = pasfTheme === 'light';
+
+  // Справочники (24 вида работ, 5 классов) живут в main.js — тянем через IPC.
+  // Фолбэк на пустые массивы: дашборд не упадёт, просто покажет ключи вместо меток.
+  let PASF_REF = { workTypes: [], classes: [] };
+  try { PASF_REF = await window.api.pasfReference() || PASF_REF; } catch (e) { /* аддон не активирован — не критично */ }
+
+  function daysLeft(dateStr) {
+    if (!dateStr) return null;
+    return Math.round((new Date(dateStr) - now) / DAY);
+  }
+
+  // ── Аттестация формирования — по каждому клиенту с модулем PASF ──
+  const orgCards = pasfClients.map(c => {
+    const att = c.pasf; // {cert_number, attestation_date, expiry_date, attesting_body, work_types[]}
+    let status = 'none', dl = null;
+    if (att && att.expiry_date) {
+      dl = daysLeft(att.expiry_date);
+      status = dl < 0 ? 'expired' : dl <= 90 ? 'expiring' : 'ok';
+    }
+    return { client: c, att, status, daysLeft: dl };
+  });
+
+  const expiredOrgs  = orgCards.filter(o => o.status === 'expired').length;
+  const expiringOrgs = orgCards.filter(o => o.status === 'expiring').length;
+  const noneOrgs     = orgCards.filter(o => o.status === 'none').length;
+
+  // ── Спасатели по всем клиентам с PASF ──
+  const clientIds = new Set(pasfClients.map(c => String(c.id)));
+  const rescuers = allEmps.filter(e => clientIds.has(String(e.client_id)) && e.pasf);
+
+  const classExpiring = rescuers.filter(e => {
+    const dl = daysLeft(e.pasf.next_attestation_due);
+    return dl !== null && dl <= 90;
+  });
+  const noDactyloscopy = rescuers.filter(e => !e.pasf.dactyloscopy_registered);
+
+  // ── Покрытие допусков по видам работ (сколько спасателей допущено хотя бы к одному) ──
+  const totalWorkTypes = PASF_REF.workTypes.length || 24;
+  const permitCoverage = {};
+  rescuers.forEach(e => {
+    (e.pasf.work_permits || []).forEach(p => {
+      if (p.attested) permitCoverage[p.work_type] = (permitCoverage[p.work_type] || 0) + 1;
+    });
+  });
+  const coveredWorkTypes = Object.keys(permitCoverage).length;
+
+  function orgStatusBadge(o) {
+    if (o.status === 'expired')  return `<span class="pf-status pf-status-red">Просрочена</span>`;
+    if (o.status === 'expiring') return `<span class="pf-status pf-status-amber">Истекает ${o.daysLeft} дн.</span>`;
+    if (o.status === 'ok')       return `<span class="pf-status pf-status-ok">До ${formatDate(o.att.expiry_date)}</span>`;
+    return `<span class="pf-status pf-status-red">Не внесена</span>`;
+  }
+
+  // Токены темы — тёмная/светлая, обе с усиленным контрастом текста и
+  // общей "промышленной" логикой (острые углы, моно-данные, боны вместо
+  // абстрактной ленты). Переключение — кнопка в шапке, settings.pasf_theme.
+  const T = isLight ? {
+    bg:'#E4E7EB', panel:'#FFFFFF', border:'#8A939C', text:'#0A0D10', muted:'#454E59',
+    orange:'#E14A0F', red:'#C6362E', amber:'#B87A0A', green:'#1E8563',
+    waterLo:'#E8ECEF', waterHi:'#C4CCD4', boomTop:'#FF6A2B', boomBot:'#B8390F',
+  } : {
+    bg:'#14181D', panel:'#242C36', border:'#5C6773', text:'#F5F7F8', muted:'#A7B0BA',
+    orange:'#FF5A1F', red:'#F0564C', amber:'#F7BE5C', green:'#3FC49A',
+    waterLo:'#1B2128', waterHi:'#14181D', boomTop:'#FF7A3D', boomBot:'#C24413',
+  };
+  const boomStrip = (expiredOrgs + noneOrgs) > 0 ? `
+      <div class="pf-hazard-strip" style="background:linear-gradient(180deg, transparent 0%, transparent 55%, ${T.waterHi} 55%, ${T.waterLo} 100%)">
+        <div class="pf-boom-segs">
+          ${Array.from({length:6}).map((_,i) => `<div class="pf-boom-seg" style="background:linear-gradient(180deg, ${T.boomTop} 0%, ${T.orange} 55%, ${T.boomBot} 100%)"></div>${i<5?`<div class="pf-boom-link" style="background:${T.text}"></div>`:''}`).join('')}
+        </div>
+      </div>` : '';
+
+  document.getElementById('content').innerHTML = `
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+      /* ── ПАСФ — отдельный визуальный язык, тёмная/светлая тема (08.07.2026) ──
+         Брутальный/промышленный: острые углы, без теней, сигнальный
+         оранжевый, моноширинные данные, боновое заграждение вместо
+         абстрактной "барьерной ленты" на критичном статусе. Изолировано
+         префиксом pf- от .oc-*/.panel-* остальных дашбордов.
+         ВАЖНО: цвета подставлены как литеральные значения (${T.panel} и т.п.),
+         БЕЗ var(--pf-*) — на этом окружении CSS custom properties, заданные
+         через #content{...} внутри innerHTML самого #content, надёжно не
+         резолвились (проверено эмпирически: псевдоэлементы с var() рисовались,
+         фон/рамка через var() на самом .pf-panel — нет). Литералы работают
+         гарантированно независимо от причины. */
+      #content{ background:${T.bg} !important; }
+      #content .pf-eyebrow{ font-family:'IBM Plex Mono',monospace !important; font-size:11px; color:${T.muted} !important;
+        letter-spacing:.12em; text-transform:uppercase; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      #content .pf-theme-btn{ font-family:'IBM Plex Mono',monospace !important; font-size:10.5px; color:${T.muted} !important;
+        background:transparent; border:2px solid ${T.border} !important; border-radius:2px; padding:4px 10px;
+        cursor:pointer; text-transform:uppercase; letter-spacing:.05em; }
+      #content .pf-theme-btn:hover{ color:${T.orange} !important; border-color:${T.orange} !important; }
+      #content .pf-h1{ font-family:'Oswald',sans-serif !important; font-weight:700; font-size:24px;
+        text-transform:uppercase; letter-spacing:.01em; color:${T.text} !important; margin-bottom:20px;
+        padding-left:14px; border-left:4px solid ${T.orange} !important; }
+      #content .pf-stats{ display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+      #content .pf-stat{ flex:1; min-width:200px; background:${T.panel} !important; border:2px solid ${T.border} !important;
+        border-top:4px solid ${T.border} !important; border-radius:2px !important; padding:14px 16px; box-shadow:none !important; }
+      #content .pf-stat.danger{ border-top-color:${T.red} !important; }
+      #content .pf-stat.amber{ border-top-color:${T.amber} !important; }
+      #content .pf-stat-num{ font-family:'Oswald',sans-serif !important; font-size:27px; font-weight:700; color:${T.text} !important; font-variant-numeric:tabular-nums; }
+      #content .pf-stat-label{ font-family:'IBM Plex Mono',monospace !important; font-size:10px; color:${T.muted} !important;
+        text-transform:uppercase; letter-spacing:.05em; margin-top:4px; }
+      #content .pf-stat.danger .pf-stat-num{ color:${T.red} !important; }
+      #content .pf-stat.amber .pf-stat-num{ color:${T.amber} !important; }
+      #content .pf-panel{ position:relative; background:${T.panel} !important; border:2px solid ${T.border} !important; border-radius:2px !important;
+        margin-bottom:16px; overflow:visible; box-shadow:none !important; }
+      #content .pf-panel:before, #content .pf-panel:after{ content:""; position:absolute; width:12px; height:12px;
+        border-color:${T.muted}; border-style:solid; opacity:.5; pointer-events:none; }
+      #content .pf-panel:before{ top:-1px; left:-1px; border-width:2px 0 0 2px; }
+      #content .pf-panel:after{ bottom:-1px; right:-1px; border-width:0 2px 2px 0; }
+      #content .pf-hazard-strip{ height:18px; position:relative; overflow:hidden; }
+      #content .pf-boom-segs{ position:absolute; top:2px; left:0; right:0; height:10px; display:flex; align-items:stretch; padding:0 4px; }
+      #content .pf-boom-seg{ flex:1; margin:0 1px; border-radius:1px; }
+      #content .pf-boom-link{ width:3px; flex-shrink:0; margin-top:-2px; height:14px; border-radius:1px; opacity:.85; }
+      #content .pf-panel-head{ display:flex; align-items:center; justify-content:space-between;
+        padding:13px 16px; border-bottom:2px solid ${T.border} !important; }
+      #content .pf-panel-title{ font-family:'Oswald',sans-serif !important; font-weight:600; font-size:13px;
+        text-transform:uppercase; letter-spacing:.04em; color:${T.text} !important; }
+      #content .pf-panel-count{ font-family:'IBM Plex Mono',monospace !important; font-size:11px; color:${T.muted} !important;
+        border:2px solid ${T.border} !important; padding:2px 8px; border-radius:2px !important; }
+      #content .pf-panel-body{ padding:4px 16px; }
+      #content .pf-row{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding:12px 0 12px 12px; border-bottom:2px solid ${T.border} !important; border-left:3px solid transparent;
+        margin-left:-12px; cursor:pointer; }
+      #content .pf-row:last-child{ border-bottom:none !important; }
+      #content .pf-row.r-red{ border-left-color:${T.red} !important; }
+      #content .pf-row.r-amber{ border-left-color:${T.amber} !important; }
+      #content .pf-row:hover .pf-row-name{ color:${T.orange} !important; }
+      #content .pf-row-name{ font-size:14px; font-weight:600; color:${T.text} !important; transition:color .15s; }
+      #content .pf-row-meta{ font-family:'IBM Plex Mono',monospace !important; font-size:11px; color:${T.muted} !important; margin-top:3px; }
+      #content .pf-status{ font-family:'IBM Plex Mono',monospace !important; font-size:10.5px; font-weight:700;
+        letter-spacing:.05em; text-transform:uppercase; padding:4px 9px; border-radius:2px !important;
+        white-space:nowrap; flex-shrink:0; }
+      #content .pf-status:before{ content:"["; margin-right:3px; opacity:.6; }
+      #content .pf-status:after{ content:"]"; margin-left:3px; opacity:.6; }
+      #content .pf-status-ok{ color:${T.green} !important; background:rgba(47,168,138,.15) !important; border:1px solid ${T.green} !important; }
+      #content .pf-status-amber{ color:${T.amber} !important; background:rgba(242,169,59,.15) !important; border:1px solid ${T.amber} !important; }
+      #content .pf-status-red{ color:${T.red} !important; background:rgba(232,67,58,.15) !important; border:1px solid ${T.red} !important; }
+      #content .pf-empty{ padding:32px 16px; text-align:center; color:${T.muted} !important; font-size:12.5px; }
+      #content .pf-footnote{ padding:0 16px 14px; font-size:10.5px; color:${T.muted} !important; opacity:.85; }
+    </style>
+
+    <div class="pf-eyebrow">
+      <span>Дашборд · ПАСФ · ${now.toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'})}</span>
+      <button class="pf-theme-btn" onclick="togglePasfTheme()">${isLight ? '● Тёмная тема' : '○ Светлая тема'}</button>
+    </div>
+    <div class="pf-h1">Аттестация и готовность формирования</div>
+
+    <div class="pf-stats">
+      <div class="pf-stat danger" style="background:${T.panel};border-color:${T.border}">
+        <div class="pf-stat-num">${expiredOrgs + noneOrgs}</div>
+        <div class="pf-stat-label">Без действующей аттестации</div>
+      </div>
+      <div class="pf-stat amber" style="background:${T.panel};border-color:${T.border}">
+        <div class="pf-stat-num">${expiringOrgs}</div>
+        <div class="pf-stat-label">Истекает в ближайшие 90 дней</div>
+      </div>
+      <div class="pf-stat amber" style="background:${T.panel};border-color:${T.border}">
+        <div class="pf-stat-num">${classExpiring.length}</div>
+        <div class="pf-stat-label">Спасателей — переаттестация класса</div>
+      </div>
+      <div class="pf-stat danger" style="background:${T.panel};border-color:${T.border}">
+        <div class="pf-stat-num">${noDactyloscopy.length}</div>
+        <div class="pf-stat-label">Без дактилоскопии (ст.24.1 151-ФЗ)</div>
+      </div>
+    </div>
+
+    <div class="pf-panel" id="pasf-weather-panel" style="background:${T.panel};border-color:${T.border};${pasfClients.some(c => c.pasf?.location?.lat) ? '' : 'display:none'}">
+      <div class="pf-panel-head"><div class="pf-panel-title">Погода на базе · ветер и порывы</div><div class="pf-panel-count">Open-Meteo</div></div>
+      <div class="pf-panel-body" id="pasf-weather-body" style="display:flex;flex-wrap:wrap;gap:12px;padding-top:12px;padding-bottom:12px">
+        <div style="color:${T.muted};font-size:12px">Загрузка...</div>
+      </div>
+      <div class="pf-footnote">Ознакомительная информация, не заменяет официальные штормовые предупреждения Росгидромета/УГМС. Порог остановки работ на открытых площадках — ${PASF_WIND_THRESHOLD_MS} м/с (782н).</div>
+    </div>
+
+    <div class="pf-panel" style="background:${T.panel};border-color:${T.border}">
+      ${boomStrip}
+      <div class="pf-panel-head"><div class="pf-panel-title">Аттестация формирований</div><div class="pf-panel-count">${pasfClients.length}</div></div>
+      <div class="pf-panel-body">
+        ${pasfClients.length ? orgCards.map(o => `
+          <div class="pf-row ${o.status === 'expired' || o.status === 'none' ? 'r-red' : o.status === 'expiring' ? 'r-amber' : ''}" onclick="navigate('client',${o.client.id})">
+            <div>
+              <div class="pf-row-name">${o.client.name}</div>
+              <div class="pf-row-meta">${o.att && o.att.cert_number ? 'СВИДЕТЕЛЬСТВО № ' + o.att.cert_number : 'ДАННЫЕ НЕ ВНЕСЕНЫ'}${o.att && o.att.max_spill_volume ? ' · ДО ' + ({'100':'100 Т','100-500':'500 Т','500-1000':'1000 Т','1000-5000':'5000 Т','5000+':'5000+ Т'}[o.att.max_spill_volume] || o.att.max_spill_volume) : ''}</div>
+            </div>
+            ${orgStatusBadge(o)}
+          </div>
+        `).join('') : '<div class="pf-empty">Нет клиентов с модулем ПАСФ<br>Подключите аддон PASF в карточке клиента</div>'}
+      </div>
+    </div>
+
+    <div class="pf-panel" style="background:${T.panel};border-color:${T.border}">
+      <div class="pf-panel-head"><div class="pf-panel-title">Классы спасателей — приближается переаттестация</div><div class="pf-panel-count">${classExpiring.length}</div></div>
+      <div class="pf-panel-body">
+        ${classExpiring.length ? classExpiring.map(e => {
+          const dl = daysLeft(e.pasf.next_attestation_due);
+          const cls = PASF_REF.classes.find(c => c.key === e.pasf.current_class);
+          return `<div class="pf-row ${dl < 0 ? 'r-red' : 'r-amber'}" onclick="navigate('client',${e.client_id})">
+            <div>
+              <div class="pf-row-name">${e.name}</div>
+              <div class="pf-row-meta">${(cls ? cls.label : e.pasf.current_class || '—').toUpperCase()}</div>
+            </div>
+            ${dl < 0
+              ? `<span class="pf-status pf-status-red">Просрочено ${-dl} дн.</span>`
+              : `<span class="pf-status pf-status-amber">Через ${dl} дн.</span>`}
+          </div>`;
+        }).join('') : '<div class="pf-empty">Все классы актуальны<br>Ближайших переаттестаций в течение 90 дней нет</div>'}
+      </div>
+    </div>
+
+    <div class="pf-panel" style="background:${T.panel};border-color:${T.border}">
+      <div class="pf-panel-head"><div class="pf-panel-title">Покрытие допусков к видам работ</div><div class="pf-panel-count">${coveredWorkTypes}/${totalWorkTypes}</div></div>
+      <div class="pf-panel-body" style="color:${T.muted};font-size:12.5px;line-height:1.6;padding-top:14px;padding-bottom:16px">
+        ${rescuers.length
+          ? `Из ${totalWorkTypes} видов работ хотя бы один аттестованный спасатель есть на ${coveredWorkTypes}.
+             ${coveredWorkTypes < totalWorkTypes ? `<span style="color:${T.amber}">Не покрыто: ${totalWorkTypes - coveredWorkTypes} вид(ов) — если формирование заявляет эти работы, нужна аттестация конкретных спасателей.</span>` : 'Все заявленные виды работ покрыты хотя бы одним допущенным спасателем.'}`
+          : 'Нет данных по допускам спасателей — заполните work_permits в карточках сотрудников.'}
+      </div>
+    </div>
+  `;
+
+  // Фон #content ставим через JS setProperty(...,'important'), а НЕ через
+  // <style>-блок: инлайновый !important физически не может проиграть ни
+  // одному правилу в стилевых листах приложения, независимо от специфичности
+  // их селекторов — а именно это и было причиной, что фон страницы не
+  // перекрашивался, хотя классовые правила (.pf-panel и т.д.) применялись
+  // нормально (у них не было конкурентов в глобальных стилях).
+  document.getElementById('content').style.setProperty('background', T.bg, 'important');
+
+  // Погода — асинхронно, после отрисовки (не блокирует остальной дашборд,
+  // если сеть недоступна). Каждая организация с заданными координатами базы
+  // получает свою карточку — важно для роста в крупные структуры типа
+  // Морспасслужбы с несколькими базами/районами, а не одна точка на всех.
+  const withLocation = pasfClients.filter(c => c.pasf?.location?.lat && c.pasf?.location?.lon);
+  if (withLocation.length) {
+    const results = await Promise.all(withLocation.map(async c => ({
+      client: c,
+      weather: await fetchPasfWeather(c.pasf.location.lat, c.pasf.location.lon),
+    })));
+    const body = document.getElementById('pasf-weather-body');
+    if (body) {
+      const cards = results.filter(r => r.weather).map(r => {
+        const w = r.weather;
+        const wind = w.wind_speed_10m;
+        const alert = wind >= PASF_WIND_THRESHOLD_MS;
+        return `
+          <div style="flex:1;min-width:200px;padding:14px;background:${T.panel};border:1px solid ${alert ? T.red : T.border};border-radius:2px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:${T.text};text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${(r.client.pasf.location.label || r.client.name).toUpperCase()}</div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <div style="font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:${alert ? T.red : T.text}">${wind}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${T.muted}">м/с ветер</div>
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${T.muted};margin-top:4px">порывы до ${w.wind_gusts_10m} м/с · ${w.temperature_2m}°C</div>
+            ${alert ? `<div style="margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;color:${T.red};text-transform:uppercase">⚠ превышен порог остановки работ (${PASF_WIND_THRESHOLD_MS} м/с)</div>` : ''}
+          </div>`;
+      }).join('');
+      body.innerHTML = cards || `<div style="color:${T.muted};font-size:12px">Нет данных — проверьте соединение с интернетом</div>`;
+    }
   }
 }

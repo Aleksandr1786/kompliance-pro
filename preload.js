@@ -39,11 +39,23 @@ contextBridge.exposeInMainWorld('api', {
   chopGet:  (id)       => ipcRenderer.invoke('chop:get', id),
   chopSave: (id, data) => ipcRenderer.invoke('chop:save', id, data),
 
+  // ПАСФ (аддон PASF) — два уровня данных:
+  // уровень клиента — аттестация формирования (блокирующий статус, 151-ФЗ ст.12)
+  pasfOrgGet:  (clientId)       => ipcRenderer.invoke('pasf-org:get', clientId),
+  pasfOrgSave: (clientId, data) => ipcRenderer.invoke('pasf-org:save', clientId, data),
+  // уровень сотрудника — класс спасателя, дактилоскопия, допуски к видам АСР
+  pasfGet:       (id)       => ipcRenderer.invoke('pasf:get', id),
+  pasfSave:      (id, data) => ipcRenderer.invoke('pasf:save', id, data),
+  // справочники для UI: 24 вида работ + 5 классов с периодичностью
+  pasfReference: ()         => ipcRenderer.invoke('pasf:reference'),
+
   // Документы
   documentsList:  (cid)       => ipcRenderer.invoke('documents:list', cid),
   documentsListAll: ()        => ipcRenderer.invoke('documents:list-all'),
   documentAdd:    (data)      => ipcRenderer.invoke('documents:add', data),
   documentStatus: (id, s)     => ipcRenderer.invoke('documents:update-status', id, s),
+  documentDelete: (id)        => ipcRenderer.invoke('documents:delete', id),
+  documentsClear: (cid, module) => ipcRenderer.invoke('documents:clear', cid, module),
 
   // События
   eventsList:     (cid)       => ipcRenderer.invoke('events:list', cid),
@@ -68,6 +80,14 @@ contextBridge.exposeInMainWorld('api', {
   npaMarkSeen:      (id)      => ipcRenderer.invoke('npa:markSeen', id),
   npaCheckNow:      ()        => ipcRenderer.invoke('npa:checkNow'),
 
+  // Аудит актуальности цитат НПА — отдельно от мониторинга изменений выше:
+  // это проверка, что сами номера актов, зашитые в генераторах, ещё
+  // корректны и актуальны (см. main.js, чат 19, 09.07.2026).
+  npaCitationAuditList:  ()   => ipcRenderer.invoke('npa:citationAuditList'),
+  npaCitationMarkSeen:   (id) => ipcRenderer.invoke('npa:citationMarkSeen', id),
+  npaCheckCitationsNow:  ()   => ipcRenderer.invoke('npa:checkCitationsNow'),
+  onNpaCitationProgress: (cb) => ipcRenderer.on('npa:citationProgress', (_, d) => cb(d)),
+
   // Статистика
   dashboardStats: ()          => ipcRenderer.invoke('stats:dashboard'),
 
@@ -89,6 +109,13 @@ contextBridge.exposeInMainWorld('api', {
 
   // AI / Ассистент
   aiRequest:      (data)      => ipcRenderer.invoke('ai:request', data),
+  // Черновик инструкции по ОТ через ИИ (ai-draft.js) — для должностей вне
+  // справочника SPECIALIZED_ROLES. Лимит 5/мес на компанию считается в main.js.
+  aiDraftInstruction: (clientId, position, industry) => ipcRenderer.invoke('ai:draftInstruction', clientId, position, industry),
+  // Склонение ФИО (локально, lvovich) и должностей (Морфер, RU-хостинг) —
+  // заменили DeepSeek 09.07.2026, см. main.js для причин.
+  declineFio:      (fullName)     => ipcRenderer.invoke('fio:decline', fullName),
+  declinePosition: (positionText) => ipcRenderer.invoke('position:decline', positionText),
 
   // Центр обучения — реестр удостоверений
   certsList:      (clientId)      => ipcRenderer.invoke('certs:list', clientId),

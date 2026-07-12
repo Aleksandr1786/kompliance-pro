@@ -3,10 +3,17 @@
 
 const base=require('./gen_p1');
 const { safe, makeRunner } = require('./utils');
-const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW}=base;
+const {norm,save,oNum,approvalBlock,approvalOrder,orderHead,orderSign,famSheet,famSheetOrder,devSign,sealBox,bul,H,SH,p,pC,pR,pL,eL,cell,row,tbl,footer,FONT,SZ,SZ_S,SZ_H,MP,ML,CW,declRole}=base;
 const {PageOrientation}=require('docx');
 const { gen_intro_briefing, gen_primary_briefing } = require('./gen_instructage');
 const { gen_chop_instructions, gen_chop_post_table, gen_chop_weapon_order } = require('./gen_chop');
+const {
+  gen_pasf_00_spasatel_obshaya, gen_pasf_01_spasatel_more, gen_pasf_02_bony,
+  gen_pasf_03_skimmer, gen_pasf_04_gaz_razvedka, gen_pasf_05_poisk_spasenie,
+  gen_pasf_06_kontrol_bezopasnosti, gen_pasf_07_nedopushenie_zagryazneniya,
+  gen_pasf_08_dostup_v_zonu, gen_pasf_09_pb_lrn, gen_pasf_10_elektrobezopasnost,
+  gen_pasf_11_dispetcher, gen_pasf_12_asr_obshie,
+} = require('./gen_pasf');
 
 // ── РАЗДЕЛ 6 ───────────────────────────────────────────
 // Ширина контента альбомный A4 = 15398 DXA
@@ -47,8 +54,9 @@ async function gen_06_01(c,s,dir){
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...empRows,...emptyRows]),
+    ...sealBox(c),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'Журнал регистрации вводного инструктажа.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('06.01')},children:ch}],dir,'Журнал регистрации вводного инструктажа.docx');
 }
 
 async function gen_06_02(c,s,dir){
@@ -78,10 +86,11 @@ async function gen_06_02(c,s,dir){
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
+    ...sealBox(c),
     ...eL(1),
     p([{t:'Виды инструктажей: ',b:true},{t:'П — первичный; Пв — повторный; Вн — внеплановый; Ц — целевой.'}],{sz:SZ_S}),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'Журнал регистрации инструктажа на рабочем месте.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('06.02')},children:ch}],dir,'Журнал регистрации инструктажа на рабочем месте.docx');
 }
 
 async function gen_06_03(c,s,dir){
@@ -110,8 +119,9 @@ async function gen_06_03(c,s,dir){
     pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
+    ...sealBox(c),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'Журнал учёта микротравм.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('06.03')},children:ch}],dir,'Журнал учёта микротравм.docx');
 }
 
 async function gen_06_04(c,s,dir){
@@ -141,8 +151,9 @@ async function gen_06_04(c,s,dir){
     pL('Окончен: «____» __________________ ______ г.'),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
+    ...sealBox(c),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'Журнал учёта выдачи СИЗ.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('06.04')},children:ch}],dir,'Журнал учёта выдачи СИЗ.docx');
 }
 
 async function gen_06_05(c,s,dir){
@@ -167,6 +178,7 @@ async function gen_06_05(c,s,dir){
     pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
     ...eL(1),
     tbl(colW,[hdr,...emptyRows]),
+    ...sealBox(c),
   ];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('06.05')},children:ch}],dir,'Журнал контроля аптечки первой помощи.docx');
 }
@@ -200,7 +212,7 @@ async function gen_06_06(c,s,dir){
     ...eL(2),
     pL('Ответственный за ДСИЗ: ________________  '+(c.dsiz_name||c.manager_name)),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'Личная карточка учёта выдачи СИЗ.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('06.06')},children:ch}],dir,'Личная карточка учёта выдачи СИЗ.docx');
 }
 
 // ── РАЗДЕЛ 6 (продолжение) — ПРОГРАММЫ ОБУЧЕНИЯ ПО ОТ ──────────────
@@ -539,33 +551,86 @@ async function gen_07_02(c,s,dir){
 async function gen_07_03(c,s,dir){
   const orderN=oNum(c,6);
   const pColW=[700,5500,1400];
-  const pD=[['1','Основные требования пожарной безопасности в офисе','5'],['2','Причины пожаров и меры предотвращения','5'],['3','Действия при обнаружении пожара','5'],['4','Правила эвакуации','5'],['5','Первичные средства пожаротушения — правила пользования','5']];
+  const pD=[['1','Основные требования пожарной безопасности в офисе','5'],['2','Причины пожаров и меры их предотвращения','5'],['3','Действия при обнаружении пожара','5'],['4','Правила эвакуации','5'],['5','Первичные средства пожаротушения, правила пользования','5']];
   const pH=row([cell('№ темы',pColW[0],{bold:true,center:true}),cell('Наименование темы',pColW[1],{bold:true,center:true}),cell('Время (мин)',pColW[2],{bold:true,center:true})]);
   const pR=pD.map(r=>row([cell(r[0],pColW[0],{center:true,sz:SZ_S}),cell(r[1],pColW[1],{sz:SZ_S}),cell(r[2],pColW[2],{center:true,sz:SZ_S})]));
-  const pT=row([cell('ИТОГО:',pColW[0]+pColW[1],{bold:true}),cell('25',pColW[2],{bold:true,center:true})]);
-  const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА № 03-ПИ'),H('ПРОТИВОПОЖАРНОГО ИНСТРУКТАЖА'),H(c.name.toUpperCase(),SZ),...eL(1),
+  const pT=row([cell('ИТОГО:',pColW[0]+pColW[1],{bold:true,cs:2}),cell('25',pColW[2],{bold:true,center:true})]);
+  const ch=[approvalOrder(c,orderN),...eL(1),H('ПРОГРАММА № 03-ПИ'),H('ПРОТИВОПОЖАРНОГО ИНСТРУКТАЖА'),H(safe(c.name).toUpperCase(),SZ),...eL(1),
     SH('1. Общие положения'),
-    p('1.1. Определяет порядок противопожарного инструктажа с работниками '+safe(c.name)+'.',{indent:true}),
-    p('1.2. Проводит '+safe(c.manager_position)+'. Виды: вводный; первичный; повторный (не реже 1 раза в год); внеплановый; целевой.',{indent:true}),
-    SH('2. Тематический план'),
+    p('1.1. Настоящая программа определяет порядок и темы проведения противопожарного инструктажа с работниками '+safe(c.name)+'.',{indent:true}),
+    p('1.2. Противопожарный инструктаж проводит '+safe(c.manager_position)+' (как лицо, ответственное за пожарную безопасность) со всеми работниками организации.',{indent:true}),
+    p('1.3. Проводятся следующие виды противопожарного инструктажа:',{indent:true}),
+    bul('вводный — при приёме на работу;'),
+    bul('первичный на рабочем месте — при приёме на работу, затем не реже 1 раза в год;'),
+    bul('повторный — не реже 1 раза в год по программе первичного;'),
+    bul('внеплановый — при изменении требований, при пожарах, по предписанию надзорных органов;'),
+    bul('целевой — перед выполнением работ повышенной опасности.'),
+    p('1.4. О проведении противопожарного инструктажа делается запись в Журнале учёта противопожарных инструктажей (либо в Журнале инструктажа на рабочем месте).',{indent:true}),
+
+    SH('2. Тематический план противопожарного инструктажа'),
     tbl(pColW,[pH,...pR,pT]),
-    SH('3. Содержание'),
-    p([{t:'Тема 1. ',b:true},{t:'Требования ПБ в офисе'}]),
-    bul('Запрет курения в помещениях; открытого огня; загромождения выходов.'),
-    bul('Запрет неисправных розеток; оставления включённых приборов; перегрузки сети.'),
-    p([{t:'Тема 2. ',b:true},{t:'Причины пожаров и меры предотвращения'}]),
-    bul('КЗ электропроводки; неисправность приборов; нарушение эксплуатации оргтехники; курение.'),
-    p([{t:'Тема 3. ',b:true},{t:'Действия при пожаре'}]),
-    bul('НЕ ПАНИКОВАТЬ.'),
-    bul('101 или 112 (адрес, место, фамилия). Сообщить руководителю. Эвакуация. Огнетушитель.'),
-    p([{t:'Тема 4. ',b:true},{t:'Правила эвакуации'}]),
-    bul('Эвакуационные выходы (уточнить). При задымлении — ткань. Место сбора. Перекличка.'),
-    p([{t:'Тема 5. ',b:true},{t:'Первичные средства пожаротушения'}]),
-    bul('ОУ (углекислотный): пломба → чека → раструб на очаг → рычаг. НЕ ДЕРЖАТЬ ЗА РАСТРУБ.'),
-    bul('ОП (порошковый): пломба → чека → рычаг → на очаг. Оба — с наветренной стороны.'),
-    bul('ЗАПРЕЩЕНО тушить электрооборудование под напряжением водой.'),
+
+    SH('3. Содержание программы противопожарного инструктажа'),
+    p('Тема 1. Основные требования пожарной безопасности в офисе',{bold:true}),
+    p('Правила пожарной безопасности в здании:',{indent:true}),
+    bul('запрет курения в помещениях (только в специально отведённых местах);'),
+    bul('запрет использования открытого огня;'),
+    bul('запрет загромождения путей эвакуации, проходов, выходов;'),
+    bul('запрет хранения горючих материалов вблизи электрощитов, розеток.'),
+    p('Требования к эксплуатации электроприборов:',{indent:true}),
+    bul('запрет использования неисправных розеток, вилок, кабелей;'),
+    bul('запрет оставления включённых электроприборов без присмотра;'),
+    bul('запрет использования электроприборов с открытой спиралью;'),
+    bul('запрет перегрузки электросети (включение нескольких мощных приборов в одну розетку).'),
+    p('Тема 2. Причины пожаров и меры их предотвращения',{bold:true}),
+    p('Наиболее вероятные причины пожаров в офисе:',{indent:true}),
+    bul('короткое замыкание электропроводки;'),
+    bul('неисправность электроприборов;'),
+    bul('нарушение правил эксплуатации оргтехники;'),
+    bul('оставление включённых приборов без присмотра;'),
+    bul('неосторожное обращение с огнём (курение).'),
+    p('Меры предотвращения:',{indent:true}),
+    bul('своевременное отключение неисправного оборудования;'),
+    bul('регулярная проверка состояния розеток, вилок, кабелей;'),
+    bul('содержание рабочего места в чистоте;'),
+    bul('соблюдение правил эксплуатации.'),
+    p('Тема 3. Действия при обнаружении пожара',{bold:true}),
+    p('Порядок действий при обнаружении признаков пожара (дым, запах гари, открытый огонь):',{indent:true}),
+    bul('НЕ ПАНИКОВАТЬ;'),
+    bul('немедленно сообщить в пожарную охрану по телефону 101 или 112 (чётко назвать адрес, место пожара, свою фамилию);'),
+    bul('сообщить '+declRole(safe(c.manager_position),'dat')+';'),
+    bul('отключить электрооборудование от сети;'),
+    bul('приступить к тушению пожара первичными средствами (огнетушитель);'),
+    bul('если потушить невозможно — организовать эвакуацию людей.'),
+    p('Тема 4. Правила эвакуации',{bold:true}),
+    bul('места расположения эвакуационных выходов (основной и запасной);'),
+    bul('план эвакуации (место размещения, схема);'),
+    bul('пути эвакуации, запрет их загромождения.'),
+    p('Действия при эвакуации:',{indent:true}),
+    bul('двигаться спокойно, без паники;'),
+    bul('при сильном задымлении дышать через влажную ткань;'),
+    bul('помочь пострадавшим;'),
+    bul('собраться в установленном месте сбора;'),
+    bul('пройти перекличку.'),
+    p('Тема 5. Первичные средства пожаротушения, правила пользования',{bold:true}),
+    bul('типы огнетушителей в организации (углекислотные, порошковые);'),
+    bul('места расположения огнетушителей.'),
+    p('Правила пользования углекислотным огнетушителем (ОУ):',{indent:true}),
+    bul('сорвать пломбу, выдернуть чеку;'),
+    bul('направить раструб на очаг пожара;'),
+    bul('нажать рычаг;'),
+    bul('НЕ ДЕРЖАТЬСЯ ЗА РАСТРУБ (опасность обморожения);'),
+    bul('тушить с наветренной стороны.'),
+    p('Правила пользования порошковым огнетушителем (ОП):',{indent:true}),
+    bul('сорвать пломбу, выдернуть чеку;'),
+    bul('нажать рычаг;'),
+    bul('направить на очаг;'),
+    bul('тушить с наветренной стороны.'),
+    p('Запрещается использовать воду для тушения электрооборудования, находящегося под напряжением.',{indent:true}),
+
     SH('4. Заключительные положения'),
-    p('4.1. Устный опрос. Неудовлетворительный результат — к работе не допускается.',{indent:true}),
+    p('4.1. Противопожарный инструктаж завершается проверкой знаний в форме устного опроса.',{indent:true}),
+    p('4.2. Работник, показавший неудовлетворительные знания, к работе не допускается и обязан пройти инструктаж повторно.',{indent:true}),
     ...devSign(c)];
   return save([{properties:{page:{size:{width:11906,height:16838},margin:MP}},footers:{default:footer('07.03')},children:ch}],dir,'Программа противопожарного инструктажа.docx');
 }
@@ -615,11 +680,12 @@ async function gen_08_01(c,s,dir){
     pL('Ответственный: '+safe(c.ot_position)+'  '+safe(c.ot_name)),
     ...eL(1),
     tbl(colW,[hdr,...empRows,...emptyRows]),
+    ...sealBox(c),
     ...eL(1),
     p([{t:'Виды инструктажей: ',b:true},{t:'Вв — вводный (при приёме на работу); Пв — повторный (не реже 1 раза в год); Вн — внеплановый (при изменении противопожарного режима, после случаев пожара); Ц — целевой (перед выполнением пожароопасных работ).'}],{sz:SZ_S}),
     p('Основание: Правила противопожарного режима в Российской Федерации (утв. постановлением Правительства РФ от 16.09.2020 № 1479); Программа № 03-ПИ (Раздел 6).',{sz:SZ_S}),
   ];
-  return save([{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.LANDSCAPE},margin:ML}},footers:{default:footer('07.01')},children:ch}],dir,'Журнал регистрации противопожарных инструктажей.docx');
+  return save([{properties:{page:{size:{width:16838,height:11906},margin:ML}},footers:{default:footer('07.01')},children:ch}],dir,'Журнал регистрации противопожарных инструктажей.docx');
 }
 
 async function gen_08_02(c,s,dir){
@@ -704,14 +770,28 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
 
   // Какие модули генерировать в этот заход (scope: 'ALL' | 'OT' | 'PD' | 'VU')
   const genOT = scope === 'ALL' || scope === 'OT';
-  const genPD = (scope === 'ALL' || scope === 'PD') && (client.modules || '').includes('PD');
-  const genVU = (scope === 'ALL' || scope === 'VU') && (client.modules || '').includes('VU');
+  // ПДн и ВУ — аддоны поверх ОТ-тарифа, по тому же паттерну, что и ЧОП
+  // ниже: нужны ОБА условия — клиент помечен модулем (это его "хочу
+  // этот функционал") И аддон активен в лицензии (это "оплатил").
+  // Одного client.modules недостаточно — иначе документы продолжат
+  // формироваться и после истечения/отключения аддона. (11.07.2026:
+  // раньше проверялся только client.modules — рассинхрон с моделью
+  // "аддон = платная подписка", исправлено по образцу genCHOP.)
+  const genPD = (scope === 'ALL' || scope === 'PD') && (client.modules || '').includes('PD') && (s.license_addons || []).includes('PD');
+  const genVU = (scope === 'ALL' || scope === 'VU') && (client.modules || '').includes('VU') && (s.license_addons || []).includes('VU');
   // ЧОП — надстройка над ОТ, а не отдельный модуль: нужны ОБА условия —
   // клиент помечен модулем CHOP (это охранная организация) И аддон CHOP
   // активен в лицензии (s.license_addons). Одного модуля недостаточно —
   // иначе документы продолжат формироваться и после истечения/отключения
   // аддона, что нарушит модель "аддон = платная подписка".
   const genCHOP = genOT && (client.modules || '').includes('CHOP') && (s.license_addons || []).includes('CHOP');
+  // ПАСФ — НЕ аддон поверх обычного ОТ-тарифа (в отличие от ЧОП выше).
+  // Это самостоятельный ТИП лицензии (см. keygen.js: TARIFFS.PASF —
+  // { type: 'PASF', limit: 0 }), активируемый ключом целиком на
+  // установку. Подтверждено 10.07.2026: проверяем s.license_type,
+  // а не client.modules/license_addons — иначе логика не будет
+  // соответствовать реальной модели лицензирования продукта.
+  const genPASF = genOT && s.license_type === 'PASF';
 
   // Весь ОТ кладём в подпапку «Охрана труда» — единообразно с ПДн и ВУ
   const otDir = path.join(outputDir, 'Охрана труда');
@@ -732,6 +812,12 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
     d7:path.join(otDir,'Раздел 6. Программы обучения'),
     d8:path.join(otDir,'Раздел 7. Протоколы обучения'),
     d9:path.join(otDir,'Раздел 8. ЧОП'),
+    d10:path.join(otDir,'Раздел 9. ПАСФ'),
+    // Раздел «Планы» — новый, добавлен 12.07.2026 по просьбе Александра.
+    // Число в имени папки (10) не следует непосредственно за d10=ПАСФ по
+    // ключу объекта, но соответствует order:10 в sections.js — это не
+    // баг, просто у ПАСФ и Планов номера совпадают случайно с ключами dN.
+    dPlans:path.join(otDir,'Раздел 10. Планы мероприятий'),
   };
 
   // Временная папка для генерации
@@ -746,13 +832,26 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   const run = makeRunner(c, s, outputDir, tmpRoot, generated, errors, report);
 
   if(genOT){
-  // Создаём папки ОТ — НЕ удаляем файлы заранее
-  for(const d of Object.values(dirs)) fs.mkdirSync(d,{recursive:true});
+  // Создаём папки ОТ — НЕ удаляем файлы заранее.
+  // d9 (ЧОП) и d10 (ПАСФ) сюда намеренно не входят — раньше цикл создавал
+  // их всем клиентам без исключения, даже без активного модуля/аддона,
+  // и пустая «Раздел 9. ПАСФ» лишний раз путала (найдено 12.07.2026).
+  // Создаются точечно внутри if(genCHOP)/if(genPASF) ниже.
+  for(const [key, d] of Object.entries(dirs)) {
+    if (key === 'd9' || key === 'd10') continue;
+    fs.mkdirSync(d,{recursive:true});
+  }
 
-  await run(p1.gen_01_01,dirs.d1);await run(p1.gen_01_02,dirs.d1);await run(p1.gen_01_03,dirs.d1);
+  // ИСПРАВЛЕНО 12.07.2026 (сверка по инициативе Александра): gen_01_01/02
+  // писались в dirs.d1 (Приказы) по историческому именованию функций
+  // (все "gen_01_XX"), но по смыслу это ЛНА — Политика и Положение о
+  // СУОТ, а не приказы. Перенесены в dirs.d2 вместе с остальными
+  // Положениями. gen_01_10/11 (План мероприятий, График) — заведён
+  // отдельный раздел OT_PLANS (dirs.dPlans, см. sections.js) вместо d1.
+  await run(p1.gen_01_01,dirs.d2);await run(p1.gen_01_02,dirs.d2);await run(p1.gen_01_03,dirs.d1);
   await run(p1.gen_01_04,dirs.d1);await run(p1.gen_01_05,dirs.d1);await run(p1.gen_01_06,dirs.d1);
   await run(p1.gen_01_07,dirs.d1);await run(p1.gen_01_08,dirs.d1);await run(p1.gen_01_09,dirs.d1);
-  await run(p1.gen_01_10,dirs.d1);await run(p1.gen_01_11,dirs.d1);
+  await run(p1.gen_01_10,dirs.dPlans);await run(p1.gen_01_11,dirs.dPlans);
 
   // Условные документы Раздела 1
   const soatClass   = parseInt(c.soat_class||'2');
@@ -779,7 +878,17 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   await run(p2.gen_03_01,dirs.d3);await run(p2.gen_03_02,dirs.d3);
 
   await run(p2.gen_05_01,dirs.d5);await run(p2.gen_05_employees,dirs.d5);
-  await run(p2.gen_05_06,dirs.d5);await run(p2.gen_05_07,dirs.d5);await run(p2.gen_05_08,dirs.d5);
+  await run(p2.gen_05_06,dirs.d5);await run(p2.gen_05_07,dirs.d5);
+  // ИСПРАВЛЕНО 12.07.2026 (повторно): предыдущая правка тут была ОШИБОЧНОЙ —
+  // я неверно определил границы функции gen_05_08 при сверке (regex случайно
+  // зацепил файл из другой функции 6 функций ниже). gen_05_08 реально
+  // генерирует «Инструкция о порядке использования аптечки» — самая
+  // настоящая инструкция, возвращена в dirs.d5. «Приказ о создании комиссии
+  // по проверке знаний» генерируется отдельной функцией gen_commission_order
+  // через отдельный IPC-хендлер (docs:generateCommissionOrder, main.js) —
+  // не часть общего пакета «Сформировать пакет» вообще, никогда не лежал
+  // в d5 и трогать его тут было нечего.
+  await run(p2.gen_05_08,dirs.d5);
 
   // Инструкции по видам работ повышенной опасности — не по должности,
   // а по факту наличия таких работ у клиента (тот же hasHazard, что и выше).
@@ -797,20 +906,30 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
   }
   await run(gen_06_05,dirs.d6); // журнал контроля аптечки — всегда
 
-  // Программы обучения — всегда формируются
-  await run(gen_06_07,dirs.d6); // Программа А (16ч) — для всех работников
-  await run(gen_06_10,dirs.d6); // Программа первой помощи — для всех
+  // Программы обучения — всегда формируются.
+  // ИСПРАВЛЕНО 12.07.2026: раньше писались в dirs.d6 (Журналы учёта) —
+  // историческая нумерация функций gen_06_XX сбивала с толку, реально
+  // это «Раздел 6. Программы обучения» = dirs.d7. Найдено при сверке
+  // приложения с диском.
+  await run(gen_06_07,dirs.d7); // Программа А (16ч) — для всех работников
+  await run(gen_06_10,dirs.d7); // Программа первой помощи — для всех
   // Программа А (40ч) — для ответственных и специалистов по ОТ
-  if(c.ot_name||c.ot_position) await run(gen_06_08,dirs.d6);
+  if(c.ot_name||c.ot_position) await run(gen_06_08,dirs.d7);
   // Программа Б — для руководителей (если указан руководитель)
-  if(c.manager_name) await run(gen_06_09,dirs.d6);
+  if(c.manager_name) await run(gen_06_09,dirs.d7);
 
   await run(gen_intro_briefing,dirs.d7);   // Программа вводного инструктажа (с привязкой к ОКВЭД + конспект)
   await run(gen_primary_briefing,dirs.d7); // Программа первичного инструктажа (с привязкой к ОКВЭД + конспект + освобождённые)
   await run(gen_07_03,dirs.d7);
 
   // Раздел 7. Протоколы обучения (новое)
-  await run(gen_08_01,dirs.d8); // Журнал противопожарных инструктажей
+  // Раздел 5. Журналы учёта / Раздел 7. Протоколы обучения — разделены
+  // по СУТИ документа (12.07.2026): журнал регистрации фиксирует факт
+  // проведения инструктажа, протокол — результат проверки знаний
+  // комиссией. Раньше оба лежали в «Протоколах» просто потому, что были
+  // написаны в одном пакете разработки — исправлено на логическое
+  // распределение по инициативе Александра.
+  await run(gen_08_01,dirs.d6); // Журнал противопожарных инструктажей — это журнал, не протокол
   await run(gen_08_02,dirs.d8); // Протокол проверки знания требований ОТ (микропредприятия)
 
   // Раздел 8. ЧОП (аддон CHOP) — только если модуль клиента + аддон активны
@@ -824,6 +943,29 @@ async function generatePackage(client,settings,outputDir,scope='ALL'){
     // Инструкции охраннику по фактически используемым типам постов —
     // цикл внутри самой функции (см. gen_chop.js), как и gen_05_employees
     await run(gen_chop_instructions, dirs.d9);
+  }
+
+  // Раздел 9. ПАСФ (самостоятельная лицензия, не аддон) — все документы
+  // генерируются безусловно при активной лицензии типа PASF: список
+  // ролей/видов работ зафиксирован по согласованному объёму (2 роли,
+  // 4 вида работ, 6 процедурных документов) — дальнейшего сужения по
+  // c.hazard_works или другим флагам не требуется, в отличие от ОТ-
+  // инструкций по видам работ выше (hasHazard).
+  if(genPASF){
+    fs.mkdirSync(dirs.d10,{recursive:true});
+    await run(gen_pasf_00_spasatel_obshaya, dirs.d10);
+    await run(gen_pasf_01_spasatel_more,    dirs.d10);
+    await run(gen_pasf_02_bony,             dirs.d10);
+    await run(gen_pasf_03_skimmer,          dirs.d10);
+    await run(gen_pasf_04_gaz_razvedka,     dirs.d10);
+    await run(gen_pasf_05_poisk_spasenie,   dirs.d10);
+    await run(gen_pasf_06_kontrol_bezopasnosti,        dirs.d10);
+    await run(gen_pasf_07_nedopushenie_zagryazneniya,  dirs.d10);
+    await run(gen_pasf_08_dostup_v_zonu,    dirs.d10);
+    await run(gen_pasf_09_pb_lrn,           dirs.d10);
+    await run(gen_pasf_10_elektrobezopasnost, dirs.d10);
+    await run(gen_pasf_11_dispetcher,       dirs.d10);
+    await run(gen_pasf_12_asr_obshie,       dirs.d10);
   }
 
   await run(gen_checklist,otDir);

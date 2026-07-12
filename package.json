@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.39",
+  "version": "1.0.40",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -17,6 +17,7 @@
     "dotenv": "^17.4.2",
     "electron-updater": "^6.1.7",
     "lowdb": "1.0.0",
+    "lvovich": "^2.1.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
@@ -65,6 +66,10 @@
       "gen_vu.js",
       "gen_instructage.js",
       "gen_sout.js",
+      "gen_chop.js",
+      "gen_pasf.js",
+      "doc-generation.js",
+      "lock-utils.js",
       "utils.js",
       "sections.js",
       "doc-meta.js",

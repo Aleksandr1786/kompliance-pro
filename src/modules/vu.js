@@ -480,6 +480,7 @@ async function renderClientVu(clientId) {
             <span style="font-size:11px;color:var(--muted2);font-weight:500">${vuDocs.length} шт.</span>
           </span>
           ${vuFolder ? `<button onclick="window.api.docsOpenFolder('${vuFolder}')" style="padding:6px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer">📁 Открыть папку</button>` : ''}
+          ${vuDocs.length ? `<button onclick="clearDocsPrompt(${clientId},'VU')" title="Удалить все документы модуля — и запись в базе, и файлы на диске" style="padding:6px 12px;font-size:11px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#f87171;cursor:pointer;margin-left:6px">🗑 Очистить пакет</button>` : ''}
         </div>
         ${vuDocs.length ? `
         <div>${renderDocsBySection(vuDocs, 'VU')}</div>` : `<div style="font-size:12px;color:var(--muted2);padding:8px 0">Пока не сформированы — нажмите «Сформировать пакет» выше.</div>`}

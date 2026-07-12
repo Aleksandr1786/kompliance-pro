@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.open-meteo.com">
 <title>КомплаенсПро</title>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
@@ -25,6 +25,7 @@
     <div class="nav-item" data-page="pd"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span style="display:flex;flex-direction:column;line-height:1.35"><span>ПДн</span><span style="font-size:10.5px;font-weight:400;color:var(--muted2)">Документы и защита по 152-ФЗ</span></span></div>
     <div class="nav-item" data-page="vu"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span style="display:flex;flex-direction:column;line-height:1.35"><span>Воинский учёт</span><span style="font-size:10.5px;font-weight:400;color:var(--muted2)">Документы и отчётность в военкомат</span></span></div>
     <div class="nav-section">Система</div>
+    <div class="nav-item" data-page="npaAudit" style="display:none"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></span> <span style="display:flex;flex-direction:column;line-height:1.35"><span>Аудит нормативки</span><span style="font-size:10.5px;font-weight:400;color:var(--muted2)">Актуальность цитат НПА в документах</span></span> <span class="nav-badge" id="badge-npa-audit" style="display:none;background:#f87171;color:#fff">0</span></div>
     <div class="nav-item" data-page="settings"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span> Настройки</div>
   </nav>
   <div class="sidebar-bottom">
@@ -68,7 +69,7 @@
       </div>
       <div class="form-group">
         <div class="form-label">Форма</div>
-        <select class="form-select" id="c-form">
+        <select class="form-select" id="c-form" onchange="syncManagerPositionWithForm(this)">
           <option>ООО</option><option>ИП</option><option>АО / ЗАО</option><option>ГУП / МУП</option><option>НКО</option>
         </select>
       </div>
@@ -147,12 +148,12 @@
     <div class="form-row">
       <div class="form-group">
         <div class="form-label">Должность руководителя</div>
-        <select class="form-select" id="c-manager-position">
-          <option>Индивидуальный предприниматель</option>
+        <select class="form-select" id="c-manager-position" onchange="this.dataset.userTouched='1'">
           <option>Генеральный директор</option>
           <option>Директор</option>
           <option>Исполнительный директор</option>
           <option>Руководитель</option>
+          <option>Индивидуальный предприниматель</option>
         </select>
       </div>
       <div class="form-group">
@@ -233,6 +234,20 @@
       </div>
     </div>
 
+    <!-- ОТВЕТСТВЕННЫЙ ЗА ИНСТРУКТАЖИ НА РАБОЧИХ МЕСТАХ -->
+    <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">ОТВЕТСТВЕННЫЙ ЗА ИНСТРУКТАЖИ НА РАБОЧИХ МЕСТАХ</div>
+    <div style="font-size:11px;color:var(--muted2);margin-bottom:8px">Первичный/повторный/внеплановый/целевой. Если отличается от ответственного за ОТ — заполните. Иначе оставьте пустым (будет использован ответственный за ОТ).</div>
+    <div class="form-row">
+      <div class="form-group">
+        <div class="form-label">Должность отв. за инструктажи</div>
+        <input class="form-input" id="c-instr-position" placeholder="Главный бухгалтер">
+      </div>
+      <div class="form-group">
+        <div class="form-label">ФИО отв. за инструктажи</div>
+        <input class="form-input" id="c-instr-name" placeholder="Петрова Ксения Юрьевна">
+      </div>
+    </div>
+
     <!-- КЛЮЧЕВЫЕ ДАТЫ -->
     <div style="padding:10px 0 4px;font-size:11px;color:var(--muted2);font-weight:600;letter-spacing:.5px">КЛЮЧЕВЫЕ ДАТЫ</div>
     <div class="form-row">
@@ -257,13 +272,19 @@
     </div>
 
     <!-- МОДУЛИ -->
+    <!-- ВАЖНО: PASF сюда НЕ добавлять. В отличие от CHOP (аддон поверх
+         обычного клиента), ПАСФ — самостоятельный тариф-лицензия: модули
+         PASF+OT проставляются автоматически при активации PASF-ключа
+         (license:activate в main.js), без ручного выбора. Решение от
+         08.07.2026 — ПАСФ не должен быть доступен для включения ни у
+         одного обычного (аутсорсер/штатный) клиента. -->
     <div class="form-group" style="margin-top:4px">
       <div class="form-label">Модули</div>
       <div class="modules-check" id="c-modules-pills">
         <div class="module-pill checked" data-module="OT" onclick="togglePill(this)">Охрана труда</div>
-        <div class="module-pill checked" data-module="PD" onclick="togglePill(this)">ПДн</div>
-        <div class="module-pill" data-module="VU" onclick="togglePill(this)">Воинский учёт</div>
-        <div class="module-pill" data-module="CHOP" onclick="togglePill(this)" title="Требует активного аддона CHOP для доступа к разряду/оружию/постам сотрудников">ЧОП (частная охрана)</div>
+        <div class="module-pill checked" data-module="PD" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «Персональные данные»">ПДн</div>
+        <div class="module-pill" data-module="VU" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «Воинский учёт»">Воинский учёт</div>
+        <div class="module-pill" data-module="CHOP" onclick="togglePill(this)" title="Требует оплаченного дополнительного модуля «ЧОП» — доступ к разряду/оружию/постам сотрудников">ЧОП (частная охрана)</div>
       </div>
       <div style="font-size:10.5px;color:#475569;margin-top:5px">⚡ Выберите все направления, которые ведёте по этому клиенту</div>
     </div>
@@ -298,6 +319,7 @@
 <script src="modules/docs-generation.js"></script>
 <script src="modules/ot.js"></script>
 <script src="modules/pd.js"></script>
+<script src="modules/npa-audit.js"></script>
 <script src="modules/sout.js"></script>
 <script src="modules/vu.js"></script>
 <script src="modules/archive.js"></script>

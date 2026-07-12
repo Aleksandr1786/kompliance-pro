@@ -6,7 +6,7 @@
 
 var LICENSE = {
   type:        'OUTSOURCE',        // SOLO | OUTSOURCE
-  modules:     ['OT','PD','VU'],   // доступные модули
+  modules:     ['OT'],              // доступные модули — ПДн/ВУ появятся после refreshLicenseModules() по факту аддонов, здесь только безопасный дефолт до первой синхронизации
   max_clients: 2,                  // лимит триала (обновится из checkTrial)
   size:        null,               // MICRO|SMALL|MEDIUM|LARGE (для SOLO)
   expires_at:  '',                 // дата окончания (заполнится из триала/лицензии)
@@ -38,6 +38,33 @@ async function syncLicenseFromBackend() {
     }
   } catch (e) {
     console.warn('[License] Не удалось получить статус:', e);
+  }
+  // ПДн/ВУ — аддоны поверх лицензии (11.07.2026), а не встроенный бандл.
+  // Раньше LICENSE.modules был захардкожен ['OT','PD','VU'] и checkAccess()
+  // всегда пускал в ПДн/ВУ независимо от того, оплачен ли аддон — это и
+  // была третья несогласованная точка проверки помимо generator.js и
+  // client-card.js. Теперь пересчитываем модули из реального статуса
+  // аддонов при каждой синхронизации лицензии.
+  await refreshLicenseModules();
+}
+
+// ОТ — всегда доступен на любой лицензии (кроме ПАСФ-вертикали, где тоже
+// нужен для собственного персонала — там модуль ставится напрямую в
+// license:activate на main.js). ПДн/ВУ включаются в список модулей
+// только если соответствующий аддон реально активен и не истёк.
+async function refreshLicenseModules() {
+  try {
+    const addons = await window.api.addonStatus();
+    const active = new Set(addons.filter(a => a.active).map(a => a.type));
+    const mods = ['OT'];
+    if (active.has('PD')) mods.push('PD');
+    if (active.has('VU')) mods.push('VU');
+    LICENSE.modules = mods;
+  } catch (e) {
+    // Не удалось получить статус аддонов — не рискуем пускать в ПДн/ВУ
+    // без подтверждения; оставляем только ОТ.
+    console.warn('[License] Не удалось получить статус аддонов:', e);
+    LICENSE.modules = ['OT'];
   }
 }
 
@@ -134,10 +161,12 @@ function logoutAdmin() {
 }
 
 function setDashboardMode(mode) {
-  LICENSE.type = mode === 'outsourcer' ? 'OUTSOURCE' : 'SOLO';
+  LICENSE.type = mode === 'outsourcer' ? 'OUTSOURCE' : mode === 'pasf' ? 'PASF' : 'SOLO';
   window.api.settingsSave({ license_type: LICENSE.type }); // запоминаем режим между запусками
-  showToast(mode === 'outsourcer' ? 'Режим: Аутсорсер' : 'Режим: Штатный специалист', 'var(--green)');
+  const labels = { outsourcer: 'Режим: Аутсорсер', specialist: 'Режим: Штатный специалист', pasf: 'Режим: ПАСФ' };
+  showToast(labels[mode] || 'Режим переключён', 'var(--green)');
   if (typeof applyNavTerms === 'function') applyNavTerms(); // обновляем метки сайдбара/модалов
+  if (typeof applyPasfNavFilter === 'function') applyPasfNavFilter(); // скрываем ПДн/ВУ для режима ПАСФ
   navigate('dashboard');
 }
 
@@ -321,7 +350,7 @@ async function activateLicensePublic() {
   LICENSE.expires_at = expire;
   LICENSE.active     = true;
   LICENSE.type       = result.type || 'OUTSOURCE';
-  LICENSE.modules    = ['OT', 'PD', 'VU'];
+  await refreshLicenseModules(); // ПДн/ВУ — по факту купленных аддонов, не бандлом
 
   document.getElementById('trial-badge')?.remove();
   errEl.textContent = '';
@@ -351,7 +380,7 @@ async function activateLicenseFromSettings() {
   LICENSE.expires_at = expire;
   LICENSE.active     = true;
   LICENSE.type       = result.type || 'OUTSOURCE';
-  LICENSE.modules    = ['OT', 'PD', 'VU'];
+  await refreshLicenseModules(); // ПДн/ВУ — по факту купленных аддонов, не бандлом
 
   document.getElementById('trial-badge')?.remove();
   const expireStr = new Date(expire).toLocaleDateString('ru-RU');
@@ -363,6 +392,11 @@ async function activateLicenseFromSettings() {
 async function checkTrialOnStartup() {
   if (!window.api.trialStatus) return;
   const trial = await window.api.trialStatus();
+  // Модули (ПДн/ВУ) должны быть по факту оплаченных аддонов уже на старте
+  // приложения — до этой правки (11.07.2026) LICENSE.modules пересчитывался
+  // только при открытии Настроек (через syncLicenseFromBackend), и до
+  // первого визита туда сайдбар жил на хардкоде ['OT','PD','VU'].
+  await refreshLicenseModules();
 
   if (trial.status === 'licensed') {
     if (trial.daysLeft !== null && trial.daysLeft <= 14) {

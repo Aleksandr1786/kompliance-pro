@@ -42,6 +42,16 @@ async function renderClientCard(id) {
     activeAddonTypes = addons.filter(a => a.active).map(a => a.type);
   } catch(_) {}
 
+  // ПДн/ВУ — та же двухступенчатая логика, что уже используется для
+  // кнопок ЧОП/ПАСФ ниже (client.modules — "клиенту нужно" + аддон
+  // куплен — "оплачено"). 11.07.2026: mods раньше содержал 'PD'/'VU'
+  // из client.modules без проверки аддона — таб показывался даже без
+  // оплаченного аддона. Не трогаем сам mods (на него завязано много
+  // мест — готовность по вкладке, метки РКН/Военкомат), а считаем
+  // отдельные видимые флаги для табов/кнопок генерации.
+  const showPdTab = mods.includes('PD') && activeAddonTypes.includes('PD');
+  const showVuTab = mods.includes('VU') && activeAddonTypes.includes('VU');
+
   // ── КОМПЛЕКСНЫЙ ПОДСЧЁТ ГОТОВНОСТИ (100 баллов) ──────────
   let scoreTotal = 0;
   const scoreBreakdown = [];
@@ -333,9 +343,10 @@ async function renderClientCard(id) {
       <div class="tabs" style="flex:1;margin-bottom:0;border-bottom:none">
         <div class="tab active" onclick="switchTab('overview')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Обзор</span></div>
         ${mods.includes('OT')?`<div class="tab" onclick="switchTab('ot')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Охрана труда</span></div>`:''}
-        ${mods.includes('PD')?`<div class="tab" onclick="switchTab('pd')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ПДн</span></div>`:''}
-        ${mods.includes('VU')?`<div class="tab" onclick="switchTab('vu');renderClientVu(${id})"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Воинский учёт</span></div>`:''}
+        ${showPdTab?`<div class="tab" onclick="switchTab('pd')"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ПДн</span></div>`:''}
+        ${showVuTab?`<div class="tab" onclick="switchTab('vu');renderClientVu(${id})"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> Воинский учёт</span></div>`:''}
         ${mods.includes('OT')?`<div class="tab" onclick="switchTab('sout');renderSout()"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><circle cx="12" cy="12" r="10"/></svg> СОУТ</span></div>`:''}
+        ${mods.includes('PASF')?`<div class="tab" onclick="openPasfOrgData()"><span style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg> Аттестация ПАСФ</span></div>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:2px;padding:0 4px;border-bottom:2px solid rgba(255,255,255,0.06)">
         <button onclick="switchTab('staff')" id="tool-btn-staff" title="Сотрудники" style="display:flex;align-items:center;gap:5px;padding:6px 10px;background:none;border:1px solid transparent;border-radius:8px;color:#475569;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s" onmouseover="this.style.color='#94a3b8';this.style.borderColor='rgba(255,255,255,0.1)'" onmouseout="if(!this.classList.contains('tool-active')){this.style.color='#475569';this.style.borderColor='transparent'}">
@@ -382,6 +393,7 @@ async function renderClientCard(id) {
           <div class="panel-count">${otDocs.length} шт.</div>
           <div style="margin-left:auto;display:flex;gap:8px">
             ${clientDocDir ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--text)" onclick="openClientFolder()">${ic("folder",14)} Открыть папку</button>` : ''}
+            ${otDocs.length ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--red)" onclick="clearDocsPrompt(${id},'OT')" title="Удалить все документы модуля — и запись в базе, и файлы на диске">${ic("trash",14)} Очистить пакет</button>` : ''}
             <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="generateDocs(${id},'OT')">${ic("zap",14)} Сформировать пакет</button>
           </div>
         </div>
@@ -539,7 +551,10 @@ async function renderClientCard(id) {
           ${ic("file-text", 18)}
           <div class="panel-title">Документы — ПДн</div>
           <div class="panel-count">${pdDocs.length} шт.</div>
-          <button class="btn btn-primary" style="margin-left:auto;font-size:12px" onclick="generateDocs(${id},'PD')">${ic("zap",14)} Сформировать пакет</button>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            ${pdDocs.length ? `<button class="btn" style="padding:6px 12px;font-size:11px;background:var(--s3);color:var(--red)" onclick="clearDocsPrompt(${id},'PD')" title="Удалить все документы модуля — и запись в базе, и файлы на диске">${ic("trash",14)} Очистить пакет</button>` : ''}
+            <button class="btn btn-primary" style="font-size:12px" onclick="generateDocs(${id},'PD')">${ic("zap",14)} Сформировать пакет</button>
+          </div>
         </div>
         <div style="margin-top:8px">
           ${pdDocs.length
@@ -1369,6 +1384,7 @@ const SECTION_ICONS = {
   cap:       { color:'#e879f9', svg:`<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>` },
   check:     { color:'#34d399', svg:`<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>` },
   calendar:  { color:'#38bdf8', svg:`<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>` },
+  'life-buoy': { color:'#f472b6', svg:`<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="14.83" y1="9.17" x2="18.36" y2="5.64"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>` },
   doc:       { color:'#c084fc', svg:`<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>` },
   send:      { color:'#2dd4bf', svg:`<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>` },
   folder:    { color:'#94a3b8', svg:`<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>` },
@@ -1518,6 +1534,8 @@ function renderEmpRow(e, divisions = [], client = null, activeAddonTypes = []) {
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openTraining(${e.id})">${ic('graduation-cap',14)} Обучение${alertCount ? ` <span style="color:var(--red);font-weight:700">${alertCount}</span>` : ''}</button>
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openMedicalClearances(${e.id})">${ic('heart',14)} Мед. допуски${clearanceAlerts ? ` <span style="color:var(--red);font-weight:700">${clearanceAlerts}</span>` : ''}</button>
         ${activeAddonTypes.includes('CHOP') && (client?.modules || '').includes('CHOP') ? `<button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openChopData(${e.id})">${ic('shield',14)} ЧОП</button>` : ''}
+        ${activeAddonTypes.includes('PASF') && (client?.modules || '').includes('PASF') ? `<button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openPasfData(${e.id})">${ic('life-buoy',14)} ПАСФ</button>` : ''}
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s;opacity:.75" onclick="openAiDraftModal(${e.id})" title="Черновик инструкции через ИИ — для должностей вне справочника">${ic('sparkles',14)} Черновик ИИ</button>
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="editEmployeePrompt(${e.id})">${ic('edit',14)} Редактировать</button>
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--red);transition:background .15s" onclick="deleteEmployee(${e.id})">${ic('trash',14)} Удалить</button>
       </div>
@@ -2065,13 +2083,14 @@ async function openMedicalClearances(empId) {
   try { addons = await window.api.addonStatus(); } catch(_) {}
   const activeAddonTypes = addons.filter(a => a.active).map(a => a.type);
 
-  // CHOP — это надстройка над конкретным типом клиента (ЧОП-организация),
-  // а не сквозная фича аутсорсера (как TRAINING/PASF). Поэтому даже при
-  // активном аддоне CHOP-специфичные типы допусков показываем только у
-  // клиентов, помеченных модулем CHOP — иначе они появятся у всех клиентов
-  // разом, включая тех, где это не нужно.
+  // CHOP/PASF — это надстройки над конкретным типом клиента (ЧОП-организация
+  // / ПАСФ-организация), а не сквозная фича аутсорсера (как TRAINING/FLEET).
+  // Поэтому даже при активном аддоне их специфичные типы допусков показываем
+  // только у клиентов, помеченных соответствующим модулем — иначе они
+  // появятся у всех клиентов разом, включая тех, где это не нужно.
   const clientAddonTypes = activeAddonTypes.filter(type => {
     if (type === 'CHOP') return (client?.modules || '').includes('CHOP');
+    if (type === 'PASF') return (client?.modules || '').includes('PASF');
     return true;
   });
 
@@ -2250,22 +2269,333 @@ async function saveChopData(empId) {
 }
 
 
+// ─── ПАСФ — данные спасателя (аддон PASF) ──────────────────────────
+// Класс квалификации (151-ФЗ ст.24), дактилоскопия (ст.24.1) и допуски
+// к конкретным видам АСР (work_permits[]) — аттестационная комиссия
+// допускает не ко всем 24 видам сразу, а к подмножеству (ПП №1091).
+// Справочники классов и видов работ тянутся из main.js через pasfReference().
+
+// ─── Черновик инструкции по ОТ через ИИ (ai-draft.js) ──────────────
+// Явное действие пользователя, НЕ автоматика внутри обычной генерации
+// пакета документов (решение от 09.07.2026) — для должностей, которых нет
+// в SPECIALIZED_ROLES. Лимит 5/мес на компанию считается на бэкенде.
+
+async function openAiDraftModal(empId) {
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  const modal = document.createElement('div');
+  modal.id = 'aiDraftModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('sparkles', 14)} Черновик инструкции через ИИ</div>
+        <button onclick="document.getElementById('aiDraftModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+
+      <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12px;color:#fbbf24;line-height:1.5">
+        Черновик формируется автоматически и <b>обязательно требует проверки</b> специалистом по охране труда перед использованием. Используйте только для нестандартных должностей, которых нет в справочнике — если такая должность встречается регулярно, лучше сообщить в поддержку, чтобы добавить её в основной генератор.
+      </div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
+      <input id="aidraft-position" value="${e.position || ''}" placeholder="например, Дегустатор кофе" style="width:100%;padding:10px 12px;margin-bottom:14px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Сфера деятельности (необязательно, поможет ИИ)</label>
+      <input id="aidraft-industry" placeholder="например, кофейня, логистика, розница" style="width:100%;padding:10px 12px;margin-bottom:20px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+
+      <div id="aidraft-status" style="display:none;font-size:12px;color:#94a3b8;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('aiDraftModal').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button id="aidraft-submit" onclick="runAiDraft(${empId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">${ic("sparkles",14)} Сформировать</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function runAiDraft(empId) {
+  const position = document.getElementById('aidraft-position')?.value.trim();
+  const industry = document.getElementById('aidraft-industry')?.value.trim();
+  if (!position) { showToast('Укажите должность', 'var(--red)'); return; }
+
+  const statusEl = document.getElementById('aidraft-status');
+  const submitBtn = document.getElementById('aidraft-submit');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Формируем черновик через ИИ — обычно занимает 10–30 секунд...';
+  submitBtn.disabled = true;
+  submitBtn.style.opacity = '.6';
+
+  try {
+    const res = await window.api.aiDraftInstruction(currentClientId, position, industry || null);
+    if (!res.ok) {
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = res.error || 'Не удалось сформировать черновик';
+      submitBtn.disabled = false;
+      submitBtn.style.opacity = '1';
+      return;
+    }
+    showToast(`Черновик готов. Осталось попыток в этом месяце: ${res.remaining}`, 'var(--green)');
+    document.getElementById('aiDraftModal')?.remove();
+    if (res.filepath && window.api.docsOpenFile) window.api.docsOpenFile(res.filepath);
+  } catch (err) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = 'Ошибка: ' + err.message;
+    submitBtn.disabled = false;
+    submitBtn.style.opacity = '1';
+  }
+}
+
+async function openPasfData(empId) {
+  const emps = await window.api.employeesList(currentClientId);
+  const e = emps.find(x => x.id === empId);
+  if (!e) return;
+
+  let pasf = {};
+  try { pasf = (await window.api.pasfGet(empId)) || {}; } catch(_) {}
+  let ref = { workTypes: [], classes: [] };
+  try { ref = (await window.api.pasfReference()) || ref; } catch(_) {}
+
+  const permits = pasf.work_permits || [];
+  const permitted = new Set(permits.filter(p => p.attested).map(p => p.work_type));
+
+  const classOptions = ref.classes.map(c =>
+    `<option value="${c.key}" ${pasf.current_class === c.key ? 'selected' : ''}>${c.label}</option>`
+  ).join('');
+
+  // Чекбоксы допусков — двухколоночная сетка, 24 вида работ
+  const permitChecks = ref.workTypes.map(wt => `
+    <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#cbd5e1;cursor:pointer;padding:3px 0">
+      <input type="checkbox" class="pasf-permit" data-worktype="${wt.key}" ${permitted.has(wt.key) ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer;margin-top:1px;flex-shrink:0">
+      <span>${wt.label}</span>
+    </label>
+  `).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'pasfModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('life-buoy', 14)} Данные спасателя (ПАСФ)</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">${e.full_name} · ${e.position||''}</div>
+        </div>
+        <button onclick="document.getElementById('pasfModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Класс квалификации</label>
+          <select id="pasf-class" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+            <option value="">— Не аттестован —</option>
+            ${classOptions}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата аттестации класса</label>
+          <input type="date" id="pasf-class-date" value="${pasf.class_assigned_date || ''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Следующая переаттестация</label>
+          <input type="date" id="pasf-next-due" value="${pasf.next_attestation_due || ''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+          <div style="font-size:10.5px;color:#475569;margin-top:4px">Периодическая аттестация — не реже 1 раза в 3 года (ПП №1091)</div>
+        </div>
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата статуса «спасатель»</label>
+          <input type="date" id="pasf-status-date" value="${pasf.status_assigned_date || ''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input type="checkbox" id="pasf-dactyloscopy" ${pasf.dactyloscopy_registered ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer">
+        <label for="pasf-dactyloscopy" style="font-size:13px;color:#f1f5f9;cursor:pointer">Дактилоскопическая регистрация пройдена (ст. 24.1 151-ФЗ)</label>
+      </div>
+      <div style="margin-bottom:16px;padding-left:24px">
+        <input type="date" id="pasf-dactyloscopy-date" value="${pasf.dactyloscopy_date || ''}" style="width:calc(50% - 7px);padding:8px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;box-sizing:border-box">
+      </div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:8px">Допуски к видам аварийно-спасательных работ (${permitted.size} из ${ref.workTypes.length})</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;margin-bottom:20px;padding:12px;background:#0f1520;border:1px solid rgba(255,255,255,0.07);border-radius:10px;max-height:260px;overflow-y:auto">
+        ${permitChecks || '<div style="grid-column:1/3;color:#475569;font-size:12px">Справочник видов работ недоступен — активируйте аддон PASF</div>'}
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button onclick="savePasfData(${empId})" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">${ic("save",14)} Сохранить</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function savePasfData(empId) {
+  // Существующие даты аттестации по каждому допуску сохраняем, если допуск
+  // уже был отмечен ранее; для новых — проставляем сегодняшнюю как дату внесения.
+  let prev = {};
+  try {
+    const old = (await window.api.pasfGet(empId)) || {};
+    (old.work_permits || []).forEach(p => { prev[p.work_type] = p; });
+  } catch(_) {}
+
+  const today = new Date().toISOString().slice(0, 10);
+  const work_permits = Array.from(document.querySelectorAll('.pasf-permit')).map(cb => {
+    const wt = cb.dataset.worktype;
+    const was = prev[wt];
+    return {
+      work_type: wt,
+      attested: cb.checked,
+      attestation_date: cb.checked ? (was && was.attested ? was.attestation_date : today) : null,
+      valid_until: (was && cb.checked) ? was.valid_until || null : null,
+    };
+  });
+
+  const pasf = {
+    status_assigned_date:    document.getElementById('pasf-status-date')?.value || null,
+    current_class:           document.getElementById('pasf-class')?.value || null,
+    class_assigned_date:     document.getElementById('pasf-class-date')?.value || null,
+    next_attestation_due:    document.getElementById('pasf-next-due')?.value || null,
+    dactyloscopy_registered: document.getElementById('pasf-dactyloscopy')?.checked ? 1 : 0,
+    dactyloscopy_date:       document.getElementById('pasf-dactyloscopy-date')?.value || null,
+    work_permits,
+  };
+
+  await window.api.pasfSave(empId, pasf);
+  document.getElementById('pasfModal')?.remove();
+  showToast('Данные спасателя сохранены');
+  await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
+}
+
+// ─── ПАСФ — аттестация формирования (уровень клиента) ──────────────
+// Свидетельство об аттестации АСФ: раз в 3 года, блокирующий статус —
+// без действующей аттестации формирование не вправе работать по договорам
+// (151-ФЗ ст.12). Открывается из вкладки/шапки карточки клиента.
+
+async function openPasfOrgData() {
+  let att = {};
+  try { att = (await window.api.pasfOrgGet(currentClientId)) || {}; } catch(_) {}
+  let ref = { workTypes: [], classes: [] };
+  try { ref = (await window.api.pasfReference()) || ref; } catch(_) {}
+
+  const declared = new Set(att.work_types || []);
+  const typeChecks = ref.workTypes.map(wt => `
+    <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;color:#cbd5e1;cursor:pointer;padding:3px 0">
+      <input type="checkbox" class="pasf-org-worktype" data-worktype="${wt.key}" ${declared.has(wt.key) ? 'checked' : ''} style="width:14px;height:14px;cursor:pointer;margin-top:1px;flex-shrink:0">
+      <span>${wt.label}</span>
+    </label>
+  `).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'pasfOrgModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+
+  modal.innerHTML = `
+    <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('award', 14)} Аттестация формирования (ПАСФ)</div>
+          <div style="font-size:12px;color:#64748b;margin-top:2px">Свидетельство об аттестации на право ведения АСР · раз в 3 года</div>
+        </div>
+        <button onclick="document.getElementById('pasfOrgModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
+      </div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Номер свидетельства</label>
+      <input id="pasf-org-cert" value="${att.cert_number || ''}" placeholder="например, 00-12345" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Дата аттестации</label>
+          <input type="date" id="pasf-org-date" value="${att.attestation_date || ''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Действует до</label>
+          <input type="date" id="pasf-org-expiry" value="${att.expiry_date || ''}" style="width:100%;padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Аттестующий орган (комиссия)</label>
+      <input id="pasf-org-body" value="${att.attesting_body || ''}" placeholder="например, Межведомственная комиссия по аттестации АСФ" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Максимальный объём разлива (свидетельство, с 2021 г. обязательно)</label>
+      <select id="pasf-org-spill-volume" style="width:100%;padding:10px 12px;margin-bottom:16px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        <option value="">— Не указан —</option>
+        <option value="100"    ${att.max_spill_volume === '100'    ? 'selected' : ''}>До 100 тонн</option>
+        <option value="100-500" ${att.max_spill_volume === '100-500' ? 'selected' : ''}>100–500 тонн</option>
+        <option value="500-1000" ${att.max_spill_volume === '500-1000' ? 'selected' : ''}>500–1000 тонн</option>
+        <option value="1000-5000" ${att.max_spill_volume === '1000-5000' ? 'selected' : ''}>1000–5000 тонн</option>
+        <option value="5000+" ${att.max_spill_volume === '5000+' ? 'selected' : ''}>Свыше 5000 тонн</option>
+      </select>
+      <div style="font-size:10.5px;color:#475569;margin-top:-12px;margin-bottom:16px">Категория объёма, с которым формированию разрешено работать (ПП №2451)</div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">База / район работ (для погодного виджета)</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:6px">
+        <input id="pasf-org-loc-label" value="${att.location?.label || ''}" placeholder="например, Новороссийск" style="padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        <input id="pasf-org-loc-lat" type="number" step="0.0001" value="${att.location?.lat || ''}" placeholder="широта" style="padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+        <input id="pasf-org-loc-lon" type="number" step="0.0001" value="${att.location?.lon || ''}" placeholder="долгота" style="padding:10px 12px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
+      </div>
+      <div style="font-size:10.5px;color:#475569;margin-bottom:16px">Координаты базы или основного района работ — используются для погодного виджета на дашборде (ветер, штормовые пороги). Ознакомительная информация, не заменяет официальные предупреждения Росгидромета.</div>
+
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:8px">Заявленные виды работ формирования (${declared.size} из ${ref.workTypes.length})</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px;margin-bottom:20px;padding:12px;background:#0f1520;border:1px solid rgba(255,255,255,0.07);border-radius:10px;max-height:240px;overflow-y:auto">
+        ${typeChecks || '<div style="grid-column:1/3;color:#475569;font-size:12px">Справочник видов работ недоступен — активируйте аддон PASF</div>'}
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="this.closest('[style*=fixed]').remove()" style="flex:1;padding:10px;background:rgba(255,255,255,0.06);border:none;border-radius:8px;color:#94a3b8;cursor:pointer;font-size:13px">Отмена</button>
+        <button onclick="savePasfOrgData()" style="flex:1;padding:10px;background:#3b82f6;border:none;border-radius:8px;color:#fff;cursor:pointer;font-size:13px;font-weight:600">${ic("save",14)} Сохранить</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
+async function savePasfOrgData() {
+  const work_types = Array.from(document.querySelectorAll('.pasf-org-worktype'))
+    .filter(cb => cb.checked)
+    .map(cb => cb.dataset.worktype);
+
+  const att = {
+    cert_number:      document.getElementById('pasf-org-cert')?.value || '',
+    attestation_date: document.getElementById('pasf-org-date')?.value || null,
+    expiry_date:      document.getElementById('pasf-org-expiry')?.value || null,
+    attesting_body:   document.getElementById('pasf-org-body')?.value || '',
+    max_spill_volume: document.getElementById('pasf-org-spill-volume')?.value || '',
+    location: {
+      label: document.getElementById('pasf-org-loc-label')?.value || '',
+      lat:   parseFloat(document.getElementById('pasf-org-loc-lat')?.value) || null,
+      lon:   parseFloat(document.getElementById('pasf-org-loc-lon')?.value) || null,
+    },
+    work_types,
+  };
+
+  await window.api.pasfOrgSave(currentClientId, att);
+  document.getElementById('pasfOrgModal')?.remove();
+  showToast('Аттестация формирования сохранена');
+  await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
+}
 
 
-// ─── СКЛОНЕНИЕ ФИО ЧЕРЕЗ AI ──────────────────────────────
+
+
+// ─── СКЛОНЕНИЕ ФИО — ЛОКАЛЬНО (09.07.2026) ───────────────────────
+// Раньше шло через DeepSeek (aiRequest) — прямая передача ПДн сотрудника
+// за рубеж, юридический риск после 23-ФЗ (локализация с 01.07.2025).
+// Теперь — window.api.declineFio, обрабатывается локально в main.js через
+// lvovich, без единого сетевого запроса. См. main.js для деталей.
 async function declineFIO(fullName) {
   try {
-    const result = await window.api.aiRequest({
-      system: 'Ты — помощник по русской грамматике. Отвечай ТОЛЬКО валидным JSON без markdown и пояснений.',
-      prompt: `Просклоняй ФИО "${fullName}" по падежам. Определи пол автоматически.
-Верни ТОЛЬКО JSON в формате:
-{"nom":"${fullName}","gen":"...","dat":"...","acc":"...","ins":"...","pre":"...","short":"..."}
-где short — краткая форма "Фамилия И.О."`,
-    });
+    const result = await window.api.declineFio(fullName);
     if (!result.ok) return null;
-    const text = result.text.replace(/```json|```/g,'').trim();
-    const data = JSON.parse(text);
-    return data;
+    return result;
   } catch(e) {
     console.error('declineFIO error:', e);
     return null;
@@ -2274,22 +2604,16 @@ async function declineFIO(fullName) {
 
 // Склонение названия должности по падежам (для составных/нестандартных
 // формулировок вроде "Ведущий специалист по охране труда и пожарной
-// безопасности" — программная декпинация ненадёжна для произвольного
-// текста, поэтому используем тот же AI-механизм, что и для ФИО).
-// Должность в официальных документах не меняется по роду держателя
-// должности (стандартная канцелярская норма), поэтому пол не запрашиваем.
+// безопасности"). Название должности само по себе не персональные данные
+// конкретного человека, но всё равно уведено с DeepSeek на Морфер —
+// российский специализированный сервис морфологии (не LLM общего
+// назначения). Пока в настройках не задан ключ Морфера — возвращает
+// именительный падеж без изменений (безопасный дефолт, без сети).
 async function declinePosition(positionText) {
   try {
-    const result = await window.api.aiRequest({
-      system: 'Ты — помощник по русской грамматике. Отвечай ТОЛЬКО валидным JSON без markdown и пояснений.',
-      prompt: `Просклоняй название должности "${positionText}" по падежам, как она пишется в служебных документах (форма должности не меняется по роду).
-Верни ТОЛЬКО JSON в формате:
-{"nom":"${positionText}","gen":"...","dat":"...","acc":"...","ins":"...","pre":"..."}`,
-    });
+    const result = await window.api.declinePosition(positionText);
     if (!result.ok) return null;
-    const text = result.text.replace(/```json|```/g,'').trim();
-    const data = JSON.parse(text);
-    return data;
+    return result;
   } catch(e) {
     console.error('declinePosition error:', e);
     return null;
@@ -2536,7 +2860,7 @@ async function addEmployeePrompt(clientId) {
 
       // Склоняем ФИО через AI
       let declension = null;
-      if (window.api.aiRequest) {
+      if (window.api.declineFio) {
         declension = await declineFIO(name);
       }
 
@@ -2719,7 +3043,7 @@ async function editEmployeePrompt(empId) {
       saveBtn2.disabled = true;
 
       let declension = null;
-      if (window.api.aiRequest) {
+      if (window.api.declineFio) {
         declension = await declineFIO(name);
       }
 
@@ -2777,5 +3101,21 @@ async function deleteEmployee(id) {
   await window.api.clientUpdate(currentClientId, { staff: updatedEmps.length });
   showToast('Удалено');
   await navigate('client', currentClientId);
+  switchTab(window._clientActiveTab || 'overview');
+}
+
+// Полная очистка пакета документов клиента по модулю — и записи в базе,
+// и файлы на диске. Нужна для пересборки пакета с нуля (например, после
+// накопленных ошибок) — раньше такой возможности в интерфейсе не было
+// вообще, только вручную лезть в файл базы (см. main.js documents:clear,
+// 12.07.2026).
+const MODULE_LABELS_RU = { OT: 'Охрана труда', PD: 'Персональные данные', VU: 'Воинский учёт', CHOP: 'ЧОП', SOUT: 'СОУТ' };
+async function clearDocsPrompt(clientId, module) {
+  const label = MODULE_LABELS_RU[module] || module;
+  if (!confirm(`Удалить ВСЕ документы модуля «${label}» у этого клиента? И запись в базе, и файлы на диске. Отменить нельзя.`)) return;
+  const result = await window.api.documentsClear(clientId, module);
+  if (result?.error) { showToast(result.error, 'var(--red)'); return; }
+  showToast(`Удалено документов: ${result.deleted}`);
+  await navigate('client', clientId);
   switchTab(window._clientActiveTab || 'overview');
 }

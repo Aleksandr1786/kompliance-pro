@@ -206,6 +206,12 @@ async function openReadinessCenter(clientId) {
 
   const hasPD = (c.modules||'').includes('PD');
   const hasVU = (c.modules||'').includes('VU');
+  // Аддон может быть отключён/просрочен, а документы модуля — уже
+  // сформированы ранее. Решение 11.07.2026: не прятать вкладку (клиенту
+  // это интересно), а приглушить и пометить — так удобнее видеть, кому
+  // предложить продление аддона, а не терять клиента из вида в интерфейсе.
+  const addonPdActive = checkTariffAccess('pd');
+  const addonVuActive = checkTariffAccess('vu');
 
   document.getElementById('content').innerHTML = `
     <style>
@@ -244,7 +250,7 @@ async function openReadinessCenter(clientId) {
         border:2px solid rgba(255,255,255,0.08);
         background:rgba(255,255,255,0.03);
         color:#475569;font-size:13px;font-weight:700;cursor:pointer;
-        transition:all .2s;flex:1;min-width:160px"
+        transition:all .2s;flex:1;min-width:160px;${addonPdActive?'':'opacity:.55'}"
         onmouseover="this.style.borderColor='rgba(96,165,250,0.4)';this.style.color='#60a5fa'"
         onmouseout="if(!this.classList.contains('rc-active')){this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='#475569'}">
         <div style="width:28px;height:28px;border-radius:8px;background:rgba(96,165,250,0.08);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -252,7 +258,7 @@ async function openReadinessCenter(clientId) {
         </div>
         <div style="text-align:left">
           <div>Персональные данные</div>
-          <div style="font-size:10px;font-weight:500;opacity:.7;margin-top:1px">Симулятор РКН</div>
+          <div style="font-size:10px;font-weight:500;opacity:.7;margin-top:1px">${addonPdActive?'Симулятор РКН':'Аддон не активен'}</div>
         </div>
       </button>` : ''}
 
@@ -263,7 +269,7 @@ async function openReadinessCenter(clientId) {
         border:2px solid rgba(255,255,255,0.08);
         background:rgba(255,255,255,0.03);
         color:#475569;font-size:13px;font-weight:700;cursor:pointer;
-        transition:all .2s;flex:1;min-width:160px"
+        transition:all .2s;flex:1;min-width:160px;${addonVuActive?'':'opacity:.55'}"
         onmouseover="this.style.borderColor='rgba(167,139,250,0.4)';this.style.color='#a78bfa'"
         onmouseout="if(!this.classList.contains('rc-active')){this.style.borderColor='rgba(255,255,255,0.08)';this.style.color='#475569'}">
         <div style="width:28px;height:28px;border-radius:8px;background:rgba(167,139,250,0.08);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -271,7 +277,7 @@ async function openReadinessCenter(clientId) {
         </div>
         <div style="text-align:left">
           <div>Воинский учёт</div>
-          <div style="font-size:10px;font-weight:500;opacity:.7;margin-top:1px">Симулятор военкомата</div>
+          <div style="font-size:10px;font-weight:500;opacity:.7;margin-top:1px">${addonVuActive?'Симулятор военкомата':'Аддон не активен'}</div>
         </div>
       </button>` : ''}
 
@@ -781,7 +787,7 @@ async function loadAddonCache() {
 }
 
 function checkTariffAccess(feature) {
-  // feature: 'training_self' | 'fleet' | 'pasf' | 'protocol' | 'passport' | 'simulator'
+  // feature: 'training_self' | 'fleet' | 'pasf' | 'pd' | 'vu' | 'protocol' | 'passport' | 'simulator'
   // В dev-режиме (start.bat) всё открыто — app.isPackaged === false,
   // но мы не имеем доступа к app здесь, поэтому фолбэк — разрешить если кэш пуст.
   if (!_addonCache) return true;
@@ -789,6 +795,8 @@ function checkTariffAccess(feature) {
     training_self: 'TRAINING',
     fleet:         'FLEET',
     pasf:          'PASF',
+    pd:            'PD',
+    vu:            'VU',
   };
   const addonType = ADDON_FEATURES[feature];
   if (!addonType) return true; // protocol, passport, simulator — не аддоны, всегда доступны

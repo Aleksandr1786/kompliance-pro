@@ -17,6 +17,7 @@
 const {
   p, H, SH, bul, save, footer, MP, oNum,
   orderHead, orderSign, famSheetOrder, devSign, approvalOrder, eL,
+  declRole,
 } = require('./gen_p1');
 const { safe } = require('./utils');
 
@@ -95,7 +96,7 @@ async function gen_chop_instructions(c, s, dir) {
   for (const postType of usedPostTypes) {
     const label = CHOP_POST_TYPES[postType] || postType;
     const ch = [
-      ...approvalOrder(c, oNum(c, 20)),
+      approvalOrder(c, oNum(c, 20)),
       ...eL(1),
       H('ИНСТРУКЦИЯ ОХРАННИКУ'),
       H('ПОСТА «' + label.toUpperCase() + '»'),
@@ -158,7 +159,7 @@ async function gen_chop_post_table(c, s, dir) {
     p('1. Утвердить с ' + safe(c.doc_date) + ' табель постов охраны согласно приложению.'),
     SH('Приложение. Табель постов охраны'),
     ...blocks,
-    p('2. Ответственным за соблюдение табеля постов и контроль несения службы назначить ' + safe(c.manager_position) + ' ' + safe(c.manager_name) + '.'),
+    p('2. Ответственным за соблюдение табеля постов и контроль несения службы назначить ' + declRole(safe(c.manager_position),'acc') + ' ' + safe(c.manager_name) + '.'),
     p('3. Табель постов пересматривать при изменении объектов охраны, состава постов или численности сотрудников.'),
     p('4. Контроль за исполнением оставляю за собой.'),
     ...orderSign(c),

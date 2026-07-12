@@ -50,7 +50,8 @@ async function renderSettings() {
       const ADDON_LABELS = {
         TRAINING: 'Центр обучения — самообучение',
         FLEET:    'Морской флот',
-        PASF:     'ПАСФ',
+        PD:       'Персональные данные',
+        VU:       'Воинский учёт',
       };
       addons.forEach(a => {
         const badge = document.getElementById('addon-badge-' + a.type);
@@ -215,6 +216,59 @@ async function renderSettings() {
                   Нет ключа? Напишите специалисту который обслуживает программу.
                 </div>
               </div>
+              <!-- АДДОНЫ — дополнительные платные модули, видны всем
+                   пользователям (перенесено из admin-секции 11.07.2026:
+                   активация аддона — это платная фича для клиента, а
+                   не служебный инструмент, поэтому не должна прятаться
+                   за режимом администратора) -->
+              <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-top:12px">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em">Аддоны</div>
+                ${[
+                  {type:'TRAINING', name:'Центр обучения — самообучение', desc:'Чек-лист внутреннего обучения организации'},
+                  {type:'FLEET',    name:'Морской флот',                         desc:'Охрана труда на судах'},
+                  {type:'CHOP',     name:'ЧОП (частная охрана)',                 desc:'Разряд, допуск к оружию, посты, медосвидетельствование'},
+                  {type:'PD',       name:'Персональные данные',                  desc:'Документооборот по 152-ФЗ'},
+                  {type:'VU',       name:'Воинский учёт',                        desc:'Документооборот по 53-ФЗ'},
+                  // PASF сюда НЕ возвращать — с 08.07.2026 это самостоятельный
+                  // тариф-лицензия (KP-PASF-...), включается целиком через
+                  // license:activate, а не отдельным ключом аддона. Ручная
+                  // активация как аддона дала бы функционал без купленной
+                  // ПАСФ-лицензии — намеренно исключено.
+                ].map(a => `
+                  <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:12.5px;font-weight:600;color:var(--text)">${a.name}</div>
+                      <div style="font-size:11px;color:var(--muted2);margin-top:1px">${a.desc}</div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0">
+                      <span id="addon-badge-${a.type}" style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(71,85,105,0.12);color:#475569">Не подключён</span>
+                      <div id="addon-expires-${a.type}" style="font-size:10.5px;color:var(--muted2);margin-top:2px"></div>
+                    </div>
+                  </div>`).join('')}
+                <div style="margin-top:12px">
+                  <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">Активация аддона</div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <select id="addon-type-select"
+                      style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
+                      <option value="TRAINING">Центр обучения — самообучение</option>
+                      <option value="FLEET">Морской флот</option>
+                      <option value="CHOP">ЧОП (частная охрана)</option>
+                      <option value="PD">Персональные данные</option>
+                      <option value="VU">Воинский учёт</option>
+                    </select>
+                    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+                      <input id="addon-key-input" placeholder="Ключ аддона (KP-ADDON-...)"
+                        style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;font-family:monospace">
+                      <input id="addon-expire-input" type="date"
+                        style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
+                    </div>
+                    <button onclick="activateAddon()"
+                      style="padding:9px;background:linear-gradient(135deg,#d97706,#b45309);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
+                      Активировать аддон
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
         </div>
 
@@ -282,46 +336,12 @@ async function renderSettings() {
                 </button>
               </div>
             </div>
-            <!-- АДДОНЫ — дополнительные платные модули -->
-            <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:12px">
-              <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:0.05em">Аддоны</div>
-              ${[
-                {type:'TRAINING', name:'Центр обучения — самообучение', desc:'Чек-лист внутреннего обучения организации'},
-                {type:'FLEET',    name:'Морской флот',                         desc:'Охрана труда на судах'},
-                {type:'PASF',     name:'ПАСФ',                                         desc:'Профессиональное аварийно-спасательное формирование'},
-              ].map(a => `
-                <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:12.5px;font-weight:600;color:var(--text)">${a.name}</div>
-                    <div style="font-size:11px;color:var(--muted2);margin-top:1px">${a.desc}</div>
-                  </div>
-                  <div style="text-align:right;flex-shrink:0">
-                    <span id="addon-badge-${a.type}" style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(71,85,105,0.12);color:#475569">Не подключён</span>
-                    <div id="addon-expires-${a.type}" style="font-size:10.5px;color:var(--muted2);margin-top:2px"></div>
-                  </div>
-                </div>`).join('')}
-              <div style="margin-top:12px">
-                <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em">Активация аддона</div>
-                <div style="display:flex;flex-direction:column;gap:8px">
-                  <select id="addon-type-select"
-                    style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
-                    <option value="TRAINING">Центр обучения — самообучение</option>
-                    <option value="FLEET">Морской флот</option>
-                    <option value="PASF">ПАСФ</option>
-                  </select>
-                  <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
-                    <input id="addon-key-input" placeholder="Ключ аддона (KP-ADDON-...)"
-                      style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;font-family:monospace">
-                    <input id="addon-expire-input" type="date"
-                      style="padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12px;outline:none;cursor:pointer">
-                  </div>
-                  <button onclick="activateAddon()"
-                    style="padding:9px;background:linear-gradient(135deg,#d97706,#b45309);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">
-                    Активировать аддон
-                  </button>
-                </div>
-              </div>
-            </div>
+            <!-- Аддоны — перенесены в публичную секцию "Подписка" выше
+                 (s-license), т.к. это платная фича для всех пользователей,
+                 а не админский инструмент. См. там же. Исправлено 11.07.2026:
+                 раньше форма активации аддона была видна только в режиме
+                 администратора — обычный пользователь не мог сам ввести
+                 ключ ПДн/ВУ/ЧОП/FLEET/TRAINING. -->
             <!-- Переключатель режима дашборда -->
             <div style="padding:12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;margin-bottom:12px">
               <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.05em">Режим дашборда</div>
@@ -333,8 +353,13 @@ async function renderSettings() {
                 </button>
                 <button onclick="setDashboardMode('specialist')"
                   id="dash-mode-specialist"
-                  style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${LICENSE.type!=='OUTSOURCE'?'rgba(96,165,250,0.5)':'rgba(255,255,255,0.08)'};background:${LICENSE.type!=='OUTSOURCE'?'rgba(96,165,250,0.12)':'transparent'};color:${LICENSE.type!=='OUTSOURCE'?'#60a5fa':'var(--muted)'}">
+                  style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${LICENSE.type==='SOLO'?'rgba(96,165,250,0.5)':'rgba(255,255,255,0.08)'};background:${LICENSE.type==='SOLO'?'rgba(96,165,250,0.12)':'transparent'};color:${LICENSE.type==='SOLO'?'#60a5fa':'var(--muted)'}">
                   Штатный специалист
+                </button>
+                <button onclick="setDashboardMode('pasf')"
+                  id="dash-mode-pasf"
+                  style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid ${LICENSE.type==='PASF'?'rgba(96,165,250,0.5)':'rgba(255,255,255,0.08)'};background:${LICENSE.type==='PASF'?'rgba(96,165,250,0.12)':'transparent'};color:${LICENSE.type==='PASF'?'#60a5fa':'var(--muted)'}">
+                  ПАСФ
                 </button>
               </div>
               <div style="font-size:11px;color:var(--muted);margin-top:8px">Переключает вид главного экрана</div>

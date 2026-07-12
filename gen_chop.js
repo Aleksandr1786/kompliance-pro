@@ -206,3 +206,4 @@ module.exports = {
   gen_chop_post_table,
   gen_chop_weapon_order,
 };
+

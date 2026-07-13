@@ -21,8 +21,8 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "electron": "^29.0.0",
-    "electron-builder": "^24.9.1"
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "ru.kompliance.pro",

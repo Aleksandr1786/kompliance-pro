@@ -9,7 +9,7 @@ const {
   norm, save, oNum,
   p, pC, pR, pL, H, SH, bul, eL,
   cell, row, tbl,
-  footer, orderHead, orderSign, approvalBlock,
+  footer, orderHead, orderSign, approvalBlock, sealBox,
   FONT, SZ, SZ_S, SZ_H, MP, ML, CW
 } = base;
 
@@ -23,9 +23,16 @@ function getVuData(c) {
   try { return JSON.parse(c.vu_data || '{}'); } catch(_) { return {}; }
 }
 
-// ФИО руководителя / ответственного
-function directorFio(c)     { return c.director_fio     || c.responsible || '_______________'; }
-function directorPos(c)     { return c.director_position || 'Директор'; }
+// ФИО руководителя / ответственного.
+// ВАЖНО: раньше здесь читались c.director_fio/c.director_position/c.responsible —
+// таких полей нет в модели клиента нигде в приложении (реальные поля —
+// manager_name/manager_position, см. clients.js). Из-за этого документы ВУ
+// показывали director_fio/director_position ??? либо просто плейсхолдер
+// "Директор _______________" вместо настоящего руководителя. Оставляем
+// старые имена как дополнительный фолбэк на случай, если где-то в старых
+// сохранённых данных клиента они всё же были проставлены вручную.
+function directorFio(c)     { return c.manager_name     || c.director_fio     || c.responsible || '_______________'; }
+function directorPos(c)     { return c.manager_position || c.director_position || 'Директор'; }
 function vuRespFio(c, vu)   { return vu.responsible_name || directorFio(c); }
 function vuRespPos(c, vu)   { return vu.responsible_position || directorPos(c); }
 function vuRespPhone(c, vu) { return vu.responsible_phone || c.phone || ''; }
@@ -668,7 +675,12 @@ async function gen_vu_05(c, s, dir) {
     SH('проверок осуществления воинского учёта'),
     SH(safe(c.name)),
     ...eL(1),
+    pL('Начат: «___» ____________ ' + docYear(c) + ' г.'),
+    pL('Окончен: «___» ____________ ______ г.'),
+    pL('Ответственный: ' + vuRespPos(c, vu) + '  ' + vuRespFio(c, vu)),
+    ...eL(1),
     tbl(colW, [hdr, ...emptyRows]),
+    ...sealBox(c),
   ];
 
   return save([{

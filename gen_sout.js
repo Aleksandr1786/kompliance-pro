@@ -79,7 +79,7 @@ function addCalDays(dateStr, days) {
 function commissionSignRows(sout, c) {
   const rows = [];
   const members = sout.commission || [];
-  if (!members.length) return [eL(1), pL('Председатель комиссии:'), eL(1), pL(safe(c.manager_position)+' __________________ /'+safe(c.manager_name)+'/'), eL(1)];
+  if (!members.length) return [...eL(1), pL('Председатель комиссии:'), ...eL(1), pL(safe(c.manager_position)+' __________________ /'+safe(c.manager_name)+'/'), ...eL(1)];
 
   for (const m of members) {
     rows.push(pL(safe(m.position) + ':'));
@@ -805,12 +805,14 @@ function pluralRabochihMest(n) {
 }
 
 function pluralListov(n) {
-  if (n % 10 === 1 && n % 100 !== 11) return 'листа';
+  if (n % 10 === 1 && n % 100 !== 11) return 'лист';
+  if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'листа';
   return 'листов';
 }
 
 function pluralChelovek(n) {
   if (n % 10 === 1 && n % 100 !== 11) return 'человек';
+  if ([2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)) return 'человека';
   return 'человек';
 }
 

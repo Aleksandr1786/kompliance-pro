@@ -91,6 +91,8 @@ function applySettings() {
   document.getElementById('userAvatar').textContent = initials;
   document.getElementById('userRole').textContent = settings.user_position || 'Специалист по ОТ';
   applyNavTerms();
+  applyPasfNavFilter();
+  applyAdminNavFilter();
 
   const hasKey = true; // Ключ DeepSeek встроен по умолчанию
   const dot = document.querySelector('.ai-dot');
@@ -115,6 +117,29 @@ function applySettings() {
 
 
 
+
+// Для лицензии ПАСФ автоматически выдаются только модули OT+PASF (решение
+// от 08.07.2026 — ПАСФ покупается как самостоятельный тариф, ПДн/ВУ туда
+// не входят). Пункты меню на них при этом режиме прячем — иначе ведут
+// в раздел без активированного модуля, что выглядит как баг, а не фича.
+function applyPasfNavFilter() {
+  const isPasf = typeof LICENSE !== 'undefined' && LICENSE.type === 'PASF';
+  document.querySelectorAll('[data-page="pd"], [data-page="vu"]').forEach(el => {
+    el.style.display = isPasf ? 'none' : '';
+  });
+}
+
+// «Аудит нормативки» — технический инструмент для проверки актуальности
+// цитат НПА в самом коде генераторов документов, нужен только Александру
+// (разработчику), не клиентам продукта. Скрыт по умолчанию, появляется
+// только в режиме администратора (5 кликов на логотип + пароль, см.
+// app.js/auth.js) — тот же механизм, что уже используется для доступа
+// к внутренним настройкам ИИ-провайдера. Решение от 09.07.2026.
+function applyAdminNavFilter() {
+  document.querySelectorAll('[data-page="npaAudit"]').forEach(el => {
+    el.style.display = (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) ? '' : 'none';
+  });
+}
 
 function renderComingSoon(title) {
   document.getElementById('content').innerHTML = `
@@ -159,9 +184,9 @@ function formatDate(str) {
 
 // ── Терминология по режиму (Аутсорсер / Штатный) ─────────
 // Единый источник правды. Меняем формулировки ЗДЕСЬ, а не по всему UI.
-// LICENSE.type: 'SOLO' = Штатный специалист → «Компания», иначе → «Клиент».
+// LICENSE.type: 'SOLO' и 'PASF' = штатные режимы → «Компания», иначе → «Клиент».
 function term(key) {
-  const staff = (typeof LICENSE !== 'undefined' && LICENSE.type === 'SOLO');
+  const staff = (typeof LICENSE !== 'undefined' && (LICENSE.type === 'SOLO' || LICENSE.type === 'PASF'));
   const DICT = {
     outsourcer: { clients:'Клиенты', client:'Клиент', clientAcc:'клиента', clientGen:'клиента', addClient:'Добавить клиента', clientsGenPl:'Клиентов' },
     staff:      { clients:'Компании', client:'Компания', clientAcc:'компанию', clientGen:'компании', addClient:'Добавить компанию', clientsGenPl:'Компаний' },

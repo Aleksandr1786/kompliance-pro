@@ -1,0 +1,14 @@
+{
+  "name": "kompliancepro-mcp-server",
+  "version": "0.3.0",
+  "description": "MCP-сервер для КомплаенсПро — read-only доступ к данным (клиенты, готовность, просрочки) плюс отдельный write-инструмент generate_document_package (генерация пакета документов через mcp-write-bridge.js, с обязательным бэкапом и файловой блокировкой).",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  }
+}

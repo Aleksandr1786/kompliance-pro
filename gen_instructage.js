@@ -23,7 +23,8 @@ const {
   orderHead, orderSign, famSheet, famSheetOrder, devSign,
   bul, H, SH, p, pC, pR, pL, eL,
   cell, row, tbl, footer,
-  FONT, SZ, SZ_S, SZ_H, MP, ML, CW
+  FONT, SZ, SZ_S, SZ_H, MP, ML, CW,
+  declRole,
 } = base;
 
 // ── Определение отрасли по ОКВЭД ───────────────────────────────────────────
@@ -175,7 +176,7 @@ function industryBlockIntro(industry, c) {
       bul('Статические физические нагрузки — длительное нахождение в сидячем положении.'),
       bul('Поражение электрическим током от неисправной оргтехники и электросети.'),
       bul('Травмы при перемещении по офису (скользкие полы, открытые ящики, провода).'),
-      p([{t:'6.2. ',b:true},{t:'Требования при работе с ПЭВМ (СанПиН 2.2.2/2.4.1340-03):'}]),
+      p([{t:'6.2. ',b:true},{t:'Требования при работе с ПЭВМ (СанПиН 1.2.3685-21, СП 2.2.3670-20):'}]),
       bul('Непрерывная работа с монитором — не более 2 часов. Перерыв 15 мин каждые 2 часа.'),
       bul('Расстояние от глаз до монитора — 50–70 см. Верх монитора — на уровне глаз или ниже.'),
       bul('Освещённость рабочего места — не менее 300 лк. Исключить блики на экране.'),
@@ -361,7 +362,7 @@ function primaryScript(industry, c, exemptEmps) {
     H('КОНСПЕКТ', SZ),
     H('для проведения первичного инструктажа на рабочем месте', SZ),
     ...eL(1),
-    p('Инструктаж проводит: непосредственный руководитель работника.', {bold:true}),
+    p('Инструктаж проводит: ' + safe(c.instr_position) + '  ' + safe(c.instr_name_full || c.instr_name), {bold:true}),
     p('Продолжительность: 30–60 мин. Проводится индивидуально или с группой одной профессии.'),
     ...eL(1),
     SH('ШАГ 1. Рабочее место (10–15 мин)'),
@@ -426,7 +427,7 @@ async function gen_intro_briefing(c, s, dir) {
     cell(r[2], pColW[2], {center:true, sz:SZ_S}),
   ]));
   const pT = row([
-    cell('ИТОГО:', pColW[0] + pColW[1], {bold:true}),
+    cell('ИТОГО:', pColW[0] + pColW[1], {bold:true, cs:2}),
     cell('100', pColW[2], {bold:true, center:true}),
   ]);
 
@@ -488,7 +489,7 @@ async function gen_intro_briefing(c, s, dir) {
 // ── ПРОГРАММА ПЕРВИЧНОГО ИНСТРУКТАЖА НА РАБОЧЕМ МЕСТЕ ──────────────────────
 async function gen_primary_briefing(c, s, dir) {
   const industry = getIndustry(c.okved);
-  const orderN = oNum(c, 7);
+  const orderN = oNum(c, 6); // тот же приказ №09, что утверждает и вводный инструктаж (01-ПИ) — см. gen_01_09
   const pColW = [700, 5500, 1400];
   const pH = row([
     cell('№', pColW[0], {bold:true, center:true, sz:SZ_S}),
@@ -510,7 +511,7 @@ async function gen_primary_briefing(c, s, dir) {
     cell(r[2], pColW[2], {center:true, sz:SZ_S}),
   ]));
   const pT = row([
-    cell('ИТОГО:', pColW[0] + pColW[1], {bold:true}),
+    cell('ИТОГО:', pColW[0] + pColW[1], {bold:true, cs:2}),
     cell('80', pColW[2], {bold:true, center:true}),
   ]);
 
@@ -542,7 +543,7 @@ async function gen_primary_briefing(c, s, dir) {
         ])),
       ]
     ),
-    p('Утверждено приказом № ____ от «' + safe(c.doc_date) + '»', {indent:true}),
+    p('Утверждено приказом № ' + safe(orderN) + ' от «' + safe(c.doc_date) + '»', {indent:true}),
   ] : [];
 
   const ch = [
@@ -554,12 +555,29 @@ async function gen_primary_briefing(c, s, dir) {
     ...eL(1),
     SH('1. Общие положения'),
     p('1.1. Программа разработана в соответствии с Постановлением Правительства РФ от 24.12.2021 № 2464 и Приказом Минтруда от 29.10.2021 № 772н.', {indent:true}),
-    p('1.2. Первичный инструктаж проводится до начала самостоятельной работы непосредственным руководителем индивидуально с каждым работником.', {indent:true}),
+    p('1.2. Первичный инструктаж проводится до начала самостоятельной работы ' + declRole(safe(c.instr_position),'ins').toLowerCase() + ' индивидуально с каждым работником.', {indent:true}),
     p('1.3. После инструктажа — стажировка от 2 до 14 рабочих смен (в зависимости от профессии и условий труда).', {indent:true}),
     p('1.4. Повторный инструктаж — не реже 1 раза в 6 месяцев (для опасных работ — 1 раз в 3 месяца).', {indent:true}),
     exemptEmps.length > 0
       ? p('1.5. Перечень должностей, освобождённых от первичного инструктажа, — в Приложении № 1 к настоящей программе.', {indent:true})
       : p('1.5. Освобождение от первичного инструктажа в данной организации не применяется — все работники проходят инструктаж.', {indent:true}),
+    ...(exemptEmps.length > 0 ? [
+      p('1.6. Освобождаются от прохождения первичного инструктажа:', {indent:true}),
+      bul(safe(c.manager_position) + ';'),
+      ...(() => {
+        // Убираем повторяющиеся должности (несколько сотрудников на одной
+        // должности перечисляются один раз, как в реальных образцах —
+        // список должностей, а не поимённый список людей).
+        const seen = new Set();
+        const uniq = exemptEmps.filter(e => {
+          const key = (e.position||'').trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return uniq.map(e => bul(e.position + (c.instrIsDelegate && (e.position||'').trim().toLowerCase()===safe(c.instr_position).toLowerCase() ? ' (как проводящий(ая) инструктажи)' : '') + ';'));
+      })(),
+    ] : []),
     SH('2. Тематический план'),
     tbl(pColW, [pH, ...pR, pT]),
     SH('3. Содержание'),
@@ -591,7 +609,11 @@ async function gen_primary_briefing(c, s, dir) {
     p('4.1. Устный опрос по пройденным темам.', {indent:true}),
     p('4.2. При удовлетворительном результате — допуск к стажировке. При неудовлетворительном — повторный инструктаж.', {indent:true}),
     p('4.3. Результат фиксируется в журнале регистрации инструктажа на рабочем месте.', {indent:true}),
-    ...devSign(c),
+    ...(c.instrIsDelegate ? [
+      ...eL(2),
+      pL([{t:'Разработал(а): '},{t:safe(c.instr_position)+'  _______________  '+safe(c.instr_name_full||c.instr_name)}]),
+      pL('«'+safe(c.doc_date)+'»'),
+    ] : devSign(c)),
     ...primaryScript(industry, c, exemptEmps),
     ...exemptBlock,
     ...famSheet(c, '№ 02-ПИ'),

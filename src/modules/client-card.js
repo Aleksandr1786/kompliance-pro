@@ -623,14 +623,7 @@ async function renderClientCard(id) {
                 </div>
                 ${empCount ? `
                 <div id="div-employees-${div.id}" style="display:none;border-top:1px solid var(--border);padding:6px 12px 10px">
-                  ${divEmps.map(e => `
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,0.03)">
-                      <div style="min-width:0">
-                        <div style="font-size:12px;color:var(--text)">${e.full_name}</div>
-                        <div style="font-size:10.5px;color:var(--muted2)">${e.position || '—'}${e.birth_date ? ' · ' + new Date(e.birth_date).getFullYear() + ' г.р.' : ''}</div>
-                      </div>
-                      <button onclick="event.stopPropagation();editEmployeePrompt(${e.id})" style="background:none;border:none;color:var(--muted2);cursor:pointer;padding:4px 8px;border-radius:6px;font-size:11px;flex-shrink:0" onmouseover="this.style.color='var(--blue2)'" onmouseout="this.style.color='var(--muted2)'">${ic("edit",12)}</button>
-                    </div>`).join('')}
+                  ${divEmps.map(e => renderEmpRow(e, divisions, c, activeAddonTypes)).join('')}
                 </div>` : ''}
               </div>`;
             }).join('')}
@@ -1535,7 +1528,7 @@ function renderEmpRow(e, divisions = [], client = null, activeAddonTypes = []) {
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openMedicalClearances(${e.id})">${ic('heart',14)} Мед. допуски${clearanceAlerts ? ` <span style="color:var(--red);font-weight:700">${clearanceAlerts}</span>` : ''}</button>
         ${activeAddonTypes.includes('CHOP') && (client?.modules || '').includes('CHOP') ? `<button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openChopData(${e.id})">${ic('shield',14)} ЧОП</button>` : ''}
         ${activeAddonTypes.includes('PASF') && (client?.modules || '').includes('PASF') ? `<button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="openPasfData(${e.id})">${ic('life-buoy',14)} ПАСФ</button>` : ''}
-        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s;opacity:.75" onclick="openAiDraftModal(${e.id})" title="Черновик инструкции через ИИ — для должностей вне справочника">${ic('sparkles',14)} Черновик ИИ</button>
+        <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s;opacity:.75" onclick="openAiDraftModal(${e.id})" title="Черновик инструкции — КомплаенсПро рекомендует, для должностей вне справочника">${ic('sparkles',14)} Черновик</button>
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;transition:background .15s" onclick="editEmployeePrompt(${e.id})">${ic('edit',14)} Редактировать</button>
         <button class="btn btn-ghost" style="padding:6px 12px;display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--red);transition:background .15s" onclick="deleteEmployee(${e.id})">${ic('trash',14)} Удалить</button>
       </div>
@@ -2292,7 +2285,7 @@ async function openAiDraftModal(empId) {
   modal.innerHTML = `
     <div style="background:#1a1f2e;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('sparkles', 14)} Черновик инструкции через ИИ</div>
+        <div style="font-size:16px;font-weight:700;color:#f1f5f9">${ic('sparkles', 14)} Черновик инструкции — КомплаенсПро рекомендует</div>
         <button onclick="document.getElementById('aiDraftModal').remove()" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:20px">✕</button>
       </div>
 
@@ -2303,7 +2296,7 @@ async function openAiDraftModal(empId) {
       <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Должность</label>
       <input id="aidraft-position" value="${e.position || ''}" placeholder="например, Дегустатор кофе" style="width:100%;padding:10px 12px;margin-bottom:14px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
 
-      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Сфера деятельности (необязательно, поможет ИИ)</label>
+      <label style="font-size:11px;color:#94a3b8;display:block;margin-bottom:6px">Сфера деятельности (необязательно, поможет точнее подобрать формулировки)</label>
       <input id="aidraft-industry" placeholder="например, кофейня, логистика, розница" style="width:100%;padding:10px 12px;margin-bottom:20px;background:#0f1520;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;box-sizing:border-box">
 
       <div id="aidraft-status" style="display:none;font-size:12px;color:#94a3b8;margin-bottom:14px"></div>
@@ -2325,7 +2318,7 @@ async function runAiDraft(empId) {
   const statusEl = document.getElementById('aidraft-status');
   const submitBtn = document.getElementById('aidraft-submit');
   statusEl.style.display = 'block';
-  statusEl.textContent = 'Формируем черновик через ИИ — обычно занимает 10–30 секунд...';
+  statusEl.textContent = 'Формируем черновик — обычно занимает 10–30 секунд...';
   submitBtn.disabled = true;
   submitBtn.style.opacity = '.6';
 

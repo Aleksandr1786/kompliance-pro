@@ -9,6 +9,12 @@ function setupNav() {
   document.querySelectorAll('.nav-item[data-page]').forEach(item => {
     item.addEventListener('click', () => navigate(item.dataset.page));
   });
+
+  // Версия приложения в сайдбаре — раз в сессию, при старте.
+  window.api.appVersion().then(v => {
+    const el = document.getElementById('appVersionLabel');
+    if (el) el.textContent = 'v' + v;
+  }).catch(() => {});
 }
 
 async function navigate(page, clientId = null) {
@@ -28,6 +34,7 @@ async function navigate(page, clientId = null) {
     dashboard:'Дашборд', clients:term('clients'), tasks:'Задачи',
     ot:'Охрана труда', pd:'Персональные данные', vu:'Воинский учёт',
     sout:'СОУТ', reporting:'Отчётность', settings:'Настройки',
+    npaAudit:'Аудит нормативки',
     client:'Карточка ' + term('clientGen')
   };
   document.getElementById('topbarTitle').textContent = titles[page] || page;
@@ -44,13 +51,49 @@ async function navigate(page, clientId = null) {
   else if (page === 'ot') { checkAccess('OT') ? await renderOt() : showModuleLocked('Охрана труда'); }
   else if (page === 'vu') { checkAccess('VU') ? await renderVu() : showModuleLocked('Воинский учёт'); }
   else if (page === 'sout') { checkAccess('OT') ? await renderSout() : showModuleLocked('СОУТ'); }
+  else if (page === 'npaAudit') {
+    // Двойная защита: пункт меню скрыт от обычных пользователей через
+    // applyAdminNavFilter() (app.js), но и сам маршрут проверяем на
+    // случай прямого вызова navigate('npaAudit') из консоли разработчика —
+    // технический инструмент для Александра, не для клиентов продукта.
+    if (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) await renderNpaAudit();
+    else return navigate('dashboard');
+  }
   else renderComingSoon(titles[page] || page);
 }
 
 async function updateBadges() {
   const clients = await getClients();
-  document.getElementById('badge-clients').textContent = clients.length;
+  const badgeClients = document.getElementById('badge-clients');
+  // ПАСФ — строго одна организация (лимит на бэкенде уже жёсткий, см.
+  // main.js clients:add). Счётчик тут ничего не добавляет и только
+  // сбивает с толку (как раз это заметил Александр 09.07.2026) —
+  // прячем бейдж целиком вместо показа тривиальной «1».
+  const isPasf = typeof LICENSE !== 'undefined' && LICENSE.type === 'PASF';
+  if (badgeClients) {
+    badgeClients.style.display = isPasf ? 'none' : '';
+    badgeClients.textContent = clients.length;
+  }
   const tasks = await window.api.tasksList();
   const open = tasks.filter(t => !t.done).length;
   document.getElementById('badge-tasks').textContent = open;
+
+  // Бейдж аудита нормативки — считаем только в режиме администратора,
+  // чтобы не дёргать лишний IPC-запрос у обычных пользователей (пункт
+  // меню всё равно скрыт для них через applyAdminNavFilter в app.js).
+  const badgeAudit = document.getElementById('badge-npa-audit');
+  if (badgeAudit) {
+    if (typeof IS_ADMIN !== 'undefined' && IS_ADMIN) {
+      const auditAll = await window.api.npaCitationAuditList(); // уже новые→старые
+      const latestByCode = new Map();
+      for (const rec of auditAll) {
+        if (!latestByCode.has(rec.code)) latestByCode.set(rec.code, rec);
+      }
+      const problems = [...latestByCode.values()].filter(r => r.status !== 'ok' && !r.seen);
+      badgeAudit.style.display = problems.length > 0 ? '' : 'none';
+      badgeAudit.textContent = problems.length;
+    } else {
+      badgeAudit.style.display = 'none';
+    }
+  }
 }

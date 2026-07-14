@@ -1,6 +1,6 @@
 {
   "name": "kompliance-pro",
-  "version": "1.0.40",
+  "version": "1.0.41",
   "description": "КомплаенсПро — Аутсорс-платформа",
   "main": "main.js",
   "author": {
@@ -40,9 +40,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.png",
-      "publisherName": "ИП Свинцова Д.И.",
-      "verifyUpdateCodeSignature": false
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -70,6 +68,7 @@
       "gen_pasf.js",
       "doc-generation.js",
       "lock-utils.js",
+      "ai-draft.js",
       "utils.js",
       "sections.js",
       "doc-meta.js",

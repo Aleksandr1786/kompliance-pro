@@ -2523,16 +2523,23 @@ ipcMain.handle('ai:draftInstruction', async (_, clientId, position, industry) =>
   const count = (entry && entry.month === curMonth) ? entry.count : 0;
 
   if (count >= AI_DRAFT_MONTHLY_LIMIT) {
-    return { ok: false, error: `Лимит черновиков через ИИ на этот месяц исчерпан (${AI_DRAFT_MONTHLY_LIMIT} на компанию). Если новых нестандартных должностей стабильно много — есть смысл добавить их в основной справочник, напишите в поддержку.` };
+    return { ok: false, error: `Лимит черновиков на этот месяц исчерпан (${AI_DRAFT_MONTHLY_LIMIT} на компанию). Если новых нестандартных должностей стабильно много — есть смысл добавить их в основной справочник, напишите в поддержку.` };
   }
 
   const client = db.get('clients').find({ id: clientId }).value();
   if (!client) return { ok: false, error: 'Компания не найдена' };
 
   try {
-    const { safe } = require('./utils');
     const aiDraft = require('./ai-draft');
-    const dir = path.join(app.getPath('userData'), 'Документы', safe(client.name), 'Проекты ИИ');
+    // ИСПРАВЛЕНО 13.07.2026: safe() из utils.js — это экранирование текста
+    // для .docx (XML-безопасность), а не очистка имени файла/папки от
+    // запрещённых Windows-символов (< > : " / \ | ? *). Имя клиента с
+    // кавычками (например, ООО "СПЛ") падало с ENOENT при mkdir даже с
+    // recursive:true — Windows такую папку создать физически не может.
+    // Используем тот же паттерн санитизации, что уже проверен в
+    // doc-generation.js.
+    const safeClientName = (client.name || 'Клиент').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60).replace(/[ .]+$/, '') || 'Клиент';
+    const dir = path.join(app.getPath('userData'), 'Документы', safeClientName, 'Черновики инструкций');
     fs.mkdirSync(dir, { recursive: true });
     const filepath = await aiDraft.draftInstruction(client, dir, position, callAI, industry);
 
@@ -2749,6 +2756,39 @@ ipcMain.handle('addon:status', () => {
     active: hasAddon(type),
     expires: addonExpires[type] || null,
   }));
+});
+
+// «Написать разработчику» — собирает контекст об установке (Machine ID,
+// тариф, аддоны, версия приложения) и отправляет через серверный прокси
+// (support-proxy.php на kompliancepro.ru) в Telegram Александра. Токен
+// бота НЕ хранится в приложении — только на сервере, тем же принципом,
+// что и DeepSeek-прокси (см. память: "переход на надёжное чтение ключа
+// из PHP-файла"). 13.07.2026.
+ipcMain.handle('support:send', async (_, message, contact) => {
+  if (!message || !message.trim()) return { ok: false, error: 'Пустое сообщение' };
+  const settings = db.get('settings').value();
+  const activeAddons = KNOWN_ADDONS.filter(type => hasAddon(type));
+  const payload = {
+    message: message.trim().slice(0, 2000),
+    contact: (contact || '').trim().slice(0, 200),
+    machineId: getMachineId(),
+    licenseType: settings.license_type || '—',
+    expiresAt: settings.license_expires || '—',
+    addons: activeAddons,
+    appVersion: require('./package.json').version,
+  };
+  try {
+    const resp = await fetch('https://kompliancepro.ru/support-proxy.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) return { ok: false, error: data.error || 'Не удалось отправить сообщение' };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'Нет соединения с сервером поддержки: ' + e.message };
+  }
 });
 
 ipcMain.handle('training:get', (_, employeeId) => {
@@ -3186,6 +3226,13 @@ ipcMain.handle('trial:status', () => checkTrial(db));
 
 // Получить ID машины
 ipcMain.handle('machine:id', () => ({ machineId: getMachineId() }));
+
+// Версия приложения для отображения в интерфейсе (сайдбар, Настройки →
+// Подписка) — раньше нигде не показывалась пользователю, из-за чего было
+// сложно понять, какая версия реально установлена (см. историю с потерянным
+// апгрейдом Electron 13.07.2026 — часть путаницы была именно из-за того,
+// что версию негде было посмотреть, кроме package.json на диске).
+ipcMain.handle('app:version', () => require('./package.json').version);
 
 // Активировать лицензию
 ipcMain.handle('license:activate', (_, key, expireDate, type) => {

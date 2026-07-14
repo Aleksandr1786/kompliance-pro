@@ -80,6 +80,7 @@ async function renderSettings() {
         <div class="snav-item" onclick="scrollSection('s-remind',this)">${ic("bell",14)} Напоминания</div>
         <div class="snav-item" onclick="scrollSection('s-backup',this)">${ic("database",14)} Резервные копии</div>
         <div class="snav-item" onclick="scrollSection('s-archive',this)">${ic("folder",14)} Архив клиентов</div>
+        <div class="snav-item" onclick="scrollSection('s-support',this)">💬 Поддержка</div>
         ${IS_ADMIN ? `<div class="snav-item" onclick="scrollSection('s-ai',this)">${ic("settings",14)} AI-провайдер</div>` : ''}
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:14px">
@@ -172,6 +173,7 @@ async function renderSettings() {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
               </span>
               <div class="section-title">Подписка</div>
+              <span id="settingsAppVersion" style="margin-left:auto;font-size:11px;color:var(--muted2)"></span>
             </div>
             <div class="section-body">
               <!-- Статус -->
@@ -399,6 +401,27 @@ async function renderSettings() {
           </div>
         </div>
 
+        <div class="section" id="s-support">
+          <div class="section-head">
+            <span class="section-icon" style="display:flex">${ic('message-circle',15)}</span>
+            <div class="section-title">Поддержка</div>
+          </div>
+          <div class="section-body">
+            <div style="font-size:12.5px;color:var(--muted2);margin-bottom:12px;line-height:1.5">
+              Вопрос, баг, идея — напишите разработчику напрямую. К сообщению автоматически прикладывается
+              техническая информация об установке (тариф, аддоны, версия), чтобы не пришлось объяснять это словами.
+            </div>
+            <textarea id="support-message" rows="5" placeholder="Опишите вопрос или проблему..."
+              style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+            <input id="support-contact" placeholder="Как с вами связаться для ответа — телефон, email или Telegram (необязательно)"
+              style="width:100%;margin-top:8px;padding:9px 12px;background:#0d1117;border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#f1f5f9;font-size:12.5px;outline:none;box-sizing:border-box">
+            <div id="support-status" style="font-size:12px;margin-top:8px"></div>
+            <div style="margin-top:10px">
+              <button class="btn btn-primary" onclick="sendSupportMessage()">${ic('send',14)} Отправить</button>
+            </div>
+          </div>
+        </div>
+
         <div style="display:flex;justify-content:flex-end;gap:10px;padding-bottom:20px">
           <button class="btn btn-ghost" onclick="renderSettings()">Сбросить</button>
           <button class="btn btn-primary" onclick="saveAllSettings()">${ic("save",14)} Сохранить</button>
@@ -409,6 +432,12 @@ async function renderSettings() {
 
   // Загружаем архив
   loadArchiveList();
+
+  // Версия приложения
+  window.api.appVersion().then(v => {
+    const el = document.getElementById('settingsAppVersion');
+    if (el) el.textContent = 'v' + v;
+  }).catch(() => {});
 }
 
 function scrollSection(id, el) {
@@ -531,5 +560,36 @@ async function activateAddon() {
     document.getElementById('addon-expire-input').value = '';
   } else {
     showToast(result.error || 'Ключ не подходит', 'var(--red)');
+  }
+}
+
+// «Написать разработчику» — main.js сам собирает технический контекст
+// (Machine ID, тариф, аддоны, версия) и шлёт через support-proxy.php.
+async function sendSupportMessage() {
+  const msgEl = document.getElementById('support-message');
+  const contactEl = document.getElementById('support-contact');
+  const statusEl = document.getElementById('support-status');
+  const message = msgEl.value.trim();
+  if (!message) {
+    statusEl.textContent = 'Напишите текст сообщения';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+  statusEl.textContent = 'Отправляем...';
+  statusEl.style.color = 'var(--muted2)';
+  try {
+    const result = await window.api.supportSend(message, contactEl.value.trim());
+    if (result.ok) {
+      statusEl.textContent = 'Отправлено — обычно отвечаем в течение рабочего дня.';
+      statusEl.style.color = 'var(--green)';
+      msgEl.value = '';
+      contactEl.value = '';
+    } else {
+      statusEl.textContent = result.error || 'Не удалось отправить, попробуйте позже';
+      statusEl.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Не удалось отправить, попробуйте позже';
+    statusEl.style.color = 'var(--red)';
   }
 }

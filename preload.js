@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('api', {
   // Аддоны (дополнительные платные модули: TRAINING, FLEET, PASF)
   addonActivate:  (key, expire, type) => ipcRenderer.invoke('addon:activate', key, expire, type),
   addonStatus:    ()              => ipcRenderer.invoke('addon:status'),
+  supportSend:    (message, contact) => ipcRenderer.invoke('support:send', message, contact),
 
   // Комиссия по проверке знаний
   commissionGet:             (clientId)                    => ipcRenderer.invoke('commission:get', clientId),
@@ -155,5 +156,6 @@ contextBridge.exposeInMainWorld('api', {
   trialStatus:    ()                    => ipcRenderer.invoke('trial:status'),
   licenseActivate:(key, expire)         => ipcRenderer.invoke('license:activate', key, expire),
   machineId:      ()                    => ipcRenderer.invoke('machine:id'),
+  appVersion:     ()                    => ipcRenderer.invoke('app:version'),
   trialReset:     ()                    => ipcRenderer.invoke('trial:reset'),
 });

@@ -4,6 +4,20 @@
 // Обновлён: 09.06.2026
 // ============================================================
 
+// Экранирование HTML для текста, который может содержать данные не под
+// полным нашим контролем (заголовки автозадач от НПА-мониторинга, AI-
+// сводки npa_summary, имена клиентов) перед вставкой в innerHTML — иначе
+// случайный "<" или "&quot;" в тексте сломал бы вёрстку или, в худшем
+// случае, выполнился бы как HTML/атрибут внутри окна приложения.
+// Определяем один раз глобально (см. также npa-audit.js — та же функция).
+if (typeof window.escapeHtml !== 'function') {
+  window.escapeHtml = function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[ch]));
+  };
+}
+
 async function renderDashboard() {
   const clients = await getClients();
   const tasks   = await window.api.tasksList();
@@ -748,13 +762,13 @@ function renderTaskRow(t, opts = {}) {
   // документов по найденному НПА) имя клиента полностью пропадало под ellipsis.
   // Внутри карточки клиента (opts.inClientCard) колонка не нужна — имя уже видно в шапке.
   const clientCol = (t.client_name && !opts.inClientCard)
-    ? `<div style="flex-shrink:0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px" title="${t.client_name}">${t.client_name}</div>`
+    ? `<div style="flex-shrink:0;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px" title="${window.escapeHtml(t.client_name)}">${window.escapeHtml(t.client_name)}</div>`
     : '';
   return `<div class="task-item" id="task-item-${t.id}">
     <div class="task-row" id="task-row-${t.id}" style="${rowStyle}"${rowClick} onmouseover="this.querySelector('.task-del-btn').style.opacity='1'" onmouseout="this.querySelector('.task-del-btn').style.opacity='0'">
       <div class="task-check ${isDone?'done':''}" onclick="event.stopPropagation();toggleTask(${t.id},this)" id="task-check-${t.id}" style="flex-shrink:0;cursor:pointer">${checkInner}</div>
       ${chevron}
-      <div class="task-text ${isDone?'done':''}" id="task-text-${t.id}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.title}</div>
+      <div class="task-text ${isDone?'done':''}" id="task-text-${t.id}" style="flex:1;min-width:0;font-size:13px;${isDone?'text-decoration:line-through;color:#475569':'color:var(--text)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${window.escapeHtml(t.title)}</div>
       ${clientCol}
       ${t.module?`<div class="task-tag ${tagClass}" style="flex-shrink:0">${tagLabel}</div>`:''}
       <button class="task-del-btn" onclick="event.stopPropagation();deleteTask(${t.id})" title="Удалить задачу"
@@ -785,14 +799,14 @@ function renderTaskDetailsContent(t, opts = {}) {
   const docsList = (Array.isArray(t.npa_related_docs) && t.npa_related_docs.length)
     ? `<div style="margin-top:10px">
         <div style="font-size:10.5px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Нужно сформировать заново</div>
-        <ul style="margin:0;padding-left:18px;color:var(--text);font-size:12.5px;line-height:1.7">${t.npa_related_docs.map(d=>`<li>${d}</li>`).join('')}</ul>
+        <ul style="margin:0;padding-left:18px;color:var(--text);font-size:12.5px;line-height:1.7">${t.npa_related_docs.map(d=>`<li>${window.escapeHtml(d)}</li>`).join('')}</ul>
         ${moduleHint}
       </div>`
     : '';
   const summary = t.npa_summary
     ? `<div style="margin-top:10px">
         <div style="font-size:10.5px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Почему это важно</div>
-        <div style="color:var(--text);font-size:12.5px;line-height:1.5">${t.npa_summary}</div>
+        <div style="color:var(--text);font-size:12.5px;line-height:1.5">${window.escapeHtml(t.npa_summary)}</div>
       </div>`
     : '';
   const clientLink = (t.client_id && !opts.inClientCard)
@@ -803,7 +817,7 @@ function renderTaskDetailsContent(t, opts = {}) {
       </button>`
     : '';
   return `<div style="padding:2px 16px 16px 43px;font-size:12.5px;color:var(--text)">
-    <div style="color:var(--text);line-height:1.5;font-size:13px">${t.title}</div>
+    <div style="color:var(--text);line-height:1.5;font-size:13px">${window.escapeHtml(t.title)}</div>
     ${due?`<div style="margin-top:5px;color:var(--muted);font-size:11.5px">Срок: ${due}</div>`:''}
     ${summary}
     ${docsList}

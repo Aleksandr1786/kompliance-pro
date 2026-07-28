@@ -94,7 +94,7 @@ async function generateDocsForClient({
 
   const clientWithEmployees = {
     ...client,
-    city: (client.city || client.region || '').replace(/^г\.?\s*/i, '').trim() || '',
+    city: (client.city || client.region || '').replace(/^г(?:\.\s*|\s+)/i, '').replace(/^город\s+/i, '').trim() || '',
     soat_class: client.soat_class || '2',
     hazard_works: client.hazard_works || 0,
     medcheck_required: client.medcheck_required || 0,

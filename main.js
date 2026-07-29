@@ -643,7 +643,7 @@ ipcMain.handle('clients:add', (_, data) => {
   }
 
   const id = nextId('clients');
-  const client = { ...data, id, created_at: now(), score: 0 };
+  const client = { ...data, id, created_at: now(), updated_at: now(), score: 0 };
 
   // ПАСФ-тариф — единственная компания пользователя сразу получает модули
   // PASF+OT, без отдельного шага активации аддона (см. license:activate).
@@ -662,7 +662,7 @@ ipcMain.handle('clients:add', (_, data) => {
 ipcMain.handle('clients:update', (_, id, data) => {
   const err = validateClient(data, true);
   if (err) return err;
-  db.get('clients').find({ id }).assign(data).write();
+  db.get('clients').find({ id }).assign({ ...data, updated_at: now() }).write();
   syncClientEvents(id, data);
   return { ok: true };
 });
@@ -732,14 +732,14 @@ ipcMain.handle('employees:add', (_, data) => {
   }
 
   const id = nextId('employees');
-  db.get('employees').push({ ...data, id }).write();
+  db.get('employees').push({ ...data, id, updated_at: now() }).write();
   return { id };
 });
 
 ipcMain.handle('employees:update', (_, id, data) => {
   const err = validateEmployee(data, true);
   if (err) return err;
-  db.get('employees').find({ id }).assign(data).write();
+  db.get('employees').find({ id }).assign({ ...data, updated_at: now() }).write();
   return { ok: true };
 });
 
@@ -1123,6 +1123,34 @@ function buildMorningDigestText() {
 // Если включена утренняя сводка, не отправлена сегодня и сейчас 8:00 или позже —
 // отправляем. Это даёт «догоняющую» логику само по себе: если приложение
 // открыли в 14:00, а сводка за сегодня ещё не уходила — она уйдёт прямо сейчас.
+// Проверяет у сервера, реально ли Telegram привязан через облако (deep
+// link боту), а не полагается на локальное предположение "залогинен —
+// значит привязан". Кэшируем результат ненадолго (5 минут — совпадает
+// с периодом основного таймера), чтобы не дёргать сервер на каждый тик,
+// но и не хранить статус вечно, если пользователь только что привязал/
+// отвязал Telegram в веб-версии.
+let _cloudTelegramLinkedCache = null; // { value: bool, checkedAt: number } | null
+async function isCloudTelegramLinked(s) {
+  const CACHE_MS = 5 * 60 * 1000;
+  if (_cloudTelegramLinkedCache && Date.now() - _cloudTelegramLinkedCache.checkedAt < CACHE_MS) {
+    return _cloudTelegramLinkedCache.value;
+  }
+  try {
+    const result = await cloudApi('/api/telegram-status', {}, s.cloud_token);
+    _cloudTelegramLinkedCache = { value: !!result.linked, checkedAt: Date.now() };
+    return _cloudTelegramLinkedCache.value;
+  } catch (e) {
+    // Сервер недоступен или ошибка — не можем подтвердить, что сервер
+    // пришлёт сводку сам. Безопаснее промолчать здесь и не решать за
+    // пользователя (риск дубля), НО и не потерять единственный канал,
+    // если сервер реально недоступен длительное время — поэтому не
+    // кэшируем отрицательный результат ошибки, пробуем на каждый тик,
+    // и локальная сводка ниже сработает как фолбэк на устаревших
+    // tg_token/tg_chat_id, если они у пользователя ещё настроены.
+    return null; // null = "не знаем", отличается от false = "точно не привязан"
+  }
+}
+
 async function maybeSendMorningDigest() {
   const s = db.get('settings').value();
   if (!s.tg_token || !s.tg_chat_id || s.tg_morning !== '1') return;
@@ -1130,6 +1158,16 @@ async function maybeSendMorningDigest() {
   const today = new Date().toISOString().slice(0, 10);
   if (s.tg_last_morning_date === today) return;
   if (new Date().getHours() < 8) return;
+
+  // Если аккаунт залогинен в облако И сервер подтвердил, что Telegram
+  // привязан через облачного бота — сводку шлёт серверный cron
+  // (broadcast.js), локальная отправка станет дублем. Не отправляем,
+  // но и не помечаем "отправлено" — если облако вдруг не пришлёт,
+  // хотим повторно проверить на следующем тике, а не молчать весь день.
+  if (s.cloud_token) {
+    const linked = await isCloudTelegramLinked(s);
+    if (linked === true) return;
+  }
 
   const text = buildMorningDigestText();
   const res = await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
@@ -1161,13 +1199,344 @@ async function checkUrgentEvents() {
   }
 }
 
+// ─── ОБЛАКО (СИНХРОНИЗАЦИЯ С СЕРВЕРОМ) ──────────────────
+// Фаза 1: сервер держит копию events/tasks, чтобы слать Telegram-уведомления
+// независимо от того, открыт ли компьютер. Авторизация — персональный
+// токен, полученный через логин/регистрацию (email+пароль), хранится
+// в settings.cloud_token — пользователь никогда не вводит и не видит
+// сам токен, только email/пароль один раз при подключении.
+const CLOUD_API_BASE = 'https://api.kompliancepro.ru';
+
+async function cloudApi(path, body, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${CLOUD_API_BASE}${path}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+  return data;
+}
+
+ipcMain.handle('cloud:register', async (_, { email, password }) => {
+  try {
+    const result = await cloudApi('/api/register', { email, password });
+    db.get('settings').assign({
+      cloud_token: result.token,
+      cloud_account_id: result.account_id,
+      cloud_email: email,
+    }).write();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('cloud:login', async (_, { email, password }) => {
+  try {
+    const result = await cloudApi('/api/login', { email, password, label: 'Desktop' });
+    db.get('settings').assign({
+      cloud_token: result.token,
+      cloud_account_id: result.account_id,
+      cloud_email: email,
+    }).write();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('cloud:logout', async () => {
+  db.get('settings').assign({ cloud_token: null, cloud_account_id: null, cloud_email: null }).write();
+  return { ok: true };
+});
+
+ipcMain.handle('cloud:linkTelegram', async () => {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) {
+    return { ok: false, error: 'Сначала войдите в облачный аккаунт' };
+  }
+  try {
+    const result = await cloudApi('/api/link-telegram', {}, s.cloud_token);
+    return { ok: true, link: result.link };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('cloud:syncNow', async () => {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) {
+    return { ok: false, error: 'Сначала войдите в облачный аккаунт' };
+  }
+  try {
+    const clients = db.get('clients').value();
+    const clientName = (id) => (clients.find(c => c.id === id) || {}).name || '';
+
+    const events = db.get('events').filter({ status: 'pending' }).value().map(e => ({
+      client_id: e.client_id,
+      client_name: clientName(e.client_id),
+      title: e.title,
+      due_date: e.due_date,
+      status: e.status,
+    }));
+
+    const tasks = db.get('tasks').filter({ done: 0 }).value().map(t => ({
+      title: t.title,
+      priority: t.priority || 'normal',
+      done: false,
+    }));
+
+    const result = await cloudApi('/api/sync', { events, tasks }, s.cloud_token);
+    db.get('settings').assign({ cloud_last_sync: new Date().toISOString() }).write();
+    return { ok: true, events: result.events, tasks: result.tasks };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// Тихая фоновая синхронизация — не показывает ошибок пользователю, просто
+// пробует и логирует в консоль. Настоящая обратная связь — только через
+// кнопку «Синхронизировать сейчас» в настройках (cloud:syncNow выше).
+async function silentCloudSync() {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) return;
+  try {
+    const clients = db.get('clients').value();
+    const clientName = (id) => (clients.find(c => c.id === id) || {}).name || '';
+    const events = db.get('events').filter({ status: 'pending' }).value().map(e => ({
+      client_id: e.client_id, client_name: clientName(e.client_id),
+      title: e.title, due_date: e.due_date, status: e.status,
+    }));
+    const tasks = db.get('tasks').filter({ done: 0 }).value().map(t => ({
+      title: t.title, priority: t.priority || 'normal', done: false,
+    }));
+    await cloudApi('/api/sync', { events, tasks }, s.cloud_token);
+    db.get('settings').assign({ cloud_last_sync: new Date().toISOString() }).write();
+  } catch (e) {
+    console.error('Фоновая синхронизация с облаком не удалась:', e.message);
+  }
+}
+
+// ── Двусторонняя синхронизация clients/employees с веб-версией ──────────
+// Контракт: см. sync-clients-contract.md (согласован 19.07.2026), эндпоинт
+// POST /api/sync-clients на сервере ещё предстоит реализовать отдельно.
+// В отличие от silentCloudSync (events/tasks, одностороння) — здесь может
+// прийти conflict:true (запись поменяли в вебе позже, чем локальная правка)
+// — в этом случае НЕ перезаписываем локальные данные молча, оставляем как
+// есть и копим предупреждение для пользователя (правило "явно, не молча").
+async function syncClientsAndEmployees() {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) return;
+
+  try {
+    const allClients = db.get('clients').value();
+    const allEmployees = db.get('employees').value();
+
+    const clientsPayload = allClients.map(c => ({
+      desktop_local_id: String(c.id),
+      cloud_id: c.cloud_id || null,
+      updated_at: c.updated_at || c.created_at || now(),
+      deleted: !!c.archived,
+      data: c,
+    }));
+
+    const employeesPayload = allEmployees.map(e => {
+      const parentClient = allClients.find(c => c.id === e.client_id);
+      return {
+        desktop_local_id: String(e.id),
+        cloud_id: e.cloud_id || null,
+        client_desktop_local_id: String(e.client_id),
+        client_cloud_id: parentClient?.cloud_id || null,
+        updated_at: e.updated_at || now(),
+        deleted: false,
+        data: e,
+      };
+    });
+
+    const result = await cloudApi('/api/sync-clients', {
+      clients: clientsPayload,
+      employees: employeesPayload,
+    }, s.cloud_token);
+
+    // ── применяем ответы по нашим собственным правкам ──
+    const conflicts = [];
+
+    (result.clients || []).forEach(r => {
+      const localId = parseInt(r.desktop_local_id, 10);
+      if (r.conflict) {
+        conflicts.push({ type: 'client', localId, name: (db.get('clients').find({ id: localId }).value() || {}).name });
+        return; // не перезаписываем — правило "явно, не молча"
+      }
+      if (r.deleted_on_server) {
+        // запись уже удалена на сервере — не создаём дубликат, архивируем локально
+        db.get('clients').find({ id: localId }).assign({ cloud_id: r.id, archived: true, archived_at: now() }).write();
+        return;
+      }
+      // сервер принял правку — просто запоминаем канонический id
+      db.get('clients').find({ id: localId }).assign({ cloud_id: r.id }).write();
+    });
+
+    (result.employees || []).forEach(r => {
+      const localId = parseInt(r.desktop_local_id, 10);
+      if (r.conflict) {
+        conflicts.push({ type: 'employee', localId, name: (db.get('employees').find({ id: localId }).value() || {}).full_name });
+        return;
+      }
+      if (r.deleted_on_server) {
+        const emp = db.get('employees').find({ id: localId }).value();
+        if (emp) db.get('employees').remove({ id: localId }).write();
+        return;
+      }
+      db.get('employees').find({ id: localId }).assign({ cloud_id: r.id }).write();
+    });
+
+    // ── обратная синхронизация: клиенты/сотрудники, заведённые в вебе ──
+    (result.pulled_clients || []).forEach(pc => {
+      const exists = db.get('clients').find({ cloud_id: pc.id }).value();
+      if (exists) {
+        // web обновил запись, которую десктоп уже знает — применяем как есть,
+        // т.к. раз она попала в pulled, значит desktop не отправлял по ней
+        // более свежую версию в этом же вызове (иначе была бы в clients[], не тут)
+        db.get('clients').find({ cloud_id: pc.id }).assign({ ...pc.data, updated_at: pc.updated_at, cloud_id: pc.id }).write();
+      } else {
+        const localId = nextId('clients');
+        db.get('clients').push({ ...pc.data, id: localId, cloud_id: pc.id, updated_at: pc.updated_at }).write();
+      }
+    });
+
+    (result.pulled_employees || []).forEach(pe => {
+      const parentLocal = db.get('clients').find({ cloud_id: pe.client_id }).value();
+      if (!parentLocal) return; // клиент почему-то ещё не пришёл — пропускаем, догонит на следующем sync
+      const exists = db.get('employees').find({ cloud_id: pe.id }).value();
+      if (exists) {
+        db.get('employees').find({ cloud_id: pe.id }).assign({ ...pe.data, client_id: parentLocal.id, updated_at: pe.updated_at, cloud_id: pe.id }).write();
+      } else {
+        const localId = nextId('employees');
+        db.get('employees').push({ ...pe.data, id: localId, client_id: parentLocal.id, cloud_id: pe.id, updated_at: pe.updated_at }).write();
+      }
+    });
+
+    // ── записи, удалённые на сервере — архивируем локально, а не удаляем
+    // физически (чтобы не терять историю по ошибке; archived — уже
+    // существующий бизнес-флаг, отдельный от deleted_at/soft-delete sync) ──
+    (result.deleted_client_ids || []).forEach(cloudId => {
+      db.get('clients').find({ cloud_id: cloudId }).assign({ archived: true, archived_at: now() }).write();
+    });
+
+    (result.deleted_employee_ids || []).forEach(cloudId => {
+      const emp = db.get('employees').find({ cloud_id: cloudId }).value();
+      if (emp) db.get('employees').remove({ id: emp.id }).write();
+      // у сотрудника нет своего archived-флага (не бизнес-сущность верхнего
+      // уровня, как клиент) — тут действительно удаляем локальную запись
+    });
+
+    if (conflicts.length > 0) {
+      db.get('settings').assign({ cloud_sync_conflicts: conflicts }).write();
+      // UI (settings-page.js) должен проверять settings.cloud_sync_conflicts
+      // и показывать баннер — реализуем на шаге фронтенда настроек
+    }
+
+    db.get('settings').assign({ cloud_clients_last_sync: new Date().toISOString() }).write();
+  } catch (e) {
+    console.error('Синхронизация клиентов/сотрудников с облаком не удалась:', e.message);
+  }
+}
+
+ipcMain.handle('cloud:syncClientsNow', async () => {
+  await syncClientsAndEmployees();
+  await syncVuData();
+  await syncReportSubmissions();
+  const s = db.get('settings').value();
+  return { ok: true, conflicts: s.cloud_sync_conflicts || [] };
+});
+
+// ── Синхронизация чек-листа воинского учёта (vu_data) ──────────────
+// Отдельный канал от syncClientsAndEmployees(), т.к. vu_data живёт не
+// в коллекции 'clients', а плоскими ключами 'vu_data_<clientId>' в
+// 'settings' — используется движком генерации (см. generatePackage,
+// клиент.vu_data) и формулой calcVuReadiness (readiness-calc.js).
+// Раньше вообще не синхронизировался — сервер (веб-дашборд/готовность
+// ВУ) не мог посчитать процент по ВУ. ВСЕГДА вызывать ПОСЛЕ
+// syncClientsAndEmployees() в одном цикле — иначе у части клиентов
+// ещё не будет cloud_id, и их vu_data будет некому приписать.
+async function syncVuData() {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) return;
+
+  try {
+    const allClients = db.get('clients').value();
+    const items = [];
+
+    for (const key of Object.keys(s)) {
+      const m = key.match(/^vu_data_(\d+)$/);
+      if (!m) continue;
+      const localId = parseInt(m[1], 10);
+      const client = allClients.find(c => c.id === localId);
+      if (!client || !client.cloud_id) continue; // клиент ещё не синхронизирован — догонит на следующем цикле
+
+      let data;
+      try { data = JSON.parse(s[key] || '{}'); } catch (_) { continue; }
+
+      items.push({ client_cloud_id: client.cloud_id, data });
+    }
+
+    if (!items.length) return;
+
+    await cloudApi('/api/sync-vu-data', { items }, s.cloud_token);
+    db.get('settings').assign({ cloud_vu_data_last_sync: new Date().toISOString() }).write();
+  } catch (e) {
+    console.error('Синхронизация vu_data с облаком не удалась:', e.message);
+  }
+}
+
+// ── Синхронизация фактов сдачи отчётов (reports_submitted) ─────────
+// Тот же принцип, что и syncVuData — settings.reports_submitted живёт
+// одним плоским JSON-ключом {clientId__reportId: ISO-дата}, не в
+// коллекции clients. Ключ разбираем по ПЕРВОМУ "__" (двойное
+// подчёркивание из submittedKey) — reportId сам по себе использует
+// только одинарные подчёркивания (см. reporting.js buildClientReports),
+// поэтому разбор однозначный.
+async function syncReportSubmissions() {
+  const s = db.get('settings').value();
+  if (!s.cloud_token) return;
+
+  try {
+    let submitted;
+    try { submitted = JSON.parse(s.reports_submitted || '{}'); } catch (_) { return; }
+
+    const allClients = db.get('clients').value();
+    const items = [];
+
+    for (const key of Object.keys(submitted)) {
+      const idx = key.indexOf('__');
+      if (idx === -1) continue;
+      const localId = parseInt(key.slice(0, idx), 10);
+      const reportId = key.slice(idx + 2);
+      const client = allClients.find(c => c.id === localId);
+      if (!client || !client.cloud_id) continue; // догонит на следующем цикле
+
+      items.push({ client_cloud_id: client.cloud_id, report_id: reportId, submitted_at: submitted[key] });
+    }
+
+    if (!items.length) return;
+
+    await cloudApi('/api/sync-report-submissions', { items }, s.cloud_token);
+    db.get('settings').assign({ cloud_reports_last_sync: new Date().toISOString() }).write();
+  } catch (e) {
+    console.error('Синхронизация reports_submitted с облаком не удалась:', e.message);
+  }
+}
+
 function startTelegramScheduler() {
   // Первая проверка — с небольшой задержкой, чтобы БД успела инициализироваться.
-  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); }, 15000);
+  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); silentCloudSync(); syncClientsAndEmployees().then(syncVuData).then(syncReportSubmissions); }, 15000);
   // Дальше — каждые 5 минут, пока приложение открыто (checkNpaUpdates сам
   // ограничивает себя одним реальным запуском в день, checkNpaCitations —
   // одним запуском в 30 дней, см. соответствующие функции).
-  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); }, 5 * 60 * 1000);
+  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); silentCloudSync(); syncClientsAndEmployees().then(syncVuData).then(syncReportSubmissions); }, 5 * 60 * 1000);
 }
 
 // ─── МОНИТОРИНГ НПА ──────────────────────────────────────

@@ -392,6 +392,28 @@ async function renderDashboardSpecialist(clients, events, alerts, tasks) {
   const overdueEvents   = events.filter(e => new Date(e.due_date) < now).length;
   const totalOverdue    = overdueTraining + overdueEvents;
 
+  // «МЕДОСМОТРЫ» вместо дублирующего счётчика компаний (тот уже виден в
+  // боковом меню, а тут раньше считал все клиенты включая архив — 9 vs 4,
+  // выглядело как баг). Используем ту же подсистему medical_clearances
+  // (тип periodic_29n), что и блок рекомендаций ЧОП ниже, но для всех
+  // клиентов с medcheck_required, а не только ЧОП.
+  let medcheckAlerts = 0;
+  try {
+    const medcheckClients = clients.filter(c => c.medcheck_required && !c.archived);
+    if (medcheckClients.length) {
+      const allEmpsForMedcheck = await window.api.employeesListAll();
+      medcheckClients.forEach(cl => {
+        const emps = allEmpsForMedcheck.filter(e => e.client_id === cl.id);
+        emps.forEach(e => {
+          const mc = (e.medical_clearances || []).find(x => x.type === 'periodic_29n');
+          if (!mc) { medcheckAlerts++; return; }
+          const days = Math.ceil((new Date(mc.valid_until) - now) / 86400000);
+          if (days <= 30) medcheckAlerts++;
+        });
+      });
+    }
+  } catch (_) {}
+
   // Блок «Что делать сегодня» — до 5 приоритетных действий
   const todoItems = [];
 
@@ -652,10 +674,10 @@ async function renderDashboardSpecialist(clients, events, alerts, tasks) {
 
   document.getElementById('content').innerHTML = `
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">${ic('building', 14)} ${term('clients')}</div><div class="stat-value">${stats.clients}</div><div class="stat-sub">${isOutsourcerMode ? 'на сопровождении' : ''}</div></div>
-      <div class="stat-card"><div class="stat-label">${ic('clipboard-list', 14)} Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent > 0 ? stats.urgent + ' срочных' : 'нет срочных'}</div></div>
       <div class="stat-card"><div class="stat-label">${ic('graduation-cap', 14)} Обучение</div><div class="stat-value" style="color:${alerts.length ? 'var(--amber)' : 'var(--green)'}">${alerts.length}</div><div class="stat-sub">истекает в течение 30 дн.</div></div>
+      <div class="stat-card"><div class="stat-label">${ic('heart-pulse', 14)} Медосмотры</div><div class="stat-value" style="color:${medcheckAlerts ? 'var(--amber)' : 'var(--green)'}">${medcheckAlerts}</div><div class="stat-sub">истекает/отсутствует</div></div>
       <div class="stat-card"><div class="stat-label">${ic('alert-triangle', 14)} Просрочено</div><div class="stat-value" style="color:${totalOverdue ? 'var(--red)' : 'var(--green)'}">${totalOverdue}</div><div class="stat-sub">требуют действий</div></div>
+      <div class="stat-card"><div class="stat-label">${ic('clipboard-list', 14)} Открытых задач</div><div class="stat-value">${stats.tasks}</div><div class="stat-sub">${stats.urgent > 0 ? stats.urgent + ' срочных' : 'нет срочных'}</div></div>
     </div>
     <div class="grid2">
       <div>

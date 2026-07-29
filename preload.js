@@ -75,6 +75,15 @@ contextBridge.exposeInMainWorld('api', {
   telegramBind:    (token)    => ipcRenderer.invoke('telegram:bind', token),
   appSetAutostart: (enabled)  => ipcRenderer.invoke('app:setAutostart', enabled),
 
+  // Облако (веб-версия/Фаза 1) — синхронизация events/tasks с сервером,
+  // Telegram-уведомления независимо от того, открыт ли компьютер
+  cloudRegister:      (email, password) => ipcRenderer.invoke('cloud:register', { email, password }),
+  cloudLogin:         (email, password) => ipcRenderer.invoke('cloud:login', { email, password }),
+  cloudLogout:        ()                => ipcRenderer.invoke('cloud:logout'),
+  cloudLinkTelegram:  ()                => ipcRenderer.invoke('cloud:linkTelegram'),
+  cloudSyncNow:       ()                => ipcRenderer.invoke('cloud:syncNow'),
+  cloudSyncClientsNow: ()               => ipcRenderer.invoke('cloud:syncClientsNow'),
+
   // Мониторинг НПА
   npaList:         (module)   => ipcRenderer.invoke('npa:list', module),
   npaMarkSeen:      (id)      => ipcRenderer.invoke('npa:markSeen', id),

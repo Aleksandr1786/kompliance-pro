@@ -133,6 +133,45 @@ async function renderSettings() {
           </div>
         </div>
 
+        <div class="section" id="s-cloud">
+          <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg></span><div class="section-title">Облако (веб-версия)</div>${s.cloud_token ? `<span style="margin-left:auto;font-size:11px;font-weight:700;color:var(--green);background:rgba(52,211,153,0.12);padding:3px 10px;border-radius:6px">✓ Подключено</span>` : ''}</div>
+          <div class="section-body">
+            <div style="background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:14px;font-size:12.5px;color:var(--muted2);line-height:1.7">
+              Данные (задачи и события) будут копироваться на сервер, чтобы Telegram-уведомления приходили даже когда компьютер выключен.
+            </div>
+            ${!s.cloud_token ? `
+            <div class="form-row">
+              <div class="form-group"><div class="form-label">Email</div><input class="form-input" id="s-cloud_email_input" placeholder="you@example.com"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><div class="form-label">Пароль</div><input class="form-input" type="password" id="s-cloud_password_input" placeholder="минимум 8 символов"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" id="cloud-login-btn" onclick="cloudLoginClick()">Войти</button></div>
+              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" id="cloud-register-btn" onclick="cloudRegisterClick()">Создать аккаунт</button></div>
+            </div>
+            ` : `
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--s3);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+              <div style="font-size:13px;color:var(--text)">Подключено как <b>${s.cloud_email||''}</b></div>
+              <button class="btn btn-ghost" style="font-size:11.5px" onclick="cloudLogoutClick()">Отключить</button>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" id="cloud-link-btn" onclick="testCloudLink()">🔗 Подключить Telegram (облако)</button></div>
+              <div class="form-group" style="justify-content:flex-end"><div class="form-label" style="opacity:0">.</div><button class="btn btn-ghost" id="cloud-sync-btn" onclick="syncNowManual()">↻ Синхронизировать сейчас</button></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);line-height:1.6">Откроется страница Telegram — если приложение не установлено на компьютере, она сама предложит открыть веб-версию (Open in Web) или войти через уже открытый Telegram в браузере. Ссылку действительна 1 час.</div>
+            <div id="cloud-link-fallback" style="display:none;background:var(--s3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:4px">
+              <div style="font-size:11.5px;color:var(--muted2);margin-bottom:8px">Если окно не открылось само — скопируйте ссылку и вставьте в браузер:</div>
+              <div style="display:flex;gap:8px">
+                <input class="form-input" id="cloud-link-text" readonly style="font-size:11.5px;font-family:monospace" onclick="this.select()">
+                <button class="btn btn-ghost" style="white-space:nowrap" onclick="copyCloudLink()">Копировать</button>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted);line-height:1.6">${s.cloud_last_sync ? 'Последняя синхронизация: ' + new Date(s.cloud_last_sync).toLocaleString('ru-RU') : 'Ещё не синхронизировано'}</div>
+            `}
+          </div>
+        </div>
+
         <div class="section" id="s-remind">
           <div class="section-head"><span class="section-icon" style="display:flex"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><div class="section-title">Напоминания</div></div>
           <div class="section-body">
@@ -507,6 +546,123 @@ async function testTelegram() {
     renderSettings();
   } else {
     showToast(result.error || 'Не удалось привязать бота', 'var(--red)', 7000);
+  }
+}
+
+async function cloudLoginClick() {
+  const email = document.getElementById('s-cloud_email_input')?.value?.trim();
+  const password = document.getElementById('s-cloud_password_input')?.value;
+  if (!email || !password) { showToast('Введите email и пароль', 'var(--red)'); return; }
+
+  const btn = document.getElementById('cloud-login-btn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Входим...';
+  btn.disabled = true;
+
+  const result = await window.api.cloudLogin(email, password);
+
+  btn.textContent = oldText;
+  btn.disabled = false;
+
+  if (result.ok) {
+    showToast('✅ Вход выполнен', 'var(--green)');
+    settings = await window.api.settingsGet();
+    renderSettings();
+  } else {
+    showToast(result.error || 'Не удалось войти', 'var(--red)', 7000);
+  }
+}
+
+async function cloudRegisterClick() {
+  const email = document.getElementById('s-cloud_email_input')?.value?.trim();
+  const password = document.getElementById('s-cloud_password_input')?.value;
+  if (!email || !password) { showToast('Введите email и пароль', 'var(--red)'); return; }
+  if (password.length < 8) { showToast('Пароль должен быть не короче 8 символов', 'var(--red)'); return; }
+
+  const btn = document.getElementById('cloud-register-btn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Создаём...';
+  btn.disabled = true;
+
+  const result = await window.api.cloudRegister(email, password);
+
+  btn.textContent = oldText;
+  btn.disabled = false;
+
+  if (result.ok) {
+    showToast('✅ Аккаунт создан, вы подключены', 'var(--green)');
+    settings = await window.api.settingsGet();
+    renderSettings();
+  } else {
+    showToast(result.error || 'Не удалось создать аккаунт', 'var(--red)', 7000);
+  }
+}
+
+async function cloudLogoutClick() {
+  if (!confirm('Отключить облако? Уведомления перестанут приходить, пока компьютер выключен.')) return;
+  await window.api.cloudLogout();
+  showToast('Облако отключено', 'var(--muted)');
+  settings = await window.api.settingsGet();
+  renderSettings();
+}
+
+async function testCloudLink() {
+  const btn = document.getElementById('cloud-link-btn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Генерируем ссылку...';
+  btn.disabled = true;
+
+  const result = await window.api.cloudLinkTelegram();
+
+  btn.textContent = oldText;
+  btn.disabled = false;
+
+  if (result.ok) {
+    await window.api.openExternal(result.link);
+    showToast('Открыта ссылка для подключения Telegram — подтвердите в чате', 'var(--green)', 6000);
+    // Запасной вариант всегда показываем рядом — openExternal может не сработать
+    // молча (заблокированные всплывающие окна, нет Telegram на компьютере и т.п.),
+    // пользователь не должен остаться без способа продолжить.
+    const fallback = document.getElementById('cloud-link-fallback');
+    const linkInput = document.getElementById('cloud-link-text');
+    if (fallback && linkInput) {
+      linkInput.value = result.link;
+      fallback.style.display = 'block';
+    }
+  } else {
+    showToast(result.error || 'Не удалось получить ссылку', 'var(--red)', 7000);
+  }
+}
+
+function copyCloudLink() {
+  const linkInput = document.getElementById('cloud-link-text');
+  if (!linkInput) return;
+  linkInput.select();
+  navigator.clipboard.writeText(linkInput.value).then(() => {
+    showToast('Ссылка скопирована', 'var(--green)');
+  }).catch(() => {
+    document.execCommand('copy');
+    showToast('Ссылка скопирована', 'var(--green)');
+  });
+}
+
+async function syncNowManual() {
+  const btn = document.getElementById('cloud-sync-btn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Синхронизируем...';
+  btn.disabled = true;
+
+  const result = await window.api.cloudSyncNow();
+
+  btn.textContent = oldText;
+  btn.disabled = false;
+
+  if (result.ok) {
+    showToast(`✅ Синхронизировано: ${result.events} событий, ${result.tasks} задач`, 'var(--green)', 5000);
+    settings = await window.api.settingsGet();
+    renderSettings();
+  } else {
+    showToast(result.error || 'Не удалось синхронизировать', 'var(--red)', 7000);
   }
 }
 

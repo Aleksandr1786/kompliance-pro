@@ -98,18 +98,39 @@ function sectionsToDoc(aiSections) {
 // callAI — функция вызова ИИ из main.js (передаётся как зависимость, чтобы
 // этот модуль не тянул на себя https/AI_PROXY_URL — держим его чисто про
 // сборку документа, а не про транспорт).
+//
+// Авторетрай: DeepSeek иногда обрывает ответ раньше закрытия JSON (упирается
+// в max_tokens посреди структуры) или отдаёт пустой text — оба случая дают
+// "Unexpected end of JSON input" при парсинге. Ошибка нестабильная — по
+// наблюдению 15.07.2026 повтор без изменений в промпте помогает. Поэтому
+// при ошибке парсинга делаем до MAX_PARSE_RETRIES повторных вызовов ИИ,
+// прежде чем показывать ошибку пользователю. Ошибку самого callAI (сеть,
+// прокси недоступен и т.п. — aiResult.ok === false) не ретраим здесь: это
+// не тот же класс проблемы, и retry может маскировать реальный сбой сети.
+const MAX_PARSE_RETRIES = 2; // итого до 3 попыток вызова ИИ
+
 async function draftInstruction(c, dir, position, callAI, industry) {
   const { system, prompt } = buildPrompt(position, industry);
-  const aiResult = await callAI(prompt, system, 2000); // больше max_tokens, чем обычный callAI-дефолт — нужен полный текст 5 разделов
-  if (!aiResult.ok) {
-    throw new Error('Ошибка формирования черновика: ' + (aiResult.error || 'неизвестная ошибка'));
-  }
 
   let aiSections;
-  try {
-    aiSections = parseAiResponse(aiResult.text);
-  } catch (e) {
-    throw new Error('Не удалось разобрать полученный ответ: ' + e.message);
+  let lastParseError;
+  for (let attempt = 0; attempt <= MAX_PARSE_RETRIES; attempt++) {
+    const aiResult = await callAI(prompt, system, 2000); // больше max_tokens, чем обычный callAI-дефолт — нужен полный текст 5 разделов
+    if (!aiResult.ok) {
+      throw new Error('Ошибка формирования черновика: ' + (aiResult.error || 'неизвестная ошибка'));
+    }
+    try {
+      aiSections = parseAiResponse(aiResult.text);
+      lastParseError = null;
+      break; // успех — выходим из цикла повторов
+    } catch (e) {
+      lastParseError = e;
+      // не последняя попытка — молча повторяем, пользователь не должен
+      // видеть промежуточные сбои парсинга
+    }
+  }
+  if (lastParseError) {
+    throw new Error('Не удалось разобрать полученный ответ: ' + lastParseError.message);
   }
 
   const positionGen = declRole(position, 'gen');

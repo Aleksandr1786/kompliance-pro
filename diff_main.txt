@@ -1,0 +1,438 @@
+﻿diff --git a/main.js b/main.js
+index ca8eed2..37d7580 100644
+--- a/main.js
++++ b/main.js
+@@ -643,7 +643,7 @@ ipcMain.handle('clients:add', (_, data) => {
+   }
+ 
+   const id = nextId('clients');
+-  const client = { ...data, id, created_at: now(), score: 0 };
++  const client = { ...data, id, created_at: now(), updated_at: now(), score: 0 };
+ 
+   // ╨Я╨Р╨б╨д-╤В╨░╤А╨╕╤Д тАФ ╨╡╨┤╨╕╨╜╤Б╤В╨▓╨╡╨╜╨╜╨░╤П ╨║╨╛╨╝╨┐╨░╨╜╨╕╤П ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П ╤Б╤А╨░╨╖╤Г ╨┐╨╛╨╗╤Г╤З╨░╨╡╤В ╨╝╨╛╨┤╤Г╨╗╨╕
+   // PASF+OT, ╨▒╨╡╨╖ ╨╛╤В╨┤╨╡╨╗╤М╨╜╨╛╨│╨╛ ╤И╨░╨│╨░ ╨░╨║╤В╨╕╨▓╨░╤Ж╨╕╨╕ ╨░╨┤╨┤╨╛╨╜╨░ (╤Б╨╝. license:activate).
+@@ -662,7 +662,7 @@ ipcMain.handle('clients:add', (_, data) => {
+ ipcMain.handle('clients:update', (_, id, data) => {
+   const err = validateClient(data, true);
+   if (err) return err;
+-  db.get('clients').find({ id }).assign(data).write();
++  db.get('clients').find({ id }).assign({ ...data, updated_at: now() }).write();
+   syncClientEvents(id, data);
+   return { ok: true };
+ });
+@@ -732,14 +732,14 @@ ipcMain.handle('employees:add', (_, data) => {
+   }
+ 
+   const id = nextId('employees');
+-  db.get('employees').push({ ...data, id }).write();
++  db.get('employees').push({ ...data, id, updated_at: now() }).write();
+   return { id };
+ });
+ 
+ ipcMain.handle('employees:update', (_, id, data) => {
+   const err = validateEmployee(data, true);
+   if (err) return err;
+-  db.get('employees').find({ id }).assign(data).write();
++  db.get('employees').find({ id }).assign({ ...data, updated_at: now() }).write();
+   return { ok: true };
+ });
+ 
+@@ -1123,6 +1123,34 @@ function buildMorningDigestText() {
+ // ╨Х╤Б╨╗╨╕ ╨▓╨║╨╗╤О╤З╨╡╨╜╨░ ╤Г╤В╤А╨╡╨╜╨╜╤П╤П ╤Б╨▓╨╛╨┤╨║╨░, ╨╜╨╡ ╨╛╤В╨┐╤А╨░╨▓╨╗╨╡╨╜╨░ ╤Б╨╡╨│╨╛╨┤╨╜╤П ╨╕ ╤Б╨╡╨╣╤З╨░╤Б 8:00 ╨╕╨╗╨╕ ╨┐╨╛╨╖╨╢╨╡ тАФ
+ // ╨╛╤В╨┐╤А╨░╨▓╨╗╤П╨╡╨╝. ╨н╤В╨╛ ╨┤╨░╤С╤В ┬л╨┤╨╛╨│╨╛╨╜╤П╤О╤Й╤Г╤О┬╗ ╨╗╨╛╨│╨╕╨║╤Г ╤Б╨░╨╝╨╛ ╨┐╨╛ ╤Б╨╡╨▒╨╡: ╨╡╤Б╨╗╨╕ ╨┐╤А╨╕╨╗╨╛╨╢╨╡╨╜╨╕╨╡
+ // ╨╛╤В╨║╤А╤Л╨╗╨╕ ╨▓ 14:00, ╨░ ╤Б╨▓╨╛╨┤╨║╨░ ╨╖╨░ ╤Б╨╡╨│╨╛╨┤╨╜╤П ╨╡╤Й╤С ╨╜╨╡ ╤Г╤Е╨╛╨┤╨╕╨╗╨░ тАФ ╨╛╨╜╨░ ╤Г╨╣╨┤╤С╤В ╨┐╤А╤П╨╝╨╛ ╤Б╨╡╨╣╤З╨░╤Б.
++// ╨Я╤А╨╛╨▓╨╡╤А╤П╨╡╤В ╤Г ╤Б╨╡╤А╨▓╨╡╤А╨░, ╤А╨╡╨░╨╗╤М╨╜╨╛ ╨╗╨╕ Telegram ╨┐╤А╨╕╨▓╤П╨╖╨░╨╜ ╤З╨╡╤А╨╡╨╖ ╨╛╨▒╨╗╨░╨║╨╛ (deep
++// link ╨▒╨╛╤В╤Г), ╨░ ╨╜╨╡ ╨┐╨╛╨╗╨░╨│╨░╨╡╤В╤Б╤П ╨╜╨░ ╨╗╨╛╨║╨░╨╗╤М╨╜╨╛╨╡ ╨┐╤А╨╡╨┤╨┐╨╛╨╗╨╛╨╢╨╡╨╜╨╕╨╡ "╨╖╨░╨╗╨╛╨│╨╕╨╜╨╡╨╜ тАФ
++// ╨╖╨╜╨░╤З╨╕╤В ╨┐╤А╨╕╨▓╤П╨╖╨░╨╜". ╨Ъ╤Н╤И╨╕╤А╤Г╨╡╨╝ ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В ╨╜╨╡╨╜╨░╨┤╨╛╨╗╨│╨╛ (5 ╨╝╨╕╨╜╤Г╤В тАФ ╤Б╨╛╨▓╨┐╨░╨┤╨░╨╡╤В
++// ╤Б ╨┐╨╡╤А╨╕╨╛╨┤╨╛╨╝ ╨╛╤Б╨╜╨╛╨▓╨╜╨╛╨│╨╛ ╤В╨░╨╣╨╝╨╡╤А╨░), ╤З╤В╨╛╨▒╤Л ╨╜╨╡ ╨┤╤С╤А╨│╨░╤В╤М ╤Б╨╡╤А╨▓╨╡╤А ╨╜╨░ ╨║╨░╨╢╨┤╤Л╨╣ ╤В╨╕╨║,
++// ╨╜╨╛ ╨╕ ╨╜╨╡ ╤Е╤А╨░╨╜╨╕╤В╤М ╤Б╤В╨░╤В╤Г╤Б ╨▓╨╡╤З╨╜╨╛, ╨╡╤Б╨╗╨╕ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М ╤В╨╛╨╗╤М╨║╨╛ ╤З╤В╨╛ ╨┐╤А╨╕╨▓╤П╨╖╨░╨╗/
++// ╨╛╤В╨▓╤П╨╖╨░╨╗ Telegram ╨▓ ╨▓╨╡╨▒-╨▓╨╡╤А╤Б╨╕╨╕.
++let _cloudTelegramLinkedCache = null; // { value: bool, checkedAt: number } | null
++async function isCloudTelegramLinked(s) {
++  const CACHE_MS = 5 * 60 * 1000;
++  if (_cloudTelegramLinkedCache && Date.now() - _cloudTelegramLinkedCache.checkedAt < CACHE_MS) {
++    return _cloudTelegramLinkedCache.value;
++  }
++  try {
++    const result = await cloudApi('/api/telegram-status', {}, s.cloud_token);
++    _cloudTelegramLinkedCache = { value: !!result.linked, checkedAt: Date.now() };
++    return _cloudTelegramLinkedCache.value;
++  } catch (e) {
++    // ╨б╨╡╤А╨▓╨╡╤А ╨╜╨╡╨┤╨╛╤Б╤В╤Г╨┐╨╡╨╜ ╨╕╨╗╨╕ ╨╛╤И╨╕╨▒╨║╨░ тАФ ╨╜╨╡ ╨╝╨╛╨╢╨╡╨╝ ╨┐╨╛╨┤╤В╨▓╨╡╤А╨┤╨╕╤В╤М, ╤З╤В╨╛ ╤Б╨╡╤А╨▓╨╡╤А
++    // ╨┐╤А╨╕╤И╨╗╤С╤В ╤Б╨▓╨╛╨┤╨║╤Г ╤Б╨░╨╝. ╨С╨╡╨╖╨╛╨┐╨░╤Б╨╜╨╡╨╡ ╨┐╤А╨╛╨╝╨╛╨╗╤З╨░╤В╤М ╨╖╨┤╨╡╤Б╤М ╨╕ ╨╜╨╡ ╤А╨╡╤И╨░╤В╤М ╨╖╨░
++    // ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П (╤А╨╕╤Б╨║ ╨┤╤Г╨▒╨╗╤П), ╨Э╨Ю ╨╕ ╨╜╨╡ ╨┐╨╛╤В╨╡╤А╤П╤В╤М ╨╡╨┤╨╕╨╜╤Б╤В╨▓╨╡╨╜╨╜╤Л╨╣ ╨║╨░╨╜╨░╨╗,
++    // ╨╡╤Б╨╗╨╕ ╤Б╨╡╤А╨▓╨╡╤А ╤А╨╡╨░╨╗╤М╨╜╨╛ ╨╜╨╡╨┤╨╛╤Б╤В╤Г╨┐╨╡╨╜ ╨┤╨╗╨╕╤В╨╡╨╗╤М╨╜╨╛╨╡ ╨▓╤А╨╡╨╝╤П тАФ ╨┐╨╛╤Н╤В╨╛╨╝╤Г ╨╜╨╡
++    // ╨║╤Н╤И╨╕╤А╤Г╨╡╨╝ ╨╛╤В╤А╨╕╤Ж╨░╤В╨╡╨╗╤М╨╜╤Л╨╣ ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В ╨╛╤И╨╕╨▒╨║╨╕, ╨┐╤А╨╛╨▒╤Г╨╡╨╝ ╨╜╨░ ╨║╨░╨╢╨┤╤Л╨╣ ╤В╨╕╨║,
++    // ╨╕ ╨╗╨╛╨║╨░╨╗╤М╨╜╨░╤П ╤Б╨▓╨╛╨┤╨║╨░ ╨╜╨╕╨╢╨╡ ╤Б╤А╨░╨▒╨╛╤В╨░╨╡╤В ╨║╨░╨║ ╤Д╨╛╨╗╨▒╤Н╨║ ╨╜╨░ ╤Г╤Б╤В╨░╤А╨╡╨▓╤И╨╕╤Е
++    // tg_token/tg_chat_id, ╨╡╤Б╨╗╨╕ ╨╛╨╜╨╕ ╤Г ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П ╨╡╤Й╤С ╨╜╨░╤Б╤В╤А╨╛╨╡╨╜╤Л.
++    return null; // null = "╨╜╨╡ ╨╖╨╜╨░╨╡╨╝", ╨╛╤В╨╗╨╕╤З╨░╨╡╤В╤Б╤П ╨╛╤В false = "╤В╨╛╤З╨╜╨╛ ╨╜╨╡ ╨┐╤А╨╕╨▓╤П╨╖╨░╨╜"
++  }
++}
++
+ async function maybeSendMorningDigest() {
+   const s = db.get('settings').value();
+   if (!s.tg_token || !s.tg_chat_id || s.tg_morning !== '1') return;
+@@ -1131,6 +1159,16 @@ async function maybeSendMorningDigest() {
+   if (s.tg_last_morning_date === today) return;
+   if (new Date().getHours() < 8) return;
+ 
++  // ╨Х╤Б╨╗╨╕ ╨░╨║╨║╨░╤Г╨╜╤В ╨╖╨░╨╗╨╛╨│╨╕╨╜╨╡╨╜ ╨▓ ╨╛╨▒╨╗╨░╨║╨╛ ╨Ш ╤Б╨╡╤А╨▓╨╡╤А ╨┐╨╛╨┤╤В╨▓╨╡╤А╨┤╨╕╨╗, ╤З╤В╨╛ Telegram
++  // ╨┐╤А╨╕╨▓╤П╨╖╨░╨╜ ╤З╨╡╤А╨╡╨╖ ╨╛╨▒╨╗╨░╤З╨╜╨╛╨│╨╛ ╨▒╨╛╤В╨░ тАФ ╤Б╨▓╨╛╨┤╨║╤Г ╤И╨╗╤С╤В ╤Б╨╡╤А╨▓╨╡╤А╨╜╤Л╨╣ cron
++  // (broadcast.js), ╨╗╨╛╨║╨░╨╗╤М╨╜╨░╤П ╨╛╤В╨┐╤А╨░╨▓╨║╨░ ╤Б╤В╨░╨╜╨╡╤В ╨┤╤Г╨▒╨╗╨╡╨╝. ╨Э╨╡ ╨╛╤В╨┐╤А╨░╨▓╨╗╤П╨╡╨╝,
++  // ╨╜╨╛ ╨╕ ╨╜╨╡ ╨┐╨╛╨╝╨╡╤З╨░╨╡╨╝ "╨╛╤В╨┐╤А╨░╨▓╨╗╨╡╨╜╨╛" тАФ ╨╡╤Б╨╗╨╕ ╨╛╨▒╨╗╨░╨║╨╛ ╨▓╨┤╤А╤Г╨│ ╨╜╨╡ ╨┐╤А╨╕╤И╨╗╤С╤В,
++  // ╤Е╨╛╤В╨╕╨╝ ╨┐╨╛╨▓╤В╨╛╤А╨╜╨╛ ╨┐╤А╨╛╨▓╨╡╤А╨╕╤В╤М ╨╜╨░ ╤Б╨╗╨╡╨┤╤Г╤О╤Й╨╡╨╝ ╤В╨╕╨║╨╡, ╨░ ╨╜╨╡ ╨╝╨╛╨╗╤З╨░╤В╤М ╨▓╨╡╤Б╤М ╨┤╨╡╨╜╤М.
++  if (s.cloud_token) {
++    const linked = await isCloudTelegramLinked(s);
++    if (linked === true) return;
++  }
++
+   const text = buildMorningDigestText();
+   const res = await telegramApi(s.tg_token, 'sendMessage', { chat_id: s.tg_chat_id, text });
+   if (res.ok) {
+@@ -1161,13 +1199,344 @@ async function checkUrgentEvents() {
+   }
+ }
+ 
++// тФАтФАтФА ╨Ю╨С╨Ы╨Р╨Ъ╨Ю (╨б╨Ш╨Э╨е╨а╨Ю╨Э╨Ш╨Ч╨Р╨ж╨Ш╨п ╨б ╨б╨Х╨а╨Т╨Х╨а╨Ю╨Ь) тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
++// ╨д╨░╨╖╨░ 1: ╤Б╨╡╤А╨▓╨╡╤А ╨┤╨╡╤А╨╢╨╕╤В ╨║╨╛╨┐╨╕╤О events/tasks, ╤З╤В╨╛╨▒╤Л ╤Б╨╗╨░╤В╤М Telegram-╤Г╨▓╨╡╨┤╨╛╨╝╨╗╨╡╨╜╨╕╤П
++// ╨╜╨╡╨╖╨░╨▓╨╕╤Б╨╕╨╝╨╛ ╨╛╤В ╤В╨╛╨│╨╛, ╨╛╤В╨║╤А╤Л╤В ╨╗╨╕ ╨║╨╛╨╝╨┐╤М╤О╤В╨╡╤А. ╨Р╨▓╤В╨╛╤А╨╕╨╖╨░╤Ж╨╕╤П тАФ ╨┐╨╡╤А╤Б╨╛╨╜╨░╨╗╤М╨╜╤Л╨╣
++// ╤В╨╛╨║╨╡╨╜, ╨┐╨╛╨╗╤Г╤З╨╡╨╜╨╜╤Л╨╣ ╤З╨╡╤А╨╡╨╖ ╨╗╨╛╨│╨╕╨╜/╤А╨╡╨│╨╕╤Б╤В╤А╨░╤Ж╨╕╤О (email+╨┐╨░╤А╨╛╨╗╤М), ╤Е╤А╨░╨╜╨╕╤В╤Б╤П
++// ╨▓ settings.cloud_token тАФ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤М ╨╜╨╕╨║╨╛╨│╨┤╨░ ╨╜╨╡ ╨▓╨▓╨╛╨┤╨╕╤В ╨╕ ╨╜╨╡ ╨▓╨╕╨┤╨╕╤В
++// ╤Б╨░╨╝ ╤В╨╛╨║╨╡╨╜, ╤В╨╛╨╗╤М╨║╨╛ email/╨┐╨░╤А╨╛╨╗╤М ╨╛╨┤╨╕╨╜ ╤А╨░╨╖ ╨┐╤А╨╕ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╨╕.
++const CLOUD_API_BASE = 'https://api.kompliancepro.ru';
++
++async function cloudApi(path, body, token) {
++  const headers = { 'Content-Type': 'application/json' };
++  if (token) headers['Authorization'] = `Bearer ${token}`;
++  const res = await fetch(`${CLOUD_API_BASE}${path}`, {
++    method: 'POST',
++    headers,
++    body: JSON.stringify(body),
++  });
++  const data = await res.json().catch(() => ({}));
++  if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
++  return data;
++}
++
++ipcMain.handle('cloud:register', async (_, { email, password }) => {
++  try {
++    const result = await cloudApi('/api/register', { email, password });
++    db.get('settings').assign({
++      cloud_token: result.token,
++      cloud_account_id: result.account_id,
++      cloud_email: email,
++    }).write();
++    return { ok: true };
++  } catch (e) {
++    return { ok: false, error: e.message };
++  }
++});
++
++ipcMain.handle('cloud:login', async (_, { email, password }) => {
++  try {
++    const result = await cloudApi('/api/login', { email, password, label: 'Desktop' });
++    db.get('settings').assign({
++      cloud_token: result.token,
++      cloud_account_id: result.account_id,
++      cloud_email: email,
++    }).write();
++    return { ok: true };
++  } catch (e) {
++    return { ok: false, error: e.message };
++  }
++});
++
++ipcMain.handle('cloud:logout', async () => {
++  db.get('settings').assign({ cloud_token: null, cloud_account_id: null, cloud_email: null }).write();
++  return { ok: true };
++});
++
++ipcMain.handle('cloud:linkTelegram', async () => {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) {
++    return { ok: false, error: '╨б╨╜╨░╤З╨░╨╗╨░ ╨▓╨╛╨╣╨┤╨╕╤В╨╡ ╨▓ ╨╛╨▒╨╗╨░╤З╨╜╤Л╨╣ ╨░╨║╨║╨░╤Г╨╜╤В' };
++  }
++  try {
++    const result = await cloudApi('/api/link-telegram', {}, s.cloud_token);
++    return { ok: true, link: result.link };
++  } catch (e) {
++    return { ok: false, error: e.message };
++  }
++});
++
++ipcMain.handle('cloud:syncNow', async () => {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) {
++    return { ok: false, error: '╨б╨╜╨░╤З╨░╨╗╨░ ╨▓╨╛╨╣╨┤╨╕╤В╨╡ ╨▓ ╨╛╨▒╨╗╨░╤З╨╜╤Л╨╣ ╨░╨║╨║╨░╤Г╨╜╤В' };
++  }
++  try {
++    const clients = db.get('clients').value();
++    const clientName = (id) => (clients.find(c => c.id === id) || {}).name || '';
++
++    const events = db.get('events').filter({ status: 'pending' }).value().map(e => ({
++      client_id: e.client_id,
++      client_name: clientName(e.client_id),
++      title: e.title,
++      due_date: e.due_date,
++      status: e.status,
++    }));
++
++    const tasks = db.get('tasks').filter({ done: 0 }).value().map(t => ({
++      title: t.title,
++      priority: t.priority || 'normal',
++      done: false,
++    }));
++
++    const result = await cloudApi('/api/sync', { events, tasks }, s.cloud_token);
++    db.get('settings').assign({ cloud_last_sync: new Date().toISOString() }).write();
++    return { ok: true, events: result.events, tasks: result.tasks };
++  } catch (e) {
++    return { ok: false, error: e.message };
++  }
++});
++
++// ╨в╨╕╤Е╨░╤П ╤Д╨╛╨╜╨╛╨▓╨░╤П ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П тАФ ╨╜╨╡ ╨┐╨╛╨║╨░╨╖╤Л╨▓╨░╨╡╤В ╨╛╤И╨╕╨▒╨╛╨║ ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤О, ╨┐╤А╨╛╤Б╤В╨╛
++// ╨┐╤А╨╛╨▒╤Г╨╡╤В ╨╕ ╨╗╨╛╨│╨╕╤А╤Г╨╡╤В ╨▓ ╨║╨╛╨╜╤Б╨╛╨╗╤М. ╨Э╨░╤Б╤В╨╛╤П╤Й╨░╤П ╨╛╨▒╤А╨░╤В╨╜╨░╤П ╤Б╨▓╤П╨╖╤М тАФ ╤В╨╛╨╗╤М╨║╨╛ ╤З╨╡╤А╨╡╨╖
++// ╨║╨╜╨╛╨┐╨║╤Г ┬л╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨╕╤А╨╛╨▓╨░╤В╤М ╤Б╨╡╨╣╤З╨░╤Б┬╗ ╨▓ ╨╜╨░╤Б╤В╤А╨╛╨╣╨║╨░╤Е (cloud:syncNow ╨▓╤Л╤И╨╡).
++async function silentCloudSync() {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) return;
++  try {
++    const clients = db.get('clients').value();
++    const clientName = (id) => (clients.find(c => c.id === id) || {}).name || '';
++    const events = db.get('events').filter({ status: 'pending' }).value().map(e => ({
++      client_id: e.client_id, client_name: clientName(e.client_id),
++      title: e.title, due_date: e.due_date, status: e.status,
++    }));
++    const tasks = db.get('tasks').filter({ done: 0 }).value().map(t => ({
++      title: t.title, priority: t.priority || 'normal', done: false,
++    }));
++    await cloudApi('/api/sync', { events, tasks }, s.cloud_token);
++    db.get('settings').assign({ cloud_last_sync: new Date().toISOString() }).write();
++  } catch (e) {
++    console.error('╨д╨╛╨╜╨╛╨▓╨░╤П ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П ╤Б ╨╛╨▒╨╗╨░╨║╨╛╨╝ ╨╜╨╡ ╤Г╨┤╨░╨╗╨░╤Б╤М:', e.message);
++  }
++}
++
++// тФАтФА ╨Ф╨▓╤Г╤Б╤В╨╛╤А╨╛╨╜╨╜╤П╤П ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П clients/employees ╤Б ╨▓╨╡╨▒-╨▓╨╡╤А╤Б╨╕╨╡╨╣ тФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
++// ╨Ъ╨╛╨╜╤В╤А╨░╨║╤В: ╤Б╨╝. sync-clients-contract.md (╤Б╨╛╨│╨╗╨░╤Б╨╛╨▓╨░╨╜ 19.07.2026), ╤Н╨╜╨┤╨┐╨╛╨╕╨╜╤В
++// POST /api/sync-clients ╨╜╨░ ╤Б╨╡╤А╨▓╨╡╤А╨╡ ╨╡╤Й╤С ╨┐╤А╨╡╨┤╤Б╤В╨╛╨╕╤В ╤А╨╡╨░╨╗╨╕╨╖╨╛╨▓╨░╤В╤М ╨╛╤В╨┤╨╡╨╗╤М╨╜╨╛.
++// ╨Т ╨╛╤В╨╗╨╕╤З╨╕╨╡ ╨╛╤В silentCloudSync (events/tasks, ╨╛╨┤╨╜╨╛╤Б╤В╨╛╤А╨╛╨╜╨╜╤П) тАФ ╨╖╨┤╨╡╤Б╤М ╨╝╨╛╨╢╨╡╤В
++// ╨┐╤А╨╕╨╣╤В╨╕ conflict:true (╨╖╨░╨┐╨╕╤Б╤М ╨┐╨╛╨╝╨╡╨╜╤П╨╗╨╕ ╨▓ ╨▓╨╡╨▒╨╡ ╨┐╨╛╨╖╨╢╨╡, ╤З╨╡╨╝ ╨╗╨╛╨║╨░╨╗╤М╨╜╨░╤П ╨┐╤А╨░╨▓╨║╨░)
++// тАФ ╨▓ ╤Н╤В╨╛╨╝ ╤Б╨╗╤Г╤З╨░╨╡ ╨Э╨Х ╨┐╨╡╤А╨╡╨╖╨░╨┐╨╕╤Б╤Л╨▓╨░╨╡╨╝ ╨╗╨╛╨║╨░╨╗╤М╨╜╤Л╨╡ ╨┤╨░╨╜╨╜╤Л╨╡ ╨╝╨╛╨╗╤З╨░, ╨╛╤Б╤В╨░╨▓╨╗╤П╨╡╨╝ ╨║╨░╨║
++// ╨╡╤Б╤В╤М ╨╕ ╨║╨╛╨┐╨╕╨╝ ╨┐╤А╨╡╨┤╤Г╨┐╤А╨╡╨╢╨┤╨╡╨╜╨╕╨╡ ╨┤╨╗╤П ╨┐╨╛╨╗╤М╨╖╨╛╨▓╨░╤В╨╡╨╗╤П (╨┐╤А╨░╨▓╨╕╨╗╨╛ "╤П╨▓╨╜╨╛, ╨╜╨╡ ╨╝╨╛╨╗╤З╨░").
++async function syncClientsAndEmployees() {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) return;
++
++  try {
++    const allClients = db.get('clients').value();
++    const allEmployees = db.get('employees').value();
++
++    const clientsPayload = allClients.map(c => ({
++      desktop_local_id: String(c.id),
++      cloud_id: c.cloud_id || null,
++      updated_at: c.updated_at || c.created_at || now(),
++      deleted: !!c.archived,
++      data: c,
++    }));
++
++    const employeesPayload = allEmployees.map(e => {
++      const parentClient = allClients.find(c => c.id === e.client_id);
++      return {
++        desktop_local_id: String(e.id),
++        cloud_id: e.cloud_id || null,
++        client_desktop_local_id: String(e.client_id),
++        client_cloud_id: parentClient?.cloud_id || null,
++        updated_at: e.updated_at || now(),
++        deleted: false,
++        data: e,
++      };
++    });
++
++    const result = await cloudApi('/api/sync-clients', {
++      clients: clientsPayload,
++      employees: employeesPayload,
++    }, s.cloud_token);
++
++    // тФАтФА ╨┐╤А╨╕╨╝╨╡╨╜╤П╨╡╨╝ ╨╛╤В╨▓╨╡╤В╤Л ╨┐╨╛ ╨╜╨░╤И╨╕╨╝ ╤Б╨╛╨▒╤Б╤В╨▓╨╡╨╜╨╜╤Л╨╝ ╨┐╤А╨░╨▓╨║╨░╨╝ тФАтФА
++    const conflicts = [];
++
++    (result.clients || []).forEach(r => {
++      const localId = parseInt(r.desktop_local_id, 10);
++      if (r.conflict) {
++        conflicts.push({ type: 'client', localId, name: (db.get('clients').find({ id: localId }).value() || {}).name });
++        return; // ╨╜╨╡ ╨┐╨╡╤А╨╡╨╖╨░╨┐╨╕╤Б╤Л╨▓╨░╨╡╨╝ тАФ ╨┐╤А╨░╨▓╨╕╨╗╨╛ "╤П╨▓╨╜╨╛, ╨╜╨╡ ╨╝╨╛╨╗╤З╨░"
++      }
++      if (r.deleted_on_server) {
++        // ╨╖╨░╨┐╨╕╤Б╤М ╤Г╨╢╨╡ ╤Г╨┤╨░╨╗╨╡╨╜╨░ ╨╜╨░ ╤Б╨╡╤А╨▓╨╡╤А╨╡ тАФ ╨╜╨╡ ╤Б╨╛╨╖╨┤╨░╤С╨╝ ╨┤╤Г╨▒╨╗╨╕╨║╨░╤В, ╨░╤А╤Е╨╕╨▓╨╕╤А╤Г╨╡╨╝ ╨╗╨╛╨║╨░╨╗╤М╨╜╨╛
++        db.get('clients').find({ id: localId }).assign({ cloud_id: r.id, archived: true, archived_at: now() }).write();
++        return;
++      }
++      // ╤Б╨╡╤А╨▓╨╡╤А ╨┐╤А╨╕╨╜╤П╨╗ ╨┐╤А╨░╨▓╨║╤Г тАФ ╨┐╤А╨╛╤Б╤В╨╛ ╨╖╨░╨┐╨╛╨╝╨╕╨╜╨░╨╡╨╝ ╨║╨░╨╜╨╛╨╜╨╕╤З╨╡╤Б╨║╨╕╨╣ id
++      db.get('clients').find({ id: localId }).assign({ cloud_id: r.id }).write();
++    });
++
++    (result.employees || []).forEach(r => {
++      const localId = parseInt(r.desktop_local_id, 10);
++      if (r.conflict) {
++        conflicts.push({ type: 'employee', localId, name: (db.get('employees').find({ id: localId }).value() || {}).full_name });
++        return;
++      }
++      if (r.deleted_on_server) {
++        const emp = db.get('employees').find({ id: localId }).value();
++        if (emp) db.get('employees').remove({ id: localId }).write();
++        return;
++      }
++      db.get('employees').find({ id: localId }).assign({ cloud_id: r.id }).write();
++    });
++
++    // тФАтФА ╨╛╨▒╤А╨░╤В╨╜╨░╤П ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П: ╨║╨╗╨╕╨╡╨╜╤В╤Л/╤Б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨╕, ╨╖╨░╨▓╨╡╨┤╤С╨╜╨╜╤Л╨╡ ╨▓ ╨▓╨╡╨▒╨╡ тФАтФА
++    (result.pulled_clients || []).forEach(pc => {
++      const exists = db.get('clients').find({ cloud_id: pc.id }).value();
++      if (exists) {
++        // web ╨╛╨▒╨╜╨╛╨▓╨╕╨╗ ╨╖╨░╨┐╨╕╤Б╤М, ╨║╨╛╤В╨╛╤А╤Г╤О ╨┤╨╡╤Б╨║╤В╨╛╨┐ ╤Г╨╢╨╡ ╨╖╨╜╨░╨╡╤В тАФ ╨┐╤А╨╕╨╝╨╡╨╜╤П╨╡╨╝ ╨║╨░╨║ ╨╡╤Б╤В╤М,
++        // ╤В.╨║. ╤А╨░╨╖ ╨╛╨╜╨░ ╨┐╨╛╨┐╨░╨╗╨░ ╨▓ pulled, ╨╖╨╜╨░╤З╨╕╤В desktop ╨╜╨╡ ╨╛╤В╨┐╤А╨░╨▓╨╗╤П╨╗ ╨┐╨╛ ╨╜╨╡╨╣
++        // ╨▒╨╛╨╗╨╡╨╡ ╤Б╨▓╨╡╨╢╤Г╤О ╨▓╨╡╤А╤Б╨╕╤О ╨▓ ╤Н╤В╨╛╨╝ ╨╢╨╡ ╨▓╤Л╨╖╨╛╨▓╨╡ (╨╕╨╜╨░╤З╨╡ ╨▒╤Л╨╗╨░ ╨▒╤Л ╨▓ clients[], ╨╜╨╡ ╤В╤Г╤В)
++        db.get('clients').find({ cloud_id: pc.id }).assign({ ...pc.data, updated_at: pc.updated_at, cloud_id: pc.id }).write();
++      } else {
++        const localId = nextId('clients');
++        db.get('clients').push({ ...pc.data, id: localId, cloud_id: pc.id, updated_at: pc.updated_at }).write();
++      }
++    });
++
++    (result.pulled_employees || []).forEach(pe => {
++      const parentLocal = db.get('clients').find({ cloud_id: pe.client_id }).value();
++      if (!parentLocal) return; // ╨║╨╗╨╕╨╡╨╜╤В ╨┐╨╛╤З╨╡╨╝╤Г-╤В╨╛ ╨╡╤Й╤С ╨╜╨╡ ╨┐╤А╨╕╤И╤С╨╗ тАФ ╨┐╤А╨╛╨┐╤Г╤Б╨║╨░╨╡╨╝, ╨┤╨╛╨│╨╛╨╜╨╕╤В ╨╜╨░ ╤Б╨╗╨╡╨┤╤Г╤О╤Й╨╡╨╝ sync
++      const exists = db.get('employees').find({ cloud_id: pe.id }).value();
++      if (exists) {
++        db.get('employees').find({ cloud_id: pe.id }).assign({ ...pe.data, client_id: parentLocal.id, updated_at: pe.updated_at, cloud_id: pe.id }).write();
++      } else {
++        const localId = nextId('employees');
++        db.get('employees').push({ ...pe.data, id: localId, client_id: parentLocal.id, cloud_id: pe.id, updated_at: pe.updated_at }).write();
++      }
++    });
++
++    // тФАтФА ╨╖╨░╨┐╨╕╤Б╨╕, ╤Г╨┤╨░╨╗╤С╨╜╨╜╤Л╨╡ ╨╜╨░ ╤Б╨╡╤А╨▓╨╡╤А╨╡ тАФ ╨░╤А╤Е╨╕╨▓╨╕╤А╤Г╨╡╨╝ ╨╗╨╛╨║╨░╨╗╤М╨╜╨╛, ╨░ ╨╜╨╡ ╤Г╨┤╨░╨╗╤П╨╡╨╝
++    // ╤Д╨╕╨╖╨╕╤З╨╡╤Б╨║╨╕ (╤З╤В╨╛╨▒╤Л ╨╜╨╡ ╤В╨╡╤А╤П╤В╤М ╨╕╤Б╤В╨╛╤А╨╕╤О ╨┐╨╛ ╨╛╤И╨╕╨▒╨║╨╡; archived тАФ ╤Г╨╢╨╡
++    // ╤Б╤Г╤Й╨╡╤Б╤В╨▓╤Г╤О╤Й╨╕╨╣ ╨▒╨╕╨╖╨╜╨╡╤Б-╤Д╨╗╨░╨│, ╨╛╤В╨┤╨╡╨╗╤М╨╜╤Л╨╣ ╨╛╤В deleted_at/soft-delete sync) тФАтФА
++    (result.deleted_client_ids || []).forEach(cloudId => {
++      db.get('clients').find({ cloud_id: cloudId }).assign({ archived: true, archived_at: now() }).write();
++    });
++
++    (result.deleted_employee_ids || []).forEach(cloudId => {
++      const emp = db.get('employees').find({ cloud_id: cloudId }).value();
++      if (emp) db.get('employees').remove({ id: emp.id }).write();
++      // ╤Г ╤Б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨░ ╨╜╨╡╤В ╤Б╨▓╨╛╨╡╨│╨╛ archived-╤Д╨╗╨░╨│╨░ (╨╜╨╡ ╨▒╨╕╨╖╨╜╨╡╤Б-╤Б╤Г╤Й╨╜╨╛╤Б╤В╤М ╨▓╨╡╤А╤Е╨╜╨╡╨│╨╛
++      // ╤Г╤А╨╛╨▓╨╜╤П, ╨║╨░╨║ ╨║╨╗╨╕╨╡╨╜╤В) тАФ ╤В╤Г╤В ╨┤╨╡╨╣╤Б╤В╨▓╨╕╤В╨╡╨╗╤М╨╜╨╛ ╤Г╨┤╨░╨╗╤П╨╡╨╝ ╨╗╨╛╨║╨░╨╗╤М╨╜╤Г╤О ╨╖╨░╨┐╨╕╤Б╤М
++    });
++
++    if (conflicts.length > 0) {
++      db.get('settings').assign({ cloud_sync_conflicts: conflicts }).write();
++      // UI (settings-page.js) ╨┤╨╛╨╗╨╢╨╡╨╜ ╨┐╤А╨╛╨▓╨╡╤А╤П╤В╤М settings.cloud_sync_conflicts
++      // ╨╕ ╨┐╨╛╨║╨░╨╖╤Л╨▓╨░╤В╤М ╨▒╨░╨╜╨╜╨╡╤А тАФ ╤А╨╡╨░╨╗╨╕╨╖╤Г╨╡╨╝ ╨╜╨░ ╤И╨░╨│╨╡ ╤Д╤А╨╛╨╜╤В╨╡╨╜╨┤╨░ ╨╜╨░╤Б╤В╤А╨╛╨╡╨║
++    }
++
++    db.get('settings').assign({ cloud_clients_last_sync: new Date().toISOString() }).write();
++  } catch (e) {
++    console.error('╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П ╨║╨╗╨╕╨╡╨╜╤В╨╛╨▓/╤Б╨╛╤В╤А╤Г╨┤╨╜╨╕╨║╨╛╨▓ ╤Б ╨╛╨▒╨╗╨░╨║╨╛╨╝ ╨╜╨╡ ╤Г╨┤╨░╨╗╨░╤Б╤М:', e.message);
++  }
++}
++
++ipcMain.handle('cloud:syncClientsNow', async () => {
++  await syncClientsAndEmployees();
++  await syncVuData();
++  await syncReportSubmissions();
++  const s = db.get('settings').value();
++  return { ok: true, conflicts: s.cloud_sync_conflicts || [] };
++});
++
++// тФАтФА ╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П ╤З╨╡╨║-╨╗╨╕╤Б╤В╨░ ╨▓╨╛╨╕╨╜╤Б╨║╨╛╨│╨╛ ╤Г╤З╤С╤В╨░ (vu_data) тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
++// ╨Ю╤В╨┤╨╡╨╗╤М╨╜╤Л╨╣ ╨║╨░╨╜╨░╨╗ ╨╛╤В syncClientsAndEmployees(), ╤В.╨║. vu_data ╨╢╨╕╨▓╤С╤В ╨╜╨╡
++// ╨▓ ╨║╨╛╨╗╨╗╨╡╨║╤Ж╨╕╨╕ 'clients', ╨░ ╨┐╨╗╨╛╤Б╨║╨╕╨╝╨╕ ╨║╨╗╤О╤З╨░╨╝╨╕ 'vu_data_<clientId>' ╨▓
++// 'settings' тАФ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╤В╤Б╤П ╨┤╨▓╨╕╨╢╨║╨╛╨╝ ╨│╨╡╨╜╨╡╤А╨░╤Ж╨╕╨╕ (╤Б╨╝. generatePackage,
++// ╨║╨╗╨╕╨╡╨╜╤В.vu_data) ╨╕ ╤Д╨╛╤А╨╝╤Г╨╗╨╛╨╣ calcVuReadiness (readiness-calc.js).
++// ╨а╨░╨╜╤М╤И╨╡ ╨▓╨╛╨╛╨▒╤Й╨╡ ╨╜╨╡ ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨╕╤А╨╛╨▓╨░╨╗╤Б╤П тАФ ╤Б╨╡╤А╨▓╨╡╤А (╨▓╨╡╨▒-╨┤╨░╤И╨▒╨╛╤А╨┤/╨│╨╛╤В╨╛╨▓╨╜╨╛╤Б╤В╤М
++// ╨Т╨г) ╨╜╨╡ ╨╝╨╛╨│ ╨┐╨╛╤Б╤З╨╕╤В╨░╤В╤М ╨┐╤А╨╛╤Ж╨╡╨╜╤В ╨┐╨╛ ╨Т╨г. ╨Т╨б╨Х╨У╨Ф╨Р ╨▓╤Л╨╖╤Л╨▓╨░╤В╤М ╨Я╨Ю╨б╨Ы╨Х
++// syncClientsAndEmployees() ╨▓ ╨╛╨┤╨╜╨╛╨╝ ╤Ж╨╕╨║╨╗╨╡ тАФ ╨╕╨╜╨░╤З╨╡ ╤Г ╤З╨░╤Б╤В╨╕ ╨║╨╗╨╕╨╡╨╜╤В╨╛╨▓
++// ╨╡╤Й╤С ╨╜╨╡ ╨▒╤Г╨┤╨╡╤В cloud_id, ╨╕ ╨╕╤Е vu_data ╨▒╤Г╨┤╨╡╤В ╨╜╨╡╨║╨╛╨╝╤Г ╨┐╤А╨╕╨┐╨╕╤Б╨░╤В╤М.
++async function syncVuData() {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) return;
++
++  try {
++    const allClients = db.get('clients').value();
++    const items = [];
++
++    for (const key of Object.keys(s)) {
++      const m = key.match(/^vu_data_(\d+)$/);
++      if (!m) continue;
++      const localId = parseInt(m[1], 10);
++      const client = allClients.find(c => c.id === localId);
++      if (!client || !client.cloud_id) continue; // ╨║╨╗╨╕╨╡╨╜╤В ╨╡╤Й╤С ╨╜╨╡ ╤Б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨╕╤А╨╛╨▓╨░╨╜ тАФ ╨┤╨╛╨│╨╛╨╜╨╕╤В ╨╜╨░ ╤Б╨╗╨╡╨┤╤Г╤О╤Й╨╡╨╝ ╤Ж╨╕╨║╨╗╨╡
++
++      let data;
++      try { data = JSON.parse(s[key] || '{}'); } catch (_) { continue; }
++
++      items.push({ client_cloud_id: client.cloud_id, data });
++    }
++
++    if (!items.length) return;
++
++    await cloudApi('/api/sync-vu-data', { items }, s.cloud_token);
++    db.get('settings').assign({ cloud_vu_data_last_sync: new Date().toISOString() }).write();
++  } catch (e) {
++    console.error('╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П vu_data ╤Б ╨╛╨▒╨╗╨░╨║╨╛╨╝ ╨╜╨╡ ╤Г╨┤╨░╨╗╨░╤Б╤М:', e.message);
++  }
++}
++
++// тФАтФА ╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П ╤Д╨░╨║╤В╨╛╨▓ ╤Б╨┤╨░╤З╨╕ ╨╛╤В╤З╤С╤В╨╛╨▓ (reports_submitted) тФАтФАтФАтФАтФАтФАтФАтФАтФА
++// ╨в╨╛╤В ╨╢╨╡ ╨┐╤А╨╕╨╜╤Ж╨╕╨┐, ╤З╤В╨╛ ╨╕ syncVuData тАФ settings.reports_submitted ╨╢╨╕╨▓╤С╤В
++// ╨╛╨┤╨╜╨╕╨╝ ╨┐╨╗╨╛╤Б╨║╨╕╨╝ JSON-╨║╨╗╤О╤З╨╛╨╝ {clientId__reportId: ISO-╨┤╨░╤В╨░}, ╨╜╨╡ ╨▓
++// ╨║╨╛╨╗╨╗╨╡╨║╤Ж╨╕╨╕ clients. ╨Ъ╨╗╤О╤З ╤А╨░╨╖╨▒╨╕╤А╨░╨╡╨╝ ╨┐╨╛ ╨Я╨Х╨а╨Т╨Ю╨Ь╨г "__" (╨┤╨▓╨╛╨╣╨╜╨╛╨╡
++// ╨┐╨╛╨┤╤З╤С╤А╨║╨╕╨▓╨░╨╜╨╕╨╡ ╨╕╨╖ submittedKey) тАФ reportId ╤Б╨░╨╝ ╨┐╨╛ ╤Б╨╡╨▒╨╡ ╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╤В
++// ╤В╨╛╨╗╤М╨║╨╛ ╨╛╨┤╨╕╨╜╨░╤А╨╜╤Л╨╡ ╨┐╨╛╨┤╤З╤С╤А╨║╨╕╨▓╨░╨╜╨╕╤П (╤Б╨╝. reporting.js buildClientReports),
++// ╨┐╨╛╤Н╤В╨╛╨╝╤Г ╤А╨░╨╖╨▒╨╛╤А ╨╛╨┤╨╜╨╛╨╖╨╜╨░╤З╨╜╤Л╨╣.
++async function syncReportSubmissions() {
++  const s = db.get('settings').value();
++  if (!s.cloud_token) return;
++
++  try {
++    let submitted;
++    try { submitted = JSON.parse(s.reports_submitted || '{}'); } catch (_) { return; }
++
++    const allClients = db.get('clients').value();
++    const items = [];
++
++    for (const key of Object.keys(submitted)) {
++      const idx = key.indexOf('__');
++      if (idx === -1) continue;
++      const localId = parseInt(key.slice(0, idx), 10);
++      const reportId = key.slice(idx + 2);
++      const client = allClients.find(c => c.id === localId);
++      if (!client || !client.cloud_id) continue; // ╨┤╨╛╨│╨╛╨╜╨╕╤В ╨╜╨░ ╤Б╨╗╨╡╨┤╤Г╤О╤Й╨╡╨╝ ╤Ж╨╕╨║╨╗╨╡
++
++      items.push({ client_cloud_id: client.cloud_id, report_id: reportId, submitted_at: submitted[key] });
++    }
++
++    if (!items.length) return;
++
++    await cloudApi('/api/sync-report-submissions', { items }, s.cloud_token);
++    db.get('settings').assign({ cloud_reports_last_sync: new Date().toISOString() }).write();
++  } catch (e) {
++    console.error('╨б╨╕╨╜╤Е╤А╨╛╨╜╨╕╨╖╨░╤Ж╨╕╤П reports_submitted ╤Б ╨╛╨▒╨╗╨░╨║╨╛╨╝ ╨╜╨╡ ╤Г╨┤╨░╨╗╨░╤Б╤М:', e.message);
++  }
++}
++
+ function startTelegramScheduler() {
+   // ╨Я╨╡╤А╨▓╨░╤П ╨┐╤А╨╛╨▓╨╡╤А╨║╨░ тАФ ╤Б ╨╜╨╡╨▒╨╛╨╗╤М╤И╨╛╨╣ ╨╖╨░╨┤╨╡╤А╨╢╨║╨╛╨╣, ╤З╤В╨╛╨▒╤Л ╨С╨Ф ╤Г╤Б╨┐╨╡╨╗╨░ ╨╕╨╜╨╕╤Ж╨╕╨░╨╗╨╕╨╖╨╕╤А╨╛╨▓╨░╤В╤М╤Б╤П.
+-  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); }, 15000);
++  setTimeout(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); silentCloudSync(); syncClientsAndEmployees().then(syncVuData).then(syncReportSubmissions); }, 15000);
+   // ╨Ф╨░╨╗╤М╤И╨╡ тАФ ╨║╨░╨╢╨┤╤Л╨╡ 5 ╨╝╨╕╨╜╤Г╤В, ╨┐╨╛╨║╨░ ╨┐╤А╨╕╨╗╨╛╨╢╨╡╨╜╨╕╨╡ ╨╛╤В╨║╤А╤Л╤В╨╛ (checkNpaUpdates ╤Б╨░╨╝
+   // ╨╛╨│╤А╨░╨╜╨╕╤З╨╕╨▓╨░╨╡╤В ╤Б╨╡╨▒╤П ╨╛╨┤╨╜╨╕╨╝ ╤А╨╡╨░╨╗╤М╨╜╤Л╨╝ ╨╖╨░╨┐╤Г╤Б╨║╨╛╨╝ ╨▓ ╨┤╨╡╨╜╤М, checkNpaCitations тАФ
+   // ╨╛╨┤╨╜╨╕╨╝ ╨╖╨░╨┐╤Г╤Б╨║╨╛╨╝ ╨▓ 30 ╨┤╨╜╨╡╨╣, ╤Б╨╝. ╤Б╨╛╨╛╤В╨▓╨╡╤В╤Б╤В╨▓╤Г╤О╤Й╨╕╨╡ ╤Д╤Г╨╜╨║╤Ж╨╕╨╕).
+-  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); }, 5 * 60 * 1000);
++  setInterval(() => { maybeSendMorningDigest(); checkUrgentEvents(); checkNpaUpdates(); checkNpaCitations(); silentCloudSync(); syncClientsAndEmployees().then(syncVuData).then(syncReportSubmissions); }, 5 * 60 * 1000);
+ }
+ 
+ // тФАтФАтФА ╨Ь╨Ю╨Э╨Ш╨в╨Ю╨а╨Ш╨Э╨У ╨Э╨Я╨Р тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА

@@ -259,7 +259,7 @@ function norm(client){
   c.name=c.name||'Организация';c.form=c.form||'ООО';
   // Город: берём c.city если есть, иначе c.region, убираем префикс "г."
   const rawCity = (c.city || c.region || '').trim();
-  c.city = rawCity.replace(/^г\.?\s*/i,'').replace(/^город\s*/i,'').trim() || '________________';
+  c.city = rawCity.replace(/^г(?:\.\s*|\s+)/i,'').replace(/^город\s+/i,'').trim() || '________________';
   c.doc_date=c.doc_date||new Date().toLocaleDateString('ru-RU');
   c.doc_year=c.doc_year||String(new Date().getFullYear());
   c.manager_name=c.manager_name||'Руководитель';

@@ -25,6 +25,9 @@ jobs:
       - name: Установить зависимости
         run: npm ci
 
+      - name: Проверить код и контракт синхронизации
+        run: npm run check
+
       - name: Собрать
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

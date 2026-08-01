@@ -9,6 +9,9 @@
   },
   "scripts": {
     "start": "electron .",
+    "test": "node --test test/sync-contract.test.js",
+    "check:syntax": "node --check main.js && node --check preload.js",
+    "check": "npm run check:syntax && npm test",
     "build": "electron-builder",
     "build:win": "electron-builder --win"
   },

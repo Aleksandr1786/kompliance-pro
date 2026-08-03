@@ -18,6 +18,13 @@ test('contract v1 removes local ids, tokens and unknown client fields', () => {
   );
 });
 
+test('client contract preserves the OKVED description allowed by the backend', () => {
+  assert.deepEqual(
+    sanitizeClientData({ okved: '71.20', okved_name: 'Технические испытания', arbitrary: true }),
+    { okved: '71.20', okved_name: 'Технические испытания' }
+  );
+});
+
 test('employee contract keeps approved fields and filters medical records', () => {
   assert.deepEqual(sanitizeEmployeeData({
     id: 9,

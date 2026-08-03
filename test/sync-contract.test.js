@@ -18,6 +18,7 @@ test("sync contract v1 is documented", () => {
 test("desktop implements the documented sync response", () => {
   for (const marker of [
     "/api/sync-clients",
+    "DATA_CONTRACT_VERSION",
     "desktop_local_id",
     "cloud_id",
     "updated_at",

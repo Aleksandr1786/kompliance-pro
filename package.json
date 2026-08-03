@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/sync-contract.test.js",
+    "test": "node --test test/sync-contract.test.js test/data-contract.test.js",
     "check:syntax": "node --check main.js && node --check preload.js",
     "check": "npm run check:syntax && npm test",
     "build": "electron-builder",
@@ -75,6 +75,7 @@
       "utils.js",
       "sections.js",
       "doc-meta.js",
+      "data-contract.js",
       "src/**/*",
       "assets/**/*",
       "node_modules/**/*"

@@ -4,6 +4,14 @@ const { generatePackage } = require('./generator');
 const { generateSoutPackage } = require('./gen_sout');
 const path = require('path');
 const fs = require('fs');
+const {
+  DATA_CONTRACT_VERSION,
+  sanitizeClientData,
+  sanitizeEmployeeData,
+  sanitizeMedicalClearances,
+  sanitizeVuData,
+  isCloudSyncedPath,
+} = require('./data-contract');
 
 // ─── База данных на JSON (не требует компиляции) ──────────
 const low    = require('lowdb');
@@ -1340,7 +1348,7 @@ async function syncClientsAndEmployees() {
       cloud_id: c.cloud_id || null,
       updated_at: c.updated_at || c.created_at || now(),
       deleted: !!c.archived,
-      data: c,
+      data: sanitizeClientData(c),
     }));
 
     const employeesPayload = allEmployees.map(e => {
@@ -1352,11 +1360,12 @@ async function syncClientsAndEmployees() {
         client_cloud_id: parentClient?.cloud_id || null,
         updated_at: e.updated_at || now(),
         deleted: false,
-        data: e,
+        data: sanitizeEmployeeData(e),
       };
     });
 
     const result = await cloudApi('/api/sync-clients', {
+      contract_version: DATA_CONTRACT_VERSION,
       clients: clientsPayload,
       employees: employeesPayload,
     }, s.cloud_token);
@@ -1400,10 +1409,10 @@ async function syncClientsAndEmployees() {
         // web обновил запись, которую десктоп уже знает — применяем как есть,
         // т.к. раз она попала в pulled, значит desktop не отправлял по ней
         // более свежую версию в этом же вызове (иначе была бы в clients[], не тут)
-        db.get('clients').find({ cloud_id: pc.id }).assign({ ...pc.data, updated_at: pc.updated_at, cloud_id: pc.id }).write();
+        db.get('clients').find({ cloud_id: pc.id }).assign({ ...sanitizeClientData(pc.data), updated_at: pc.updated_at, cloud_id: pc.id }).write();
       } else {
         const localId = nextId('clients');
-        db.get('clients').push({ ...pc.data, id: localId, cloud_id: pc.id, updated_at: pc.updated_at }).write();
+        db.get('clients').push({ ...sanitizeClientData(pc.data), id: localId, cloud_id: pc.id, updated_at: pc.updated_at }).write();
       }
     });
 
@@ -1412,10 +1421,10 @@ async function syncClientsAndEmployees() {
       if (!parentLocal) return; // клиент почему-то ещё не пришёл — пропускаем, догонит на следующем sync
       const exists = db.get('employees').find({ cloud_id: pe.id }).value();
       if (exists) {
-        db.get('employees').find({ cloud_id: pe.id }).assign({ ...pe.data, client_id: parentLocal.id, updated_at: pe.updated_at, cloud_id: pe.id }).write();
+        db.get('employees').find({ cloud_id: pe.id }).assign({ ...sanitizeEmployeeData(pe.data), client_id: parentLocal.id, updated_at: pe.updated_at, cloud_id: pe.id }).write();
       } else {
         const localId = nextId('employees');
-        db.get('employees').push({ ...pe.data, id: localId, client_id: parentLocal.id, cloud_id: pe.id, updated_at: pe.updated_at }).write();
+        db.get('employees').push({ ...sanitizeEmployeeData(pe.data), id: localId, client_id: parentLocal.id, cloud_id: pe.id, updated_at: pe.updated_at }).write();
       }
     });
 
@@ -1480,7 +1489,7 @@ async function syncVuData() {
       let data;
       try { data = JSON.parse(s[key] || '{}'); } catch (_) { continue; }
 
-      items.push({ client_cloud_id: client.cloud_id, data });
+      items.push({ client_cloud_id: client.cloud_id, data: sanitizeVuData(data) });
     }
 
     if (!items.length) return;
@@ -2442,7 +2451,13 @@ ipcMain.handle('backup:now', async () => {
     const res = await dialog.showOpenDialog({ properties: ['openDirectory'] });
     if (res.canceled) return { ok: false };
     backupDir = res.filePaths[0];
+    if (isCloudSyncedPath(backupDir)) {
+      return { ok: false, error: 'Незашифрованные резервные копии нельзя сохранять в облачно-синхронизируемую папку' };
+    }
     db.get('settings').assign({ backup_path: backupDir }).write();
+  }
+  if (isCloudSyncedPath(backupDir)) {
+    return { ok: false, error: 'Выберите локальную папку: облачная синхронизация незашифрованной базы заблокирована' };
   }
   const date = new Date().toISOString().slice(0, 10);
   const src  = path.join(app.getPath('userData'), 'kompliance.json');
@@ -2473,6 +2488,15 @@ ipcMain.handle('backup:choose-folder', async () => {
   }
   const res = await dialog.showOpenDialog(opts);
   if (res.canceled) return null;
+  if (isCloudSyncedPath(res.filePaths[0])) {
+    await dialog.showMessageBox({
+      type: 'warning',
+      title: 'Небезопасная папка',
+      message: 'Выберите локальную папку',
+      detail: 'Облачно-синхронизируемые каталоги заблокированы, пока резервные копии базы не шифруются.',
+    });
+    return null;
+  }
   return res.filePaths[0];
 });
 
@@ -2705,6 +2729,10 @@ async function callAI(prompt, system, maxTokens) {
   const provider = s.ai_provider || 'deepseek';
   const apiKey   = s.ai_key || '';
   const tokens   = maxTokens || 512;
+
+  if (!['deepseek', 'claude'].includes(provider)) {
+    return { ok: false, error: `AI-провайдер «${provider}» пока не поддерживается. Выберите DeepSeek или Claude.` };
+  }
 
   // Если есть пользовательский ключ — используем напрямую
   // Если нет — для DeepSeek используем прокси
@@ -3181,7 +3209,11 @@ ipcMain.handle('medical-clearances:get', (_, employeeId) => {
 });
 
 ipcMain.handle('medical-clearances:save', (_, employeeId, list) => {
-  db.get('employees').find({ id: employeeId }).assign({ medical_clearances: list }).write();
+  const medicalClearances = sanitizeMedicalClearances(list);
+  if (!Array.isArray(list) || medicalClearances.length !== list.length) {
+    return { ok: false, error: 'Допустимы только утверждённые типы медицинских допусков' };
+  }
+  db.get('employees').find({ id: employeeId }).assign({ medical_clearances: medicalClearances }).write();
   return { ok: true };
 });
 

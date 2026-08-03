@@ -193,10 +193,10 @@ async function renderSettings() {
             <div class="form-row">
               <div class="form-group" style="grid-column:1/-1"><div class="form-label">Папка для копий</div>
                 <div style="display:flex;gap:8px">
-                  <input class="form-input" id="s-backup_path" value="${s.backup_path||''}" placeholder="C:\\Users\\...\\Яндекс.Диск\\КомплаенсПро\\Backup" style="flex:1">
+                  <input class="form-input" id="s-backup_path" value="${s.backup_path||''}" placeholder="C:\\КомплаенсПро\\Backup" style="flex:1">
                   <button class="btn btn-ghost" onclick="chooseBackupFolder()">📁</button>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px">Рекомендуется: папка Яндекс.Диска для автосинхронизации</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">Только локальная папка. Облачно-синхронизируемые каталоги блокируются, пока копии не шифруются.</div>
               </div>
             </div>
             <div style="display:flex;gap:10px">
@@ -489,9 +489,6 @@ function buildAiProviderList(s) {
   const providers = [
     ['deepseek','⚡','DeepSeek API','Быстрый · Дешёвый · OpenAI-совместимый','Рекомендуем'],
     ['claude','🤖','Claude API (Anthropic)','Наилучшее качество для юридических текстов','Основной'],
-    ['yandex','🟡','YandexGPT API','Российский · Не блокируется в РФ','РФ'],
-    ['giga','🟢','GigaChat API (Сбер)','Российский · Сертифицирован для ПД','РФ'],
-    ['ollama','🟣','Локальная модель (Ollama)','Полностью офлайн · Без интернета','Офлайн'],
   ];
   return providers.map(([val,icon,name,desc,badge]) =>
     `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--s3);border:1px solid ${s.ai_provider===val?'var(--blue)':'var(--border)'};border-radius:10px;cursor:pointer;transition:all .15s" onclick="selectAiProvider('${val}',this)">
@@ -682,7 +679,7 @@ async function chooseBackupFolder() {
 async function backupNow() {
   const result = await window.api.backupNow();
   if (result.ok) showToast('Резервная копия создана: ' + result.path);
-  else showToast('Выберите папку для резервных копий', 'var(--amber)');
+  else showToast(result.error || 'Выберите локальную папку для резервных копий', 'var(--amber)');
 }
 
 async function activateAddon() {

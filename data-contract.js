@@ -4,7 +4,7 @@
 const DATA_CONTRACT_VERSION = 1;
 
 const CLIENT_SYNC_FIELDS = Object.freeze([
-  'name', 'inn', 'kpp', 'ogrn', 'form', 'okved', 'okved_extra', 'email',
+  'name', 'inn', 'kpp', 'ogrn', 'form', 'okved', 'okved_extra', 'okved_name', 'email',
   'staff', 'region', 'city', 'address', 'address_actual', 'phone', 'czn',
   'manager_name', 'manager_position', 'ot_name', 'ot_position', 'ot_name_acc',
   'ot_position_acc', 'instr_name', 'instr_position', 'instr_name_acc',

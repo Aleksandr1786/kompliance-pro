@@ -82,6 +82,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   await navigate('dashboard');
   await checkOnboarding();
   await showMorningDigest();
+
+  // Used by the desktop smoke to distinguish a loaded document from a fully
+  // initialized renderer. It is also useful during manual diagnostics.
+  document.documentElement.dataset.bootstrapReady = 'true';
 });
 
 function applySettings() {

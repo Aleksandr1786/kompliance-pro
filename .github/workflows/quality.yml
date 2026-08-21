@@ -28,8 +28,18 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
-      - name: Установить зависимости
-        run: npm ci
+      - name: Установить зависимости и проверить устаревшие пакеты
+        shell: pwsh
+        env:
+          NO_COLOR: '1'
+          npm_config_color: 'false'
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'npm-ci.log'
+          npm ci 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          node scripts/check-dependency-deprecations.js $log
 
       - name: Проверить код и контракт синхронизации
         run: npm run check

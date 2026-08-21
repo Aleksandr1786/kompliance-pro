@@ -1147,8 +1147,8 @@ async function runVuSimulator(clientId) {
   summary.style.cssText = `margin-top:12px;padding:14px 16px;border-radius:10px;background:${violations===0?'rgba(52,211,153,0.08)':'rgba(248,113,113,0.08)'};border:1px solid ${violations===0?'rgba(52,211,153,0.2)':'rgba(248,113,113,0.2)'}`;
   summary.innerHTML = violations === 0
     ? `<div style="font-size:14px;font-weight:700;color:#34d399">✅ По текущему чек-листу открытых факторов нет. Подтвердите результат документами.</div>`
-    : `<div style="font-size:14px;font-weight:700;color:#f87171">⚠ Выявлено нарушений: ${violations}</div>
-       <div style="font-size:12px;color:#94a3b8;margin-top:4px">Устраните нарушения во вкладке «Воинский учёт» карточки клиента</div>`;
+    : `<div style="font-size:14px;font-weight:700;color:#f87171">⚠ Факторов, требующих проверки: ${violations}</div>
+       <div style="font-size:12px;color:#94a3b8;margin-top:4px">Проверьте факторы во вкладке «Воинский учёт» и приложите подтверждающие документы</div>`;
   result.appendChild(summary);
 
   btn.textContent = '▶ Запустить снова';

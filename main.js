@@ -4012,12 +4012,11 @@ function createWindow() {
 
   const rendererErrors = [];
   if (DESKTOP_SMOKE) {
-    mainWindow.webContents.on('console-message', (details, level, message, line, sourceId) => {
-      const severity = details?.level || (level >= 3 ? 'error' : '');
-      if (severity !== 'error') return;
+    mainWindow.webContents.on('console-message', details => {
+      if (details.level !== 'error') return;
 
       rendererErrors.push(
-        `${details?.sourceId || sourceId}:${details?.lineNumber || line} ${details?.message || message}`
+        `${details.sourceId}:${details.lineNumber} ${details.message}`
       );
     });
     mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {

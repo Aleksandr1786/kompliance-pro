@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-21",
+  "reviewAfter": "2026-10-01",
+  "warnings": [
+    {
+      "package": "boolean",
+      "version": "3.2.0",
+      "scope": "dev/optional",
+      "introducedBy": "electron-builder > app-builder-lib > @electron/get > global-agent",
+      "decision": "Upstream build dependency; do not override"
+    },
+    {
+      "package": "glob",
+      "version": "7.2.3",
+      "scope": "dev",
+      "introducedBy": "electron-builder > app-builder-lib > @electron/asar",
+      "decision": "Upstream build dependency; do not override"
+    },
+    {
+      "package": "inflight",
+      "version": "1.0.6",
+      "scope": "dev",
+      "introducedBy": "electron-builder > app-builder-lib > @electron/asar > glob",
+      "decision": "Upstream build dependency; do not override"
+    },
+    {
+      "package": "lodash.isequal",
+      "version": "4.5.0",
+      "scope": "runtime",
+      "introducedBy": "electron-updater",
+      "decision": "Latest stable updater still requires this package; do not override"
+    },
+    {
+      "package": "rimraf",
+      "version": "2.6.3",
+      "scope": "dev",
+      "introducedBy": "electron-builder > electron-winstaller > temp",
+      "decision": "Upstream build dependency; do not override"
+    }
+  ]
+}

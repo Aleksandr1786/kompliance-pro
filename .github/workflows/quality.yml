@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Получить код
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Установить Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'
@@ -33,3 +33,6 @@ jobs:
 
       - name: Проверить код и контракт синхронизации
         run: npm run check
+
+      - name: Проверить запуск Electron и навигацию
+        run: npm run smoke:desktop

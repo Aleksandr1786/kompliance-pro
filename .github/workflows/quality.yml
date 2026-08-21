@@ -37,11 +37,6 @@ jobs:
       - name: Проверить запуск Electron и навигацию
         run: npm run smoke:desktop
 
-      - name: Подготовить безопасное обновление lockfile
-        run: |
-          npm audit fix --package-lock-only
-          git diff -- package-lock.json
-
       - name: Проверить runtime-зависимости
         run: npm audit --omit=dev --audit-level=high
 

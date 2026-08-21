@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/sync-contract.test.js test/data-contract.test.js",
+    "test": "node --test test/sync-contract.test.js test/data-contract.test.js test/dependency-deprecations.test.js",
     "check:syntax": "node --check main.js && node --check preload.js && node --check test/desktop-smoke-runner.js",
     "check": "npm run check:syntax && npm test",
     "build": "electron-builder",

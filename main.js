@@ -4,6 +4,7 @@ const { generatePackage } = require('./generator');
 const { generateSoutPackage } = require('./gen_sout');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const {
   DATA_CONTRACT_VERSION,
   sanitizeClientData,
@@ -20,6 +21,29 @@ const FileSync = require('lowdb/adapters/FileSync');
 let db;
 let mainWindow = null;
 let pendingUpdate = null;
+
+const DESKTOP_SMOKE = process.env.KOMPLIANCE_DESKTOP_SMOKE === '1';
+const DESKTOP_SMOKE_DIR_PREFIX = 'kompliance-desktop-smoke-';
+let desktopSmokeFinished = false;
+
+if (DESKTOP_SMOKE) {
+  const smokeDir = process.env.KOMPLIANCE_DESKTOP_SMOKE_DIR || '';
+  const resolvedSmokeDir = path.resolve(smokeDir);
+  const safeSmokeDir = path.isAbsolute(smokeDir)
+    && path.dirname(resolvedSmokeDir) === path.resolve(os.tmpdir())
+    && path.basename(resolvedSmokeDir).startsWith(DESKTOP_SMOKE_DIR_PREFIX);
+
+  if (!safeSmokeDir) {
+    throw new Error(
+      `Desktop smoke requires an absolute temporary profile named ${DESKTOP_SMOKE_DIR_PREFIX}*`
+    );
+  }
+
+  // Must happen before initDB(): the smoke must never open the real user profile.
+  app.setPath('userData', smokeDir);
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+}
 
 // Лог автообновления в файл (для диагностики в packaged-режиме)
 function updateLog(msg) {
@@ -3871,6 +3895,85 @@ ipcMain.handle('update:install', () => {
   autoUpdater.quitAndInstall(false, true);
 });
 
+const DESKTOP_SMOKE_PAGES = [
+  { page: 'dashboard', title: 'Дашборд' },
+  { page: 'clients', title: 'Клиенты' },
+  { page: 'tasks', title: 'Задачи' },
+  { page: 'reporting', title: 'Отчётность' },
+  { page: 'ot', title: 'Охрана труда' },
+  { page: 'pd', title: 'Персональные данные' },
+  { page: 'vu', title: 'Воинский учёт' },
+  { page: 'settings', title: 'Настройки' },
+];
+
+function finishDesktopSmoke(code, details) {
+  if (desktopSmokeFinished) return;
+  desktopSmokeFinished = true;
+
+  const status = code === 0 ? 'PASS' : 'FAIL';
+  const payload = typeof details === 'string' ? details : JSON.stringify(details);
+  console.log(`[DesktopSmoke] ${status} ${payload}`);
+
+  setTimeout(() => app.exit(code), 100);
+}
+
+async function runDesktopSmoke(rendererErrors) {
+  const pages = await mainWindow.webContents.executeJavaScript(`
+    (async () => {
+      const deadline = Date.now() + 20000;
+      while (document.documentElement.dataset.bootstrapReady !== 'true') {
+        if (Date.now() >= deadline) {
+          throw new Error('Renderer bootstrap did not become ready within 20 seconds');
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (typeof navigate !== 'function') {
+        throw new Error('navigate() is unavailable after renderer bootstrap');
+      }
+      if (!window.api || typeof window.api.settingsGet !== 'function') {
+        throw new Error('preload API is unavailable');
+      }
+
+      const pages = ${JSON.stringify(DESKTOP_SMOKE_PAGES)};
+      const checked = [];
+
+      for (const expected of pages) {
+        await navigate(expected.page);
+        await new Promise(resolve => requestAnimationFrame(() => resolve()));
+
+        const navItem = document.querySelector(
+          '.nav-item[data-page="' + expected.page + '"]'
+        );
+        const title = document.getElementById('topbarTitle')?.textContent?.trim();
+        const content = document.getElementById('content');
+
+        if (!navItem?.classList.contains('active')) {
+          throw new Error('Navigation item did not activate: ' + expected.page);
+        }
+        if (title !== expected.title) {
+          throw new Error(
+            'Unexpected title for ' + expected.page + ': "' + (title || '') + '"'
+          );
+        }
+        if (!content || !content.textContent.trim()) {
+          throw new Error('Section rendered no content: ' + expected.page);
+        }
+
+        checked.push(expected.page);
+      }
+
+      return checked;
+    })()
+  `, true);
+
+  if (rendererErrors.length) {
+    throw new Error(`Renderer console errors: ${rendererErrors.join(' | ')}`);
+  }
+
+  finishDesktopSmoke(0, { pages });
+}
+
 function createWindow() {
   // Восстанавливаем сохранённый размер окна
   let bounds = {};
@@ -3900,16 +4003,56 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   // Ctrl+Shift+I — открыть DevTools (временно для отладки)
-  const { globalShortcut } = require('electron');
-  globalShortcut.register('CommandOrControl+Shift+I', () => {
-    if (mainWindow) mainWindow.webContents.toggleDevTools();
-  });
+  if (!DESKTOP_SMOKE) {
+    const { globalShortcut } = require('electron');
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      if (mainWindow) mainWindow.webContents.toggleDevTools();
+    });
+  }
+
+  const rendererErrors = [];
+  if (DESKTOP_SMOKE) {
+    mainWindow.webContents.on('console-message', (details, level, message, line, sourceId) => {
+      const severity = details?.level || (level >= 3 ? 'error' : '');
+      if (severity !== 'error') return;
+
+      rendererErrors.push(
+        `${details?.sourceId || sourceId}:${details?.lineNumber || line} ${details?.message || message}`
+      );
+    });
+    mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+      finishDesktopSmoke(1, `Preload failed at ${preloadPath}: ${error.message}`);
+    });
+    mainWindow.webContents.on(
+      'did-fail-load',
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+        if (isMainFrame && errorCode !== -3) {
+          finishDesktopSmoke(
+            1,
+            `Main frame failed to load ${validatedURL}: ${errorCode} ${errorDescription}`
+          );
+        }
+      }
+    );
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      finishDesktopSmoke(1, `Renderer process exited: ${JSON.stringify(details)}`);
+    });
+  }
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  if (!DESKTOP_SMOKE) {
+    mainWindow.once('ready-to-show', () => mainWindow.show());
+  }
 
   // Отправляем отложенное уведомление об обновлении после загрузки страницы
   mainWindow.webContents.on('did-finish-load', () => {
+    if (DESKTOP_SMOKE) {
+      runDesktopSmoke(rendererErrors).catch(error => {
+        finishDesktopSmoke(1, error.stack || error.message);
+      });
+      return;
+    }
+
     updateLog(`did-finish-load, pendingUpdate: ${JSON.stringify(pendingUpdate)}`);
     if (pendingUpdate) {
       // Задержка 5 сек — даём время на инициализацию PIN/триал экранов
@@ -3935,11 +4078,32 @@ function createWindow() {
 
 app.whenReady().then(() => {
   initDB();
-  autoBackup();
-  applyAutostartSetting();
-  startTelegramScheduler();
+
+  if (DESKTOP_SMOKE) {
+    // Stable first-run state, written only to the validated temporary profile.
+    db.get('settings').assign({
+      onboarding_done: '1',
+      pin_enabled: '0',
+      pin_setup_asked: '1',
+      tg_morning: '0',
+      tg_urgent: '0',
+      tg_npa: '0',
+      npa_general_feed: '0',
+      autostart: '0',
+      backup_path: '',
+      license_type: 'OUTSOURCE',
+    }).write();
+  } else {
+    autoBackup();
+    applyAutostartSetting();
+    startTelegramScheduler();
+  }
+
   createWindow();
-  setupAutoUpdater();
+
+  if (!DESKTOP_SMOKE) {
+    setupAutoUpdater();
+  }
 });
 
 app.on('window-all-closed', () => {

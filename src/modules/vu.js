@@ -25,7 +25,7 @@ async function renderVu() {
 
   const calendar = [
     { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>`, title: 'Сверка данных с военным комиссариатом', period: 'Ежегодно', deadline: 'до 31 декабря', color: '#f87171' },
-    { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.18 2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6.29 6.29l.96-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`, title: 'Представление сведений в военкомат', period: 'При приёме/увольнении военнообязанного', deadline: 'в течение 2 недель', color: '#f87171' },
+    { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.18 2 2 0 0 1 3.62 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.6a16 16 0 0 0 6.29 6.29l.96-.86a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>`, title: 'Представление сведений в военкомат', period: 'При приёме/увольнении военнообязанного', deadline: 'в течение 5 дней', color: '#f87171' },
     { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`, title: 'Актуализация карточек воинского учёта', period: 'При изменении данных', deadline: 'в течение 5 дней', color: '#fbbf24' },
     { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`, title: 'Отчёт о численности военнообязанных', period: 'Ежегодно', deadline: 'до 1 ноября', color: '#fbbf24' },
     { icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`, title: 'Оповещение военнообязанных о явке в военкомат', deadline: 'по запросу военкомата', period: 'По требованию', color: '#60a5fa' },
@@ -37,7 +37,7 @@ async function renderVu() {
     'Разработано положение о воинском учёте в организации',
     'Ведётся журнал проверок воинского учёта',
     'Все военнообязанные поставлены на учёт',
-    'Личные карточки (форма Т-2) заполнены корректно',
+    'Карточки гражданина (форма № 10) заполнены корректно',
     'Картотека воинского учёта актуализирована',
     'Проведена ежегодная сверка с военкоматом',
     'Военнообязанные уведомлены об обязанностях',
@@ -46,7 +46,7 @@ async function renderVu() {
   ];
 
   const categories = [
-    { icon: '🎖️', title: 'Призывники', desc: 'Мужчины 18–27 лет, не прошедшие военную службу', color: '#f87171' },
+    { icon: '🎖️', title: 'Призывники', desc: 'Мужчины 18–30 лет, не прошедшие военную службу', color: '#f87171' },
     { icon: '⭐', title: 'Военнообязанные запаса', desc: 'Прошедшие службу, офицеры запаса, военнообязанные женщины', color: '#60a5fa' },
     { icon: '🏥', title: 'Ограниченно годные', desc: 'Категория В — состоят на учёте до 50 лет', color: '#fbbf24' },
     { icon: '📌', title: 'Забронированные', desc: 'Работники организаций, имеющие бронь от призыва', color: '#34d399' },
@@ -57,8 +57,8 @@ async function renderVu() {
       title: 'Постановка работника на воинский учёт',
       steps: [
         'При приёме проверить документы воинского учёта (военный билет или приписное свидетельство)',
-        'Сделать отметку в личной карточке Т-2 (раздел II)',
-        'В течение 2 недель уведомить военкомат по месту жительства работника',
+        'Внести сведения в карточку гражданина (форма № 10)',
+        'В течение 5 дней уведомить военкомат по месту жительства работника',
         'Сверить данные с военкоматом по месту нахождения организации',
         'Внести в картотеку воинского учёта',
       ]
@@ -66,8 +66,8 @@ async function renderVu() {
     {
       title: 'Снятие с воинского учёта при увольнении',
       steps: [
-        'При увольнении сделать отметку в карточке Т-2',
-        'В течение 2 недель уведомить военкомат об увольнении',
+        'Актуализировать карточку гражданина (форма № 10)',
+        'В течение 5 дней уведомить военкомат об увольнении',
         'Изъять карточку из картотеки воинского учёта',
         'Сохранить документы в архиве организации',
       ]
@@ -76,7 +76,7 @@ async function renderVu() {
       title: 'Ежегодная сверка с военкоматом',
       steps: [
         'До 31 декабря составить список военнообязанных работников',
-        'Сверить данные карточек Т-2 с данными военкомата',
+        'Сверить данные карточек гражданина (форма № 10) с данными военкомата',
         'Актуализировать информацию о воинских званиях, составах',
         'Подписать акт сверки с военкоматом',
         'Хранить акт сверки не менее 3 лет',
@@ -296,16 +296,8 @@ async function renderClientVu(clientId) {
   const запасники   = vuEmps.filter(e => e.vu_category === 'запас').length;
   const забронир    = vuEmps.filter(e => e.vu_category === 'бронь').length;
 
-  // Score ВУ
-  const checks = [
-    !!vuData.responsible_name,
-    !!vuData.order_number,
-    !!vuData.last_reconciliation,
-    vuCount > 0,
-    !!vuData.journal_started,
-    !!vuData.regulation_done,
-  ];
-  const vuScore = Math.round(checks.filter(Boolean).length / checks.length * 100);
+  // Единая формула готовности ВУ для карточки и центра готовности.
+  const vuScore = calcVuReadiness(client, emps, vuData);
   const scoreColor = vuScore >= 80 ? '#34d399' : vuScore >= 50 ? '#fbbf24' : '#f87171';
 
   panel.innerHTML = `
@@ -374,7 +366,7 @@ async function renderClientVu(clientId) {
           ${[
             { key:'journal_started',  label:'Журнал проверок заведён' },
             { key:'regulation_done',  label:'Положение о ВУ утверждено' },
-            { key:'cards_filled',     label:'Карточки Т-2 заполнены' },
+            { key:'cards_filled',     label:'Карточки формы № 10 заполнены' },
             { key:'notifications_sent',label:'Работники уведомлены' },
           ].map(cb => `
             <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;cursor:pointer;font-size:12px;color:#94a3b8;transition:background .15s"
@@ -527,7 +519,7 @@ async function renderClientVu(clientId) {
             { key:'regulation',  label:'Положение о воинском учёте утверждено', done: !!vuData.regulation_done },
             { key:'reconcil',    label:'Сверка с военкоматом проведена', done: !!vuData.last_reconciliation },
             { key:'emps',        label:'Все военнообязанные поставлены на учёт', done: vuCount > 0 },
-            { key:'cards',       label:'Личные карточки Т-2 заполнены', done: !!vuData.cards_filled },
+            { key:'cards',       label:'Карточки формы № 10 заполнены', done: !!vuData.cards_filled },
           ].map(item => `
             <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:${item.done?'rgba(52,211,153,0.04)':'rgba(255,255,255,0.01)'};border:1px solid ${item.done?'rgba(52,211,153,0.15)':'rgba(255,255,255,0.05)'};border-radius:8px">
               ${item.done
@@ -853,7 +845,7 @@ function renderVuCategoryField(emp) {
   // Используется в форме редактирования сотрудника
   const cats = [
     { value:'', label:'Не указано' },
-    { value:'призывник', label:'Призывник (18–27 лет)' },
+    { value:'призывник', label:'Призывник (18–30 лет)' },
     { value:'запас', label:'Военнообязанный запаса' },
     { value:'бронь', label:'Забронированный' },
   ];
@@ -905,60 +897,71 @@ async function renderVuReadiness(clientId) {
   const risks = [];
   if (!checks.responsible) risks.push({
     level: 'high', title: 'Не назначен ответственный за воинский учёт',
-    law: 'п.12 Положения о ВУ (Пост. №719)', fine: 'до 500 000 ₽',
+    law: 'п.12 Положения о ВУ (Пост. №719)',
     fix: 'Оформить приказ о назначении во вкладке ВУ',
   });
   if (!checks.regulation) risks.push({
     level: 'high', title: 'Отсутствует положение о воинском учёте',
-    law: 'п.39 Методических рекомендаций ГШ ВС РФ', fine: 'до 300 000 ₽',
+    law: 'п.39 Методических рекомендаций ГШ ВС РФ',
     fix: 'Утвердить положение о ВУ',
   });
   if (!checks.journal) risks.push({
     level: 'medium', title: 'Не заведён журнал проверок воинского учёта',
-    law: 'п.40 Методических рекомендаций ГШ ВС РФ', fine: 'до 100 000 ₽',
+    law: 'п.40 Методических рекомендаций ГШ ВС РФ',
     fix: 'Завести журнал (шаблон — кнопка «Сформировать пакет»)',
   });
   if (emps.length > 0 && vuCount === 0) risks.push({
     level: 'medium', title: 'Данные о военнообязанных сотрудниках не заполнены',
-    law: 'п.28 Положения о ВУ (Пост. №719)', fine: 'до 200 000 ₽',
+    law: 'п.28 Положения о ВУ (Пост. №719)',
     fix: 'Указать категорию ВУ в карточках сотрудников',
   });
   if (!checks.plan) risks.push({
     level: 'medium', title: 'Нет отметки о последней сверке с военкоматом',
-    law: 'п.32 Положения о ВУ (Пост. №719)', fine: 'до 100 000 ₽',
+    law: 'п.32 Положения о ВУ (Пост. №719)',
     fix: 'Провести сверку и внести дату во вкладке ВУ',
   });
   if (!checks.cards) risks.push({
-    level: 'low', title: 'Личные карточки (Т-2) не актуализированы',
-    law: 'п.28 Положения о ВУ (Пост. №719)', fine: 'предупреждение',
-    fix: 'Актуализировать карточки Т-2 для военнообязанных',
+    level: 'low', title: 'Карточки гражданина (форма № 10) не актуализированы',
+    law: 'п.28 Положения о ВУ (Пост. №719)',
+    fix: 'Актуализировать карточки гражданина (форма № 10) для военнообязанных',
   });
 
   // Риски только для организаций с бронированием
   if (hasBron) {
     if (!checks.bron_codes) risks.push({
       level: 'high', title: 'Не указаны коды должностей для бронирования',
-      law: 'п.11 Формы 18 (Письмо Минкультуры № 344-01-39-ВА)', fine: 'до 300 000 ₽',
+      law: 'п.11 Формы 18 (Письмо Минкультуры № 344-01-39-ВА)',
       fix: 'Указать коды должностей из Перечня бронирования во вкладке ВУ',
     });
     if (!checks.gov_organ) risks.push({
       level: 'high', title: 'Не указан орган государственной власти для бронирования',
-      law: 'п.13 Формы 18 (Письмо Минкультуры № 344-01-39-ВА)', fine: 'до 200 000 ₽',
+      law: 'п.13 Формы 18 (Письмо Минкультуры № 344-01-39-ВА)',
       fix: 'Указать орган госвласти в блоке кодов вкладки ВУ',
     });
   }
 
-  const totalFine = risks.filter(r => r.level === 'high').length * 300000
-    + risks.filter(r => r.level === 'medium').length * 100000;
-
   const highRisks = risks.filter(r => r.level === 'high').length;
-  let probability = Math.min(95, Math.max(5, 100 - scorePct + highRisks * 10));
-  if (risks.length === 0) probability = 5;
+  const mediumRisks = risks.filter(r => r.level === 'medium').length;
 
-  let riskLabel, riskColor;
-  if (probability >= 70)      { riskLabel = 'ВЫСОКИЙ';  riskColor = '#f87171'; }
-  else if (probability >= 40) { riskLabel = 'СРЕДНИЙ';  riskColor = '#fbbf24'; }
-  else                        { riskLabel = 'НИЗКИЙ';   riskColor = '#34d399'; }
+  // Детерминированный уровень: без выдуманной вероятности и арифметики штрафов.
+  let riskLabel, riskColor, riskHint;
+  if (highRisks > 0) {
+    riskLabel = 'ВЫСОКИЙ';
+    riskColor = '#f87171';
+    riskHint = `${highRisks} первоочередн. · ${mediumRisks} требуют внимания`;
+  } else if (mediumRisks > 0) {
+    riskLabel = 'СРЕДНИЙ';
+    riskColor = '#fbbf24';
+    riskHint = `${mediumRisks} факторов требуют внимания`;
+  } else if (risks.length > 0) {
+    riskLabel = 'НИЗКИЙ';
+    riskColor = '#60a5fa';
+    riskHint = `${risks.length} фактор(а) для проверки`;
+  } else {
+    riskLabel = 'НЕ ВЫЯВЛЕН';
+    riskColor = '#34d399';
+    riskHint = 'По текущему чек-листу открытых факторов нет';
+  }
 
   const levelColor = l => l==='high'?'#f87171':l==='medium'?'#fbbf24':'#60a5fa';
   const levelLabel = l => l==='high'?'ВЫСОКИЙ':l==='medium'?'СРЕДНИЙ':'НИЗКИЙ';
@@ -971,7 +974,7 @@ async function renderVuReadiness(clientId) {
     { done: checks.responsible, label: 'Назначен ответственный (есть приказ о назначении)' },
     { done: checks.regulation,  label: 'Утверждено положение о воинском учёте' },
     { done: checks.journal,     label: 'Заведён журнал проверок воинского учёта' },
-    { done: checks.cards,       label: 'Личные карточки Т-2 заполнены и актуальны' },
+    { done: checks.cards,       label: 'Карточки гражданина (форма № 10) заполнены и актуальны' },
     { done: checks.emps,        label: 'Все военнообязанные сотрудники поставлены на учёт' },
     { done: checks.plan,        label: 'Проведена ежегодная сверка с военкоматом' },
   ];
@@ -982,16 +985,16 @@ async function renderVuReadiness(clientId) {
 
   // Симулятор — шаги с учётом бронирования
   const simSteps = [
-    { label: 'Проверка наличия приказа о назначении ответственного',     ok: checks.responsible,  fine: '500 000 ₽' },
-    { label: 'Проверка положения о воинском учёте',                       ok: checks.regulation,   fine: '300 000 ₽' },
-    { label: 'Проверка журнала проверок воинского учёта',                 ok: checks.journal,      fine: '100 000 ₽' },
-    { label: 'Проверка наличия карточек Т-2 на военнообязанных',          ok: checks.cards,        fine: '100 000 ₽' },
-    { label: 'Сверка списков с данными военкомата',                       ok: checks.plan,         fine: '100 000 ₽' },
-    { label: 'Проверка учёта призывников и запасников',                   ok: checks.emps,         fine: '200 000 ₽' },
+    { label: 'Проверка наличия приказа о назначении ответственного',     ok: checks.responsible },
+    { label: 'Проверка положения о воинском учёте',                       ok: checks.regulation },
+    { label: 'Проверка журнала проверок воинского учёта',                 ok: checks.journal },
+    { label: 'Проверка наличия карточек гражданина (форма № 10) на военнообязанных',          ok: checks.cards },
+    { label: 'Сверка списков с данными военкомата',                       ok: checks.plan },
+    { label: 'Проверка учёта призывников и запасников',                   ok: checks.emps },
   ];
   if (hasBron) {
-    simSteps.push({ label: 'Проверка кодов должностей для бронирования (Форма 18 п.12)',   ok: checks.bron_codes, fine: '300 000 ₽' });
-    simSteps.push({ label: 'Проверка органа госвласти для бронирования (Форма 18 п.13)',    ok: checks.gov_organ,  fine: '200 000 ₽' });
+    simSteps.push({ label: 'Проверка кодов должностей для бронирования (Форма 18 п.12)',   ok: checks.bron_codes });
+    simSteps.push({ label: 'Проверка органа госвласти для бронирования (Форма 18 п.13)',    ok: checks.gov_organ });
   }
 
   // Сохраняем для симулятора
@@ -1025,21 +1028,14 @@ async function renderVuReadiness(clientId) {
       <div class="rc-card panel">
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:14px">Индекс риска ВУ</div>
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
-          <div style="position:relative;width:80px;height:80px;flex-shrink:0">
-            <svg viewBox="0 0 80 80" style="width:80px;height:80px;transform:rotate(-90deg)">
-              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
-              <circle cx="40" cy="40" r="32" fill="none" stroke="${riskColor}" stroke-width="10"
-                stroke-dasharray="${2*Math.PI*32}" stroke-dashoffset="${2*Math.PI*32*(1-probability/100)}"
-                stroke-linecap="round"/>
-            </svg>
-            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-              <div style="font-size:18px;font-weight:800;color:${riskColor}">${probability}%</div>
-            </div>
+          <div style="width:80px;height:80px;border-radius:50%;border:10px solid ${riskColor}22;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+            <div style="font-size:22px;font-weight:800;color:${riskColor}">${risks.length}</div>
+            <div style="font-size:8px;color:var(--muted2);text-transform:uppercase">факторов</div>
           </div>
           <div>
-            <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">Вероятность нарушений при проверках</div>
+            <div style="font-size:11px;color:var(--muted2);margin-bottom:4px">Уровень выявленных рисков</div>
             <div style="font-size:16px;font-weight:800;color:${riskColor}">${riskLabel}</div>
-            <div style="font-size:11px;color:var(--muted2);margin-top:4px">Макс. штраф: ~${totalFine > 0 ? (totalFine/1000).toFixed(0)+'K ₽' : '—'}</div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:4px">${riskHint}</div>
           </div>
         </div>
         <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
@@ -1081,21 +1077,20 @@ async function renderVuReadiness(clientId) {
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${risks.map(r => `
-          <div style="display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:start;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-left:3px solid ${levelColor(r.level)};border-radius:8px">
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-left:3px solid ${levelColor(r.level)};border-radius:8px">
             <span style="font-size:9px;font-weight:800;color:${levelColor(r.level)};background:${levelColor(r.level)}18;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-top:1px">${levelLabel(r.level)}</span>
             <div>
               <div style="font-size:12px;font-weight:600;color:var(--text)">${r.title}</div>
-              <div style="font-size:10px;color:var(--muted2);margin-top:3px">${r.law} · штраф ${r.fine}</div>
+              <div style="font-size:10px;color:var(--muted2);margin-top:3px">${r.law}</div>
               <div style="font-size:10px;color:#60a5fa;margin-top:3px">→ ${r.fix}</div>
             </div>
-            <div style="font-size:11px;font-weight:700;color:${levelColor(r.level)};white-space:nowrap">${r.fine}</div>
           </div>`).join('')}
       </div>
     </div>` : `
     <div class="rc-card panel" style="text-align:center;padding:28px;margin-bottom:16px">
       <div style="font-size:28px;margin-bottom:8px">✅</div>
-      <div style="font-size:14px;font-weight:700;color:#34d399">Воинский учёт в порядке</div>
-      <div style="font-size:12px;color:var(--muted2);margin-top:4px">Критических нарушений не выявлено</div>
+      <div style="font-size:14px;font-weight:700;color:#34d399">Базовые проверки пройдены</div>
+      <div style="font-size:12px;color:var(--muted2);margin-top:4px">По текущему чек-листу открытых факторов нет; итог требует подтверждающих документов</div>
     </div>`}
 
     <!-- ЧЕК-ЛИСТ -->
@@ -1142,7 +1137,7 @@ async function runVuSimulator(clientId) {
     row.innerHTML = `
       <span style="font-size:16px">${st.ok ? '✅' : '❌'}</span>
       <span style="flex:1;font-size:12px;color:${st.ok?'#94a3b8':'#f1f5f9'};${st.ok?'text-decoration:line-through':''}">${st.label}</span>
-      ${!st.ok ? `<span style="font-size:11px;font-weight:700;color:#f87171;white-space:nowrap">штраф до ${st.fine}</span>` : ''}`;
+      ${!st.ok ? `<span style="font-size:11px;font-weight:700;color:#f87171;white-space:nowrap">требует проверки</span>` : ''}`;
     result.appendChild(row);
   }
 
@@ -1151,7 +1146,7 @@ async function runVuSimulator(clientId) {
   const summary = document.createElement('div');
   summary.style.cssText = `margin-top:12px;padding:14px 16px;border-radius:10px;background:${violations===0?'rgba(52,211,153,0.08)':'rgba(248,113,113,0.08)'};border:1px solid ${violations===0?'rgba(52,211,153,0.2)':'rgba(248,113,113,0.2)'}`;
   summary.innerHTML = violations === 0
-    ? `<div style="font-size:14px;font-weight:700;color:#34d399">✅ Нарушений не выявлено — организация готова к проверке!</div>`
+    ? `<div style="font-size:14px;font-weight:700;color:#34d399">✅ По текущему чек-листу открытых факторов нет. Подтвердите результат документами.</div>`
     : `<div style="font-size:14px;font-weight:700;color:#f87171">⚠ Выявлено нарушений: ${violations}</div>
        <div style="font-size:12px;color:#94a3b8;margin-top:4px">Устраните нарушения во вкладке «Воинский учёт» карточки клиента</div>`;
   result.appendChild(summary);

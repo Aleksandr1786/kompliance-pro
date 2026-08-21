@@ -33,3 +33,6 @@ jobs:
 
       - name: Проверить код и контракт синхронизации
         run: npm run check
+
+      - name: Проверить запуск Electron и навигацию
+        run: npm run smoke:desktop

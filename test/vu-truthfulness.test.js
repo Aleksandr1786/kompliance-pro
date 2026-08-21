@@ -34,4 +34,6 @@ test('all desktop VU views use the canonical readiness calculator', () => {
   assert.ok(calls.length >= 2, 'client card and readiness center must share calcVuReadiness');
   assert.match(vu, /const vuScore = calcVuReadiness\(client, emps, vuData\);/);
   assert.doesNotMatch(vu, /организация готова к проверке!/);
+  assert.doesNotMatch(vu, /Выявлено нарушений|Устраните нарушения/);
+  assert.match(vu, /Факторов, требующих проверки/);
 });

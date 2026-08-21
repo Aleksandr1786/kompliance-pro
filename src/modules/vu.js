@@ -948,7 +948,7 @@ async function renderVuReadiness(clientId) {
   if (highRisks > 0) {
     riskLabel = 'ВЫСОКИЙ';
     riskColor = '#f87171';
-    riskHint = `${highRisks} первоочередн. · ${mediumRisks} требуют внимания`;
+    riskHint = `Высокий приоритет: ${highRisks} · средний: ${mediumRisks}`;
   } else if (mediumRisks > 0) {
     riskLabel = 'СРЕДНИЙ';
     riskColor = '#fbbf24';
